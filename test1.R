@@ -2,9 +2,9 @@
 Sys.setenv(http_proxy = "http://proxy.nih.go.jp:8080",
            https_proxy = "http://proxy.nih.go.jp:8080")
 
-#test#
+cat(Sys.time(), "開始\n", file = "test1.log", append = TRUE)
 
-# Sys.setlocale("LC_TIME", "C")
+Sys.setlocale("LC_TIME", "C")
 #### ライブラリ読み込み ####
 library(xml2)
 library(dplyr)
@@ -12,6 +12,9 @@ library(purrr)
 library(lubridate)
 library(stringr)
 library(tibble)
+
+
+setwd("C:/Users/kobayashi/Documents/R/EI1")
 
 #### 検索キーワード ####
 keywords <- c("急性呼吸器感染症", "インフルエンザ", "新型コロナ", "RSウイルス")
@@ -37,18 +40,21 @@ get_google_news_rss <- function(keyword) {
     snippet <- xml_text(read_html(paste0("<body>", desc_html, "</body>")) %>%
                           xml_find_first("//body"))
     
-    # pubDate（例: "Sun, 27 Jul 2025 22:27:24 GMT"）
+    # pubDate（例: "Sun, 28 Jul 2025 22:27:24 GMT"）
     pub_raw <- xml_text(xml_find_first(item, "pubDate")) %>%
       str_replace_all('["\r\n\t]', "") %>%
       str_squish()
     
-    # 変換（GMTを+0000としてパース）
+    # ログ出力：pub_rawの確認（ファイルに書き込み）
+    cat("pub_raw: ", pub_raw, "\n", file = "test1.log", append = TRUE)
+    
+    # 日付変換（タイムゾーン部分を強制的に削除して処理）
+    pub_clean <- str_remove(pub_raw, " GMT$")
     pub_dt <- tryCatch({
-      as.POSIXct(pub_raw, format = "%a, %d %b %Y %H:%M:%S %Z", tz = "GMT")
+      as.POSIXct(pub_clean, format = "%a, %d %b %Y %H:%M:%S", tz = "GMT")
     }, error = function(e) {
-      tryCatch({
-        as.POSIXct(pub_raw, format = "%a, %d %b %Y %H:%M:%S GMT", tz = "GMT")
-      }, error = function(e2) NA)
+      cat("日付変換エラー: ", pub_raw, "\n", file = "test1.log", append = TRUE)
+      NA
     })
     
     tibble(
@@ -59,8 +65,11 @@ get_google_news_rss <- function(keyword) {
       snippet      = snippet,
       posted       = pub_raw,
       posted_date  = as_date(pub_dt)
+      
+      
     )
   })
+  
 }
 
 
@@ -92,6 +101,5 @@ write.csv(google_rss_week,
 
 #### 出力確認（先頭）####
 print(head(google_rss_all, 10))
-
 
 
