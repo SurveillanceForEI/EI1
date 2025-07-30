@@ -9,3 +9,4 @@ taskscheduler_create(
   Rexe = file.path(R.home("bin"), "Rscript.exe"),
   logfile = "C:/Users/yusuke-k/Documents/R/EI1/test1.log"
 )
+##YUSUKE##
