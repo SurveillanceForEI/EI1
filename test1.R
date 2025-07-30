@@ -2,6 +2,8 @@
 Sys.setenv(http_proxy = "http://proxy.nih.go.jp:8080",
            https_proxy = "http://proxy.nih.go.jp:8080")
 
+#test#
+
 # Sys.setlocale("LC_TIME", "C")
 #### ライブラリ読み込み ####
 library(xml2)
@@ -90,5 +92,6 @@ write.csv(google_rss_week,
 
 #### 出力確認（先頭）####
 print(head(google_rss_all, 10))
+
 
 
