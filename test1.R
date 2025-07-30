@@ -2,7 +2,7 @@
 Sys.setenv(http_proxy = "http://proxy.nih.go.jp:8080",
            https_proxy = "http://proxy.nih.go.jp:8080")
 
-cat(Sys.time(), "開始\n", file = "test1.log", append = TRUE)
+
 
 Sys.setlocale("LC_TIME", "C")
 #### ライブラリ読み込み ####
@@ -103,3 +103,4 @@ write.csv(google_rss_week,
 print(head(google_rss_all, 10))
 
 
+cat(Sys.time(), "開始\n", file = "test1.log", append = TRUE)
