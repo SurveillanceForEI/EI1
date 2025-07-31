@@ -67,7 +67,7 @@ google_rss_all <- map_dfr(keywords, get_google_news_rss)
 write.csv(google_rss_all, paste0("results/google_rss_all_", Sys.Date(), ".csv"), row.names = FALSE, fileEncoding = "CP932", quote = TRUE)
 
 #### 前週・前々週含む疫学週ごとの処理 ####
-for (offset in c(0, 7, 14)) {
+for (offset in c(0)) {
   ref_date <- Sys.Date() - 1 - offset
   target_year <- isoyear(ref_date)
   target_week <- isoweek(ref_date)
