@@ -1,7 +1,3 @@
-#### プロキシ設定（必要に応じて）####
-Sys.setenv(http_proxy = "http://proxy.nih.go.jp:8080",
-           https_proxy = "http://proxy.nih.go.jp:8080")
-
 
 
 Sys.setlocale("LC_TIME", "C")
@@ -17,7 +13,7 @@ library(tibble)
 setwd("C:/Users/kobayashi/Documents/R/EI1")
 
 #### 検索キーワード ####
-keywords <- c("急性呼吸器感染症", "インフルエンザ", "新型コロナ", "RSウイルス")
+keywords <- c("急性呼吸器感染症", "インフルエンザ", "新型コロナ", "RSウイルス","感染症")
 
 #### GoogleニュースRSS取得関数（posted_date対応）####
 get_google_news_rss <- function(keyword) {
@@ -79,7 +75,7 @@ google_rss_all <- map_dfr(keywords, get_google_news_rss)
 
 #### 保存（全件）####
 write.csv(google_rss_all,
-          paste0("google_rss_all_", Sys.Date(), ".csv"),
+          paste0("results/google_rss_all_", Sys.Date(), ".csv"),
           row.names = FALSE, fileEncoding = "CP932")
 
 #### 昨日分抽出・保存 ####
@@ -88,7 +84,7 @@ google_rss_yesterday <- google_rss_all %>%
   filter(posted_date == yesterday)
 
 write.csv(google_rss_yesterday,
-          paste0("google_rss_yesterday_", Sys.Date(), ".csv"),
+          paste0("results/google_rss_yesterday_", Sys.Date(), ".csv"),
           row.names = FALSE, fileEncoding = "CP932")
 
 #### 直近1週間分抽出・保存 ####
@@ -96,8 +92,44 @@ google_rss_week <- google_rss_all %>%
   filter(posted_date >= Sys.Date() - 7)
 
 write.csv(google_rss_week,
-          paste0("google_rss_week_", Sys.Date(), ".csv"),
+          paste0("results/google_rss_week_", Sys.Date(), ".csv"),
           row.names = FALSE, fileEncoding = "CP932")
+
+
+
+google_rss_all <- google_rss_all %>%
+  filter(!is.na(posted_date)) %>%
+  mutate(
+    epiyear = isoyear(posted_date),
+    epiweek = isoweek(posted_date)
+  )
+
+# 前日基準で前の疫学週を取得
+ref_date <- Sys.Date() - 1
+target_year <- isoyear(ref_date)
+target_week <- isoweek(ref_date)
+
+# 対象週のデータ抽出
+google_rss_epiweek <- google_rss_all %>%
+  filter(epiyear == target_year, epiweek == target_week)
+
+# 保存ファイル名（例: google_rss_epi_2025w30.csv）
+epi_filename <- sprintf("results/google_rss_epi_%dw%02d.csv", target_year, target_week)
+
+# ファイルが存在する場合は読み込んで結合・重複除去
+if (file.exists(epi_filename)) {
+  existing <- read.csv(epi_filename, fileEncoding = "CP932")
+  
+  combined <- bind_rows(existing, google_rss_epiweek) %>%
+    mutate(posted_date = as.character(posted_date)) %>%  # 型を揃える
+    distinct(title, posted_date, .keep_all = TRUE)       # title + posted_date で重複除去
+} else {
+  combined <- google_rss_epiweek
+}
+
+# 保存
+write.csv(combined, epi_filename, row.names = FALSE, fileEncoding = "CP932")
+
 
 #### 出力確認（先頭）####
 print(head(google_rss_all, 10))
