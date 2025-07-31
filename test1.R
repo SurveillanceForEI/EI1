@@ -1,6 +1,12 @@
-
+#### プロキシ設定（必要に応じて）####
+Sys.setenv(http_proxy = "http://proxy.nih.go.jp:8080",
+           https_proxy = "http://proxy.nih.go.jp:8080")
 
 Sys.setlocale("LC_TIME", "C")
+
+logfile <- paste0("log/test_", Sys.Date(), ".log")
+cat(Sys.time(), "開始\n", file = logfile, append = TRUE)
+
 #### ライブラリ読み込み ####
 library(xml2)
 library(dplyr)
@@ -118,14 +124,44 @@ epi_filename <- sprintf("results/google_rss_epi_%dw%02d.csv", target_year, targe
 
 # ファイルが存在する場合は読み込んで結合・重複除去
 if (file.exists(epi_filename)) {
-  existing <- read.csv(epi_filename, fileEncoding = "CP932")
+  existing <- tryCatch(
+    read.csv(epi_filename, fileEncoding = "CP932", row.names = NULL, quote = "", check.names = FALSE),
+    error = function(e) {
+      message("⚠️ 読み込み失敗: ", e$message)
+      return(NULL)
+    }
+  )
   
-  combined <- bind_rows(existing, google_rss_epiweek) %>%
-    mutate(posted_date = as.character(posted_date)) %>%  # 型を揃える
-    distinct(title, posted_date, .keep_all = TRUE)       # title + posted_date で重複除去
+  if (!is.null(existing)) {
+    # クオートされた列名を修正
+    colnames(existing) <- gsub('^"|"$', '', colnames(existing))
+    
+    # 各列の型を統一
+    existing <- existing %>%
+      mutate(
+        posted_date = as.Date(posted_date),
+        epiyear     = as.integer(epiyear),
+        epiweek     = as.integer(epiweek)
+      )
+    
+    google_rss_epiweek <- google_rss_epiweek %>%
+      mutate(
+        posted_date = as.Date(posted_date),
+        epiyear     = as.integer(epiyear),
+        epiweek     = as.integer(epiweek)
+      )
+    
+    combined <- bind_rows(existing, google_rss_epiweek) %>%
+      distinct(title, posted_date, .keep_all = TRUE)
+  } else {
+    combined <- google_rss_epiweek
+  }
 } else {
   combined <- google_rss_epiweek
 }
+
+
+
 
 # 保存
 write.csv(combined, epi_filename, row.names = FALSE, fileEncoding = "CP932")
@@ -135,4 +171,3 @@ write.csv(combined, epi_filename, row.names = FALSE, fileEncoding = "CP932")
 print(head(google_rss_all, 10))
 
 
-cat(Sys.time(), "開始\n", file = "test1.log", append = TRUE)
