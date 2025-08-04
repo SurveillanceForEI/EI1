@@ -3,8 +3,8 @@ Sys.setenv(http_proxy = "http://proxy.nih.go.jp:8080",
            https_proxy = "http://proxy.nih.go.jp:8080")
 Sys.setlocale("LC_TIME", "C")
 
-logfile <- paste0("log/test_", Sys.Date(), ".log")
-cat(Sys.time(), "開始\n", file = logfile, append = TRUE)
+# logfile <- paste0("log/test_", Sys.Date(), ".log")
+# cat(Sys.time(), "開始\n", file = logfile, append = TRUE)
 
 #### ライブラリ読み込み ####
 library(xml2)
@@ -13,6 +13,8 @@ library(purrr)
 library(lubridate)
 library(stringr)
 library(tibble)
+library(gtrendsR)
+
 
 setwd("C:/Users/kobayashi/Documents/R/EI1")
 
@@ -82,3 +84,26 @@ for (offset in c(0)) {
   # 既存ファイルは読み込まず、上書き保存
   write.csv(google_rss_epiweek, epi_filename, row.names = FALSE, fileEncoding = "CP932", quote = TRUE)
 }
+
+
+
+# Google Trendsデータ取得（過去12か月、日本）
+trends <- gtrends(keyword = keywords, time = "today 12-m", geo = "JP")
+
+# 日付ごとの検索トレンドを抽出
+trend_data <- trends$interest_over_time %>%
+  select(date, keyword, hits) %>%
+  mutate(
+    hits = as.numeric(ifelse(hits == "<1", 0, hits)),  # "<1" を 0 に変換
+    date = as.Date(date)                               # 日付形式を明確化
+  ) %>%
+  arrange(date, keyword)
+
+# データ確認（先頭15行）
+print(head(trend_data, 15))
+
+# CSVとして保存（UTF-8、日付付きファイル名）
+output_file <- paste0("results/google_trends_12months_", Sys.Date(), ".csv")
+write.csv(trend_data, output_file, fileEncoding = "CP932")
+
+cat("保存完了: ", output_file, "\n")
