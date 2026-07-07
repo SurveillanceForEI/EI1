@@ -451,8 +451,8 @@ function ebsUntranslateCards(containerId) {
         )
       ),
 
-      # ── 時系列 ───────────────────────────────────────────
-      tabPanel("時系列", icon=icon("chart-line"),
+      # ── 流行曲線 ───────────────────────────────────────────
+      tabPanel("流行曲線", icon=icon("chart-line"),
         tags$div(style="text-align:right;font-size:0.78em;margin:2px 4px 0;",
           tags$a(href="javascript:void(0)", onclick="goToNotes('notes-ibs')",
             style="color:#888;text-decoration:none;",
@@ -756,7 +756,7 @@ function ebsUntranslateCards(containerId) {
           ),
 
           # ── IBS（定点把握）────────────────────────────────
-          tags$h4(id="notes-ibs", "■定点把握疾患（地図・時系列・複数疾患比較）", style="border-bottom:2px solid #3498db;padding-bottom:4px;color:#2c3e50;"),
+          tags$h4(id="notes-ibs", "■定点把握疾患（地図・流行曲線・複数疾患比較）", style="border-bottom:2px solid #3498db;padding-bottom:4px;color:#2c3e50;"),
           tags$h5("データソース"),
           tags$p("感染症発生動向調査週報（IDWR）速報　国立健康危機管理研究機構（JIHS）"),
           tags$ul(
@@ -854,14 +854,14 @@ function ebsUntranslateCards(containerId) {
           tags$h5("タブ構成"),
           tags$ul(
             tags$li(tags$strong("地図:"), "都道府県別コロプレスマップ（直近週）＋都道府県ランキング"),
-            tags$li(tags$strong("時系列:"), "週次報告数推移・年別重ね合わせ・都道府県別ヒートマップ・地域別比較"),
+            tags$li(tags$strong("流行曲線:"), "週次報告数推移・年別重ね合わせ・都道府県別ヒートマップ・地域別比較"),
             tags$li(tags$strong("複数疾患比較:"), "複数疾患の定点報告数を重ね合わせ表示"),
             tags$li(tags$strong("実効再生産数Rt:"), "Cori法によるRt推定")
           ),
           tags$br(),
 
           # ── 全数把握疾患 ──────────────────────────────────
-          tags$h4(id="notes-zensu", "■ 全数把握疾患（地図・時系列）", style="border-bottom:2px solid #27ae60;padding-bottom:4px;color:#2c3e50;"),
+          tags$h4(id="notes-zensu", "■ 全数把握疾患（地図・流行曲線）", style="border-bottom:2px solid #27ae60;padding-bottom:4px;color:#2c3e50;"),
           tags$h5("データソース"),
           tags$p("感染症発生動向調査（NESID）　国立健康危機管理研究機構（JIHS）"),
           tags$ul(
@@ -1074,7 +1074,7 @@ function ebsUntranslateCards(containerId) {
           # 両方の説明が出そろった後にまとめて配置する
           tags$h4(id="notes-integrated", "■ 統合活動レベルカード（IBS + EBS）", style="border-bottom:2px solid #6c3483;padding-bottom:4px;color:#2c3e50;"),
           tags$p(
-            "地図・時系列タブ上部の「統合活動レベル」カードは、上記の定点把握（IBS）データとEBSニュースの", tags$strong("両方"), "を用いて算出しています。",
+            "地図・流行曲線タブ上部の「統合活動レベル」カードは、上記の定点把握（IBS）データとEBSニュースの", tags$strong("両方"), "を用いて算出しています。",
             "IBS成分（95%）には「現在の流行フェーズカード」と同じ2段階加重平均ロジック（注意報・警報基準値・Rt・過去5年比較の統合）を適用し、",
             "EBS成分（5%）と合算して最終的な活動レベル（1〜4）を決定しています。"
           ),
@@ -1599,7 +1599,7 @@ server <- function(input, output, session) {
     ))
   })
 
-  # 時系列タブ
+  # 流行曲線タブ
   output$filter_bar_ts <- renderUI({
     disease_label <- get_disease_label(input$ts_mode, input$disease, input$zensu_disease_ts)
     pref_val <- if (!is.null(input$pref_filter)) input$pref_filter else "全国"
@@ -2755,7 +2755,7 @@ server <- function(input, output, session) {
     n_by_level <- if (length(res) > 0) table(sapply(res, `[[`, "act_level")) else table(integer(0))
     tags$div(style="margin-bottom:10px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;",
       tags$div(style="font-size:0.9em;font-weight:700;color:#333;",
-               paste0(label, " — 都道府県別 統合活動レベル一覧　（北から南の順）　", length(res), "都道府県")),
+               paste0(label, " — 都道府県別 統合活動レベル一覧　", length(res), "都道府県")),
       tags$div(style="display:flex;gap:8px;",
         lapply(4:1, function(lv) {
           cfg <- list(`4`=list(col="#c0392b",name="流行"),`3`=list(col="#e67e22",name="警戒"),
@@ -2834,7 +2834,7 @@ server <- function(input, output, session) {
           r$label
         ),
         title = paste0(r$label, "　Lv", r$act_level, " ", cfg$name,
-                       "　", cur_fmt_fn(r$cur_val), "　", r$ibs_label, "　（クリックで時系列タブへ）"),
+                       "　", cur_fmt_fn(r$cur_val), "　", r$ibs_label, "　（クリックで流行曲線タブへ）"),
         tags$div(style="font-weight:700;color:#222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;",
                  if (identical(r$label, "北海道")) r$label else sub("[都道府県]$", "", r$label)),
         tags$span(style=paste0(
@@ -2852,16 +2852,16 @@ server <- function(input, output, session) {
         "gap:3px;max-width:760px;margin:0 auto;"
       ), tiles),
       tags$p(style="font-size:0.7em;color:#999;text-align:center;margin-top:8px;",
-        "※ 実際の地理的形状ではなく、相対位置をおおまかに表したデフォルメ配置です。タイルをクリックするとその都道府県・疾患の時系列タブに移動します。")
+        "※ 実際の地理的形状ではなく、相対位置をおおまかに表したデフォルメ配置です。タイルをクリックするとその都道府県・疾患の流行曲線タブに移動します。")
     )
   })
 
-  # タイルクリック → サイドバーの都道府県フィルターを切り替えて時系列タブへ移動
+  # タイルクリック → サイドバーの都道府県フィルターを切り替えて流行曲線タブへ移動
   # （疾患・全数/定点の選択はサイドバーの現在の選択をそのまま引き継ぐ）
   observeEvent(input$pref_tile_click, {
     req(input$pref_tile_click$pref)
     updateSelectInput(session, "pref_filter", selected = input$pref_tile_click$pref)
-    updateTabsetPanel(session, "main_tabs", selected = "時系列")
+    updateTabsetPanel(session, "main_tabs", selected = "流行曲線")
   })
 
   # ── 病原体検出（IASR）────────────────────────────────────
@@ -3270,7 +3270,7 @@ server <- function(input, output, session) {
     }
   })
 
-  # ── 時系列 ─────────────────────────────────────────────
+  # ── 流行曲線 ─────────────────────────────────────────────
   output$timeseries_plot <- renderPlotly({
     is_pref <- !is.null(input$pref_filter) && input$pref_filter != "全国"
     nat    <- ts_main_data()
@@ -4163,7 +4163,7 @@ server <- function(input, output, session) {
 
 
 
-  # ── 全数把握疾患（時系列タブ統合） ──────────────────────────
+  # ── 全数把握疾患（流行曲線タブ統合） ──────────────────────────
 
   # date_range に依存しない全期間集計（±2SD 帯計算用）
   zensu_hist <- reactive({
