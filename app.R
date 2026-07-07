@@ -2566,9 +2566,14 @@ server <- function(input, output, session) {
       tags$div(
         style=paste0(
           "border:1px solid ",cfg$border,";border-left:5px solid ",cfg$color,";",
-          "background:",cfg$bg,";border-radius:6px;padding:8px 10px;",
+          "background:",cfg$bg,";border-radius:6px;padding:8px 10px;cursor:pointer;",
           "display:flex;flex-direction:column;gap:3px;height:100%;box-sizing:border-box;"
         ),
+        onclick=sprintf(
+          "Shiny.setInputValue('disease_tile_click', {id:'%s', zensu:%s, t:Date.now()}, {priority:'event'})",
+          r$id, if (identical(r$type, "定点")) "false" else "true"
+        ),
+        title = paste0(r$label, "　Lv", r$act_level, "　", cur_fmt, "　", r$ibs_label, "　（クリックで流行曲線タブへ）"),
         # 疾患名 + 類型バッジ
         tags$div(style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;",
           tags$div(style="font-size:0.82em;font-weight:700;color:#222;line-height:1.3;flex:1;",
@@ -2600,11 +2605,15 @@ server <- function(input, output, session) {
     n <- length(cards)
     cols_per_row <- 4L
     rows <- split(seq_len(n), ceiling(seq_len(n) / cols_per_row))
-    do.call(tagList, lapply(rows, function(idx) {
-      fluidRow(style="margin-bottom:8px;",
-        lapply(idx, function(i) column(3, style="padding:4px;", cards[[i]]))
-      )
-    }))
+    tagList(
+      do.call(tagList, lapply(rows, function(idx) {
+        fluidRow(style="margin-bottom:8px;",
+          lapply(idx, function(i) column(3, style="padding:4px;", cards[[i]]))
+        )
+      })),
+      tags$p(style="font-size:0.7em;color:#999;text-align:center;margin-top:4px;",
+        "※ タイルをクリックするとその疾患・現在の都道府県フィルターの流行曲線タブに移動します。")
+    )
   })
 
   # ── 活動レベル一覧（都道府県別）────────────────────────────
@@ -2861,6 +2870,20 @@ server <- function(input, output, session) {
   observeEvent(input$pref_tile_click, {
     req(input$pref_tile_click$pref)
     updateSelectInput(session, "pref_filter", selected = input$pref_tile_click$pref)
+    updateTabsetPanel(session, "main_tabs", selected = "流行曲線")
+  })
+
+  # 疾患別タイルクリック → 表示モード・疾患を切り替えて流行曲線タブへ移動
+  # （都道府県フィルターの選択はそのまま引き継ぐ）
+  observeEvent(input$disease_tile_click, {
+    req(input$disease_tile_click$id)
+    if (isTRUE(input$disease_tile_click$zensu)) {
+      updateRadioButtons(session, "ts_mode", selected = "zensu")
+      updateSelectInput(session, "zensu_disease_ts", selected = input$disease_tile_click$id)
+    } else {
+      updateRadioButtons(session, "ts_mode", selected = "teiten")
+      updateSelectInput(session, "disease", selected = input$disease_tile_click$id)
+    }
     updateTabsetPanel(session, "main_tabs", selected = "流行曲線")
   })
 
