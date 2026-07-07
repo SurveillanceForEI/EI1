@@ -419,6 +419,16 @@ function ebsUntranslateCards(containerId) {
         )
       ),
 
+      # ── 都道府県比較 ─────────────────────────────────────
+      tabPanel("都道府県比較", icon=icon("border-all"),
+        tags$div(style="padding:10px 6px 4px;",
+          uiOutput("pref_compare_title_ui"),
+          tags$p(style="font-size:0.78em;color:#888;margin-bottom:8px;",
+            "疾患・期間はサイドバーの選択（表示モード・疾患・期間スライダー）と連動します。都道府県は北から南の順に並んでいます。"),
+          plotOutput("pref_compare_plot", height="auto")
+        )
+      ),
+
       # ── 地図 ─────────────────────────────────────────────
       tabPanel("地図", icon=icon("map"),
         tags$div(style="text-align:right;font-size:0.78em;margin:2px 4px 0;",
@@ -2590,6 +2600,72 @@ server <- function(input, output, session) {
       )
     }))
   })
+
+  # ── 都道府県比較（全47都道府県の流行曲線タイル）──────────────
+  # サイドバーの表示モード（定点/全数）・疾患・期間スライダーと連動し、
+  # 都道府県フィルターの選択には依存しない（常に全47都道府県を表示するため）
+  pref_compare_data <- reactive({
+    is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
+    if (is_zensu) {
+      d <- ZENSU_DATA
+      if (is.null(d) || nrow(d) == 0) return(NULL)
+      dr <- input$date_range
+      d %>%
+        filter(disease == input$zensu_disease_ts, date >= dr[1], date <= dr[2]) %>%
+        group_by(pref_name, date) %>%
+        summarise(val = sum(cases, na.rm = TRUE), .groups = "drop") %>%
+        inner_join(PREF_MASTER, by = "pref_name")
+    } else {
+      fd <- filtered_data()
+      if (is.null(fd) || nrow(fd) == 0) return(NULL)
+      fd %>%
+        group_by(pref_name, date) %>%
+        summarise(val = mean(reports_per_site, na.rm = TRUE), .groups = "drop") %>%
+        inner_join(PREF_MASTER, by = "pref_name")
+    }
+  })
+
+  output$pref_compare_title_ui <- renderUI({
+    is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
+    did   <- if (is_zensu) input$zensu_disease_ts else input$disease
+    label <- tryCatch(
+      if (is_zensu) ZENSU_DISEASE_CONFIG[[did]]$label else DISEASE_CONFIG[[did]]$label,
+      error = function(e) did)
+    dr <- input$date_range
+    tags$h5(
+      sprintf("%s — 都道府県別流行曲線（%s 〜 %s）",
+              label, format(dr[1], "%Y/%m"), format(dr[2], "%Y/%m")),
+      style = "font-weight:700;margin-bottom:2px;"
+    )
+  })
+
+  output$pref_compare_plot <- renderPlot({
+    d <- pref_compare_data()
+    shiny::validate(shiny::need(!is.null(d) && nrow(d) > 0, "データがありません"))
+
+    d$pref_name <- factor(d$pref_name,
+      levels = PREF_MASTER$pref_name[order(PREF_MASTER$pref_code)])
+
+    is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
+    col <- tryCatch(
+      if (is_zensu) ZENSU_DISEASE_CONFIG[[input$zensu_disease_ts]]$color
+      else DISEASE_CONFIG[[input$disease]]$color,
+      error = function(e) "#2980b9")
+    if (is.null(col) || is.na(col)) col <- "#2980b9"
+
+    ggplot(d, aes(x = date, y = val)) +
+      geom_line(color = col, linewidth = 0.4) +
+      facet_wrap(~pref_name, ncol = 8, scales = "free_y") +
+      theme_minimal(base_size = 9) +
+      theme(
+        strip.text      = element_text(size = 8, face = "bold"),
+        axis.text.x     = element_text(size = 6, angle = 45, hjust = 1),
+        axis.text.y     = element_text(size = 6),
+        panel.spacing   = unit(0.5, "lines"),
+        plot.margin     = margin(4, 8, 4, 4)
+      ) +
+      labs(x = NULL, y = NULL)
+  }, height = function() ceiling(47 / 8) * 160)
 
   # ── 病原体検出（IASR）────────────────────────────────────
 
