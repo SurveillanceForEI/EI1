@@ -2696,6 +2696,8 @@ server <- function(input, output, session) {
             id=pr, label=pr, region=PREF_MASTER$region[PREF_MASTER$pref_name==pr][1],
             grid_row=PREF_MASTER$grid_row[PREF_MASTER$pref_name==pr][1],
             grid_col=PREF_MASTER$grid_col[PREF_MASTER$pref_name==pr][1],
+            grid_colspan=PREF_MASTER$grid_colspan[PREF_MASTER$pref_name==pr][1],
+            grid_rowspan=PREF_MASTER$grid_rowspan[PREF_MASTER$pref_name==pr][1],
             ibs_score=ibs_s, ebs_score=ebs_s,
             act_level=act_level(sc), combined=sc,
             cur_val=cur$reports_per_site[1],
@@ -2729,6 +2731,8 @@ server <- function(input, output, session) {
             id=pr, label=pr, region=PREF_MASTER$region[PREF_MASTER$pref_name==pr][1],
             grid_row=PREF_MASTER$grid_row[PREF_MASTER$pref_name==pr][1],
             grid_col=PREF_MASTER$grid_col[PREF_MASTER$pref_name==pr][1],
+            grid_colspan=PREF_MASTER$grid_colspan[PREF_MASTER$pref_name==pr][1],
+            grid_rowspan=PREF_MASTER$grid_rowspan[PREF_MASTER$pref_name==pr][1],
             ibs_score=ibs_s, ebs_score=ebs_s,
             act_level=act_level(sc), combined=sc,
             cur_val=cur$reports_per_site[1],
@@ -2784,16 +2788,20 @@ server <- function(input, output, session) {
 
     # デフォルメした日本地図のグリッド上に、都道府県ごとのタイルを配置する
     # （grid_row/grid_colはPREF_MASTERで定義した簡易的な相対配置）
-    max_row <- max(sapply(res, `[[`, "grid_row"))
-    max_col <- max(sapply(res, `[[`, "grid_col"))
+    max_row <- max(sapply(res, function(r) r$grid_row + coalesce(r$grid_rowspan, 1L) - 1L))
+    max_col <- max(sapply(res, function(r) r$grid_col + coalesce(r$grid_colspan, 1L) - 1L))
 
     tiles <- lapply(res, function(r) {
       cfg <- lcfg[[as.character(r$act_level)]]
-      # 北海道は面積が大きいため、タイルも2列分の幅で表示する
-      col_span <- if (identical(r$label, "北海道")) paste0(r$grid_col," / span 2") else as.character(r$grid_col)
+      # 一部の都道府県（北海道・青森・福島・京都・和歌山は横2マス、熊本は縦2マス）は
+      # 参考画像に合わせて複数マス分の大きさで表示する
+      colspan <- coalesce(r$grid_colspan, 1L)
+      rowspan <- coalesce(r$grid_rowspan, 1L)
+      col_span <- if (colspan > 1) paste0(r$grid_col," / span ",colspan) else as.character(r$grid_col)
+      row_span <- if (rowspan > 1) paste0(r$grid_row," / span ",rowspan) else as.character(r$grid_row)
       tags$div(
         style=paste0(
-          "grid-row:",r$grid_row,";grid-column:",col_span,";",
+          "grid-row:",row_span,";grid-column:",col_span,";",
           "border:1px solid ",cfg$border,";border-left:4px solid ",cfg$color,";",
           "background:",cfg$bg,";border-radius:5px;padding:4px 6px;",
           "display:flex;flex-direction:column;gap:1px;box-sizing:border-box;",
