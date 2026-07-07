@@ -3288,23 +3288,11 @@ server <- function(input, output, session) {
         select(順位, 都道府県=pref_name, 週次報告数=cases) %>%
         datatable(options=list(pageLength=10, dom="tp"), rownames=FALSE)
     } else {
-      rt_latest <- tryCatch({
-        rd <- rt_series() %>% filter(!is.na(rt)) %>% slice_tail(n=1)
-        if (nrow(rd)==0) NA_real_ else rd$rt[1]
-      }, error=function(e) NA_real_)
-      ibs_latest <- tryCatch({
-        bd <- ts_band_series() %>% filter(!is.na(ibs_score)) %>% slice_tail(n=1)
-        if (nrow(bd)==0) NA_real_ else bd$ibs_score[1]
-      }, error=function(e) NA_real_)
       map_week_data() %>%
         arrange(desc(reports_per_site)) %>%
-        mutate(順位=min_rank(desc(reports_per_site)), `定点あたり`=round(reports_per_site,2),
-               レベル=classify_alert(reports_per_site,input$disease,rt_latest,ibs_latest)) %>%
-        select(順位,都道府県=pref_name,`定点あたり`,レベル) %>%
-        datatable(options=list(pageLength=10,dom="tp"),rownames=FALSE) %>%
-        formatStyle("レベル",backgroundColor=styleEqual(
-          c("警戒（レベル3）","注意（レベル2）","流行期（レベル1）","基準以下"),
-          c("#fadbd8","#fdebd0","#fef9e7","#d5f5e3")))
+        mutate(順位=min_rank(desc(reports_per_site)), `定点あたり`=round(reports_per_site,2)) %>%
+        select(順位,都道府県=pref_name,`定点あたり`) %>%
+        datatable(options=list(pageLength=10,dom="tp"),rownames=FALSE)
     }
   })
 
