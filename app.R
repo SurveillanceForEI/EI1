@@ -125,8 +125,14 @@ tryCatch(
   error = function(e) NULL
 )
 
-# ローリングキャッシュ管理（過去60日保持・重複削除）
-merge_ebs_cache <- function(new_data, cache_path = EBS_STARTUP_CACHE, keep_days = 60) {
+# EBSキャッシュの保持日数。EBSスコア評価系（zensu_ibs_band・ebs_score_for等）の
+# 「評価不能」判定もこの値に連動させ、実際にキャッシュが持つ範囲までは評価可能にする
+# （数日分のバッファを見て少し短めに設定）
+EBS_CACHE_KEEP_DAYS      <- 365
+EBS_SCORE_EVALUABLE_DAYS <- 360
+
+# ローリングキャッシュ管理（過去1年保持・重複削除）
+merge_ebs_cache <- function(new_data, cache_path = EBS_STARTUP_CACHE, keep_days = EBS_CACHE_KEEP_DAYS) {
   cutoff <- Sys.Date() - keep_days
   old <- tryCatch(readRDS(cache_path), error = function(e) NULL)
   combined <- if (!is.null(old) && nrow(old) > 0) {
@@ -1016,8 +1022,8 @@ function ebsUntranslateCards(containerId) {
           ),
           tags$h5("データ更新"),
           tags$ul(
-            tags$li("毎日午前3時に自動取得・過去60日分をキャッシュ保持（PubMed含む全ソース共通）"),
-            tags$li("PubMed: 直近60日以内に公開された論文を毎回取得し、累積60日分を保持"),
+            tags$li("毎日午前3時に自動取得・過去1年分をキャッシュ保持（PubMed含む全ソース共通）"),
+            tags$li("PubMed: 直近1年以内に公開された論文を毎回取得し、累積1年分を保持"),
             tags$li("重複記事は自動除去（タイトル・日付・ソースで判定）")
           ),
           tags$br(),
@@ -1151,7 +1157,7 @@ function ebsUntranslateCards(containerId) {
             tags$tbody(
               tags$tr(tags$td("定点把握（IBS）"), tags$td("毎日 03:00 自動"), tags$td("JIHS IDWR")),
               tags$tr(tags$td("全数把握"), tags$td("毎日 03:00 自動"), tags$td("JIHS NESID")),
-              tags$tr(tags$td("EBSニュース"), tags$td("毎日 03:00 自動（60日キャッシュ）"), tags$td("各RSS・Google News")),
+              tags$tr(tags$td("EBSニュース"), tags$td("毎日 03:00 自動（1年キャッシュ）"), tags$td("各RSS・Google News")),
               tags$tr(tags$td("Google Trends"), tags$td("毎日 03:00 自動"), tags$td("gtrendsR API")),
               tags$tr(tags$td("病原体検出（IASR）"), tags$td("毎日 03:00 自動（24時間キャッシュ）"), tags$td("JIHS IASR"))
             )
@@ -1422,7 +1428,7 @@ server <- function(input, output, session) {
              error = function(e) NULL)
     removeNotification("ebs_upd")
     showNotification(
-      paste0("EBSニュース更新完了（過去60日・", nrow(merged), "件）"),
+      paste0("EBSニュース更新完了（過去1年・", nrow(merged), "件）"),
       type="message", duration=3)
   })
 
@@ -2320,7 +2326,7 @@ server <- function(input, output, session) {
         }
         ref_date <- if (exists("cur") && !is.null(cur) && nrow(cur) > 0 && !is.na(cur$date[1]))
           as.Date(cur$date[1]) else Sys.Date()
-        if (as.numeric(Sys.Date() - ref_date) > 56) {
+        if (as.numeric(Sys.Date() - ref_date) > EBS_SCORE_EVALUABLE_DAYS) {
           list(score=0L, label="評価不能", n=0L, high=0L, evaluable=FALSE)
         } else {
           d_this <- d %>% filter(pub_date >= ref_date - 7, pub_date <= ref_date)
@@ -2389,7 +2395,7 @@ server <- function(input, output, session) {
         paste0("評価期間: IBS2週×過去5年比較／Rt7週／EBS7日変化率",
                if (exists("cur") && !is.null(cur) && nrow(cur)>0)
                  sprintf("　(IBS/Rt/EBS: %d年第%d週時点)", cur$year[1], cur$week[1]) else "",
-               if (!isTRUE(ebs_info$evaluable)) "　※EBSは直近8週分のみ評価可能" else "")),
+               if (!isTRUE(ebs_info$evaluable)) "　※EBSは直近1年分のみ評価可能" else "")),
       tags$div(style="display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;text-align:center;",
         tags$div(
           tags$span(style=paste0("font-size:2em;font-weight:900;color:",cfg$color,
@@ -2450,7 +2456,7 @@ server <- function(input, output, session) {
     ebs_score_for <- function(did, ref_date = Sys.Date()) {
       tryCatch({
         if (is.null(ebs_d) || nrow(ebs_d) == 0) return(0L)
-        if (is.na(ref_date) || as.numeric(Sys.Date() - as.Date(ref_date)) > 56) return(0L)
+        if (is.na(ref_date) || as.numeric(Sys.Date() - as.Date(ref_date)) > EBS_SCORE_EVALUABLE_DAYS) return(0L)
         ref_date <- as.Date(ref_date)
         de <- ebs_d %>% filter(!is.na(pub_date),
                                is.na(source_id) | source_id != "pubmed",
@@ -2689,7 +2695,7 @@ server <- function(input, output, session) {
     ebs_score_for_pref <- function(pref_name_i, ref_date = Sys.Date()) {
       tryCatch({
         if (is.null(ebs_d) || nrow(ebs_d) == 0) return(0L)
-        if (is.na(ref_date) || as.numeric(Sys.Date() - as.Date(ref_date)) > 56) return(0L)
+        if (is.na(ref_date) || as.numeric(Sys.Date() - as.Date(ref_date)) > EBS_SCORE_EVALUABLE_DAYS) return(0L)
         ref_date <- as.Date(ref_date)
         de <- ebs_d %>% filter(!is.na(pub_date),
                                is.na(source_id) | source_id != "pubmed",
@@ -3081,7 +3087,7 @@ server <- function(input, output, session) {
       if (!is.null(dd) && nrow(dd) > 0) max(dd$date, na.rm=TRUE) else Sys.Date()
     }, error=function(e) Sys.Date())
     if (is.na(ref_date) || is.infinite(ref_date)) ref_date <- Sys.Date()
-    ebs_evaluable <- as.numeric(Sys.Date() - ref_date) <= 56
+    ebs_evaluable <- as.numeric(Sys.Date() - ref_date) <= EBS_SCORE_EVALUABLE_DAYS
 
     # ── EBS シグナル評価（基準日の週 vs 前週の重みスコア比較）──
     ebs_calc <- if (!ebs_evaluable) {
@@ -3172,7 +3178,7 @@ server <- function(input, output, session) {
                   else if (total <= 2) "▲"
                   else                 "▲▲"
 
-    ebs_txt <- if (!ebs_evaluable) "EBS: 評価不能（対象期間が直近8週より前）"
+    ebs_txt <- if (!ebs_evaluable) "EBS: 評価不能（対象期間が直近1年より前）"
                else if (ebs_n == 0) "EBS今週: 記事なし"
                else sprintf("EBS今週: %d件 (High:%d Low:%d) 前週比%+.0f%%",
                             ebs_n, ebs_calc$n_event, ebs_calc$n_signal, ebs_change_pct)

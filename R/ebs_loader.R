@@ -569,7 +569,7 @@ PUBMED_QUERIES <- c(
   "emerging infectious disease Japan"
 )
 
-fetch_pubmed <- function(queries = PUBMED_QUERIES, max_results = 5, days_back = 60) {
+fetch_pubmed <- function(queries = PUBMED_QUERIES, max_results = 5, days_back = 365) {
   message("PubMed 取得中...")
   results <- lapply(queries, function(q) {
     tryCatch({
@@ -2766,7 +2766,7 @@ signal_color <- function(level) {
 fetch_all_ebs <- function(sources      = EBS_SOURCES,
                           use_gnews    = TRUE,
                           bearer_token = NULL,
-                          max_age_days = 60) {
+                          max_age_days = 365) {
   # 固定RSS
   rss_results <- lapply(sources, fetch_rss_feed)
   all_df <- bind_rows(Filter(Negate(is.null), rss_results))

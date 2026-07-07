@@ -45,7 +45,7 @@ tryCatch({
   new_data <- fetch_all_ebs(use_gnews = TRUE, bearer_token = NULL)
   if (!is.null(new_data) && nrow(new_data) > 0) {
     cache_path <- "data/ebs_startup_cache.rds"
-    keep_days  <- 60
+    keep_days  <- 365
     cutoff     <- Sys.Date() - keep_days
     old <- tryCatch(readRDS(cache_path), error = function(e) NULL)
     if (!is.null(old)) {
