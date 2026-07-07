@@ -2826,11 +2826,15 @@ server <- function(input, output, session) {
           "border:1px solid ",cfg$border,";border-left:4px solid ",cfg$color,";",
           "background:",cfg$bg,";border-radius:5px;padding:4px 6px;",
           "display:flex;flex-direction:column;gap:1px;box-sizing:border-box;",
-          "font-size:0.68em;min-width:0;overflow:hidden;",
+          "font-size:0.68em;min-width:0;overflow:hidden;cursor:pointer;",
           half_shift, size_override
         ),
+        onclick=sprintf(
+          "Shiny.setInputValue('pref_tile_click', {pref:'%s', t:Date.now()}, {priority:'event'})",
+          r$label
+        ),
         title = paste0(r$label, "　Lv", r$act_level, " ", cfg$name,
-                       "　", cur_fmt_fn(r$cur_val), "　", r$ibs_label),
+                       "　", cur_fmt_fn(r$cur_val), "　", r$ibs_label, "　（クリックで時系列タブへ）"),
         tags$div(style="font-weight:700;color:#222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;",
                  if (identical(r$label, "北海道")) r$label else sub("[都道府県]$", "", r$label)),
         tags$span(style=paste0(
@@ -2848,8 +2852,16 @@ server <- function(input, output, session) {
         "gap:3px;max-width:760px;margin:0 auto;"
       ), tiles),
       tags$p(style="font-size:0.7em;color:#999;text-align:center;margin-top:8px;",
-        "※ 実際の地理的形状ではなく、相対位置をおおまかに表したデフォルメ配置です。タイルにマウスを乗せると詳細を表示します。")
+        "※ 実際の地理的形状ではなく、相対位置をおおまかに表したデフォルメ配置です。タイルをクリックするとその都道府県・疾患の時系列タブに移動します。")
     )
+  })
+
+  # タイルクリック → サイドバーの都道府県フィルターを切り替えて時系列タブへ移動
+  # （疾患・全数/定点の選択はサイドバーの現在の選択をそのまま引き継ぐ）
+  observeEvent(input$pref_tile_click, {
+    req(input$pref_tile_click$pref)
+    updateSelectInput(session, "pref_filter", selected = input$pref_tile_click$pref)
+    updateTabsetPanel(session, "main_tabs", selected = "時系列")
   })
 
   # ── 病原体検出（IASR）────────────────────────────────────
