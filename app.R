@@ -2450,12 +2450,17 @@ server <- function(input, output, session) {
       group_by(disease, date, year, week) %>%
       summarise(reports_per_site = mean(reports_per_site, na.rm=TRUE), .groups="drop")
 
+    dr <- input$date_range
     if (!is_zensu) for (did in names(DISEASE_CONFIG)) {
       tryCatch({
         dconf <- DISEASE_CONFIG[[did]]
         dd <- all_teiten %>% filter(disease == did) %>% arrange(date)
         if (nrow(dd) == 0) return(NULL)
-        recent2 <- slice_tail(dd, n=2)
+        # スライダー(date_range)で選択した期間の末尾2週を評価対象とする
+        # （calc_bandの過去5年比較baselineにはddの全期間データをそのまま使う）
+        dd_sel <- dd %>% filter(date >= dr[1], date <= dr[2])
+        if (nrow(dd_sel) == 0) return(NULL)
+        recent2 <- slice_tail(dd_sel, n=2)
         cur  <- slice_tail(recent2, n=1)
         prev <- if (nrow(recent2) >= 2) slice_head(recent2, n=1) else cur
         cur_b  <- calc_band(cur$reports_per_site[1],  cur$week[1],  cur$year[1],  dd)
@@ -2485,7 +2490,10 @@ server <- function(input, output, session) {
         dconf <- ZENSU_DISEASE_CONFIG[[did]]
         dd <- all_zensu %>% filter(disease == did) %>% arrange(date)
         if (nrow(dd) == 0) return(NULL)
-        recent2 <- slice_tail(dd, n=2)
+        # スライダー(date_range)で選択した期間の末尾2週を評価対象とする
+        dd_sel <- dd %>% filter(date >= dr[1], date <= dr[2])
+        if (nrow(dd_sel) == 0) return(NULL)
+        recent2 <- slice_tail(dd_sel, n=2)
         cur  <- slice_tail(recent2, n=1)
         prev <- if (nrow(recent2) >= 2) slice_head(recent2, n=1) else cur
         # 全数把握疾患: 既存データから季節性を自動判定し評価方式を切替（zensu_ibs_band参照）
@@ -2519,7 +2527,7 @@ server <- function(input, output, session) {
     is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
     mode_lbl <- if (is_zensu) "全数把握" else "定点把握"
     res  <- all_disease_levels_data()
-    n_by_level <- table(sapply(res, `[[`, "act_level"))
+    n_by_level <- if (length(res) > 0) table(sapply(res, `[[`, "act_level")) else table(integer(0))
     tags$div(style="margin-bottom:10px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;",
       tags$div(style="font-size:0.9em;font-weight:700;color:#333;",
                paste0("疾患別 統合活動レベル一覧　（", pref, " / ", mode_lbl, "）　", length(res), "疾患")),
@@ -2664,6 +2672,7 @@ server <- function(input, output, session) {
 
     results <- list()
     pref_order <- PREF_MASTER$pref_name[order(PREF_MASTER$pref_code)]
+    dr <- input$date_range
 
     if (!is_zensu) {
       base_d <- SURV_DATA %>% filter(disease == did)
@@ -2671,7 +2680,11 @@ server <- function(input, output, session) {
         tryCatch({
           dd <- base_d %>% filter(pref_name == pr) %>% arrange(date)
           if (nrow(dd) == 0) return(NULL)
-          recent2 <- slice_tail(dd, n=2)
+          # スライダー(date_range)で選択した期間の末尾2週を評価対象とする
+          # （calc_bandの過去5年比較baselineにはddの全期間データをそのまま使う）
+          dd_sel <- dd %>% filter(date >= dr[1], date <= dr[2])
+          if (nrow(dd_sel) == 0) return(NULL)
+          recent2 <- slice_tail(dd_sel, n=2)
           cur  <- slice_tail(recent2, n=1)
           prev <- if (nrow(recent2) >= 2) slice_head(recent2, n=1) else cur
           cur_b  <- calc_band(cur$reports_per_site[1],  cur$week[1],  cur$year[1],  dd)
@@ -2697,7 +2710,10 @@ server <- function(input, output, session) {
             summarise(reports_per_site = sum(cases, na.rm=TRUE), .groups="drop") %>%
             arrange(date)
           if (nrow(dd) == 0) return(NULL)
-          recent2 <- slice_tail(dd, n=2)
+          # スライダー(date_range)で選択した期間の末尾2週を評価対象とする
+          dd_sel <- dd %>% filter(date >= dr[1], date <= dr[2])
+          if (nrow(dd_sel) == 0) return(NULL)
+          recent2 <- slice_tail(dd_sel, n=2)
           cur  <- slice_tail(recent2, n=1)
           prev <- if (nrow(recent2) >= 2) slice_head(recent2, n=1) else cur
           band <- zensu_ibs_band(
@@ -2728,7 +2744,7 @@ server <- function(input, output, session) {
       if (is_zensu) ZENSU_DISEASE_CONFIG[[did]]$label else DISEASE_CONFIG[[did]]$label,
       error = function(e) did)
     res <- pref_levels_data()
-    n_by_level <- table(sapply(res, `[[`, "act_level"))
+    n_by_level <- if (length(res) > 0) table(sapply(res, `[[`, "act_level")) else table(integer(0))
     tags$div(style="margin-bottom:10px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;",
       tags$div(style="font-size:0.9em;font-weight:700;color:#333;",
                paste0(label, " — 都道府県別 統合活動レベル一覧　（北から南の順）　", length(res), "都道府県")),
