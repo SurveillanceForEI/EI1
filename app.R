@@ -2805,6 +2805,9 @@ server <- function(input, output, session) {
       half_shift <- if (r$label %in% c("愛媛県","香川県","高知県","徳島県")) "transform:translateX(50%);"
                     else if (r$label == "沖縄県") "transform:translateX(-150%);"
                     else ""
+      # 青森は、グリッド上は北海道と同じ2マス分を確保したまま、見た目の幅だけ
+      # 1.5マス分（2マスの75%）に縮小する（右側の0.5マス分は空白として残る）
+      size_override <- if (identical(r$label, "青森県")) "width:75%;" else ""
       tags$div(
         style=paste0(
           "grid-row:",row_span,";grid-column:",col_span,";",
@@ -2812,7 +2815,7 @@ server <- function(input, output, session) {
           "background:",cfg$bg,";border-radius:5px;padding:4px 6px;",
           "display:flex;flex-direction:column;gap:1px;box-sizing:border-box;",
           "font-size:0.68em;min-width:0;overflow:hidden;",
-          half_shift
+          half_shift, size_override
         ),
         title = paste0(r$label, "　Lv", r$act_level, " ", cfg$name,
                        "　", cur_fmt_fn(r$cur_val), "　", r$ibs_label),
