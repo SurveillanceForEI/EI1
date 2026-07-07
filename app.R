@@ -411,21 +411,19 @@ function ebsUntranslateCards(containerId) {
     # ── タブ群 ─────────────────────────────────────────────
     tabBox(width=12, id="main_tabs",
 
-      # ── 活動レベル一覧 ───────────────────────────────────
-      tabPanel("活動レベル一覧", icon=icon("th"),
+      # ── 活動レベル一覧（疾患別） ───────────────────────────
+      tabPanel("活動レベル一覧（疾患別）", icon=icon("th"),
         tags$div(style="padding:10px 6px 4px;",
           uiOutput("all_levels_header"),
           uiOutput("all_levels_ui")
         )
       ),
 
-      # ── 都道府県比較 ─────────────────────────────────────
-      tabPanel("都道府県比較", icon=icon("border-all"),
+      # ── 活動レベル一覧（都道府県別） ─────────────────────
+      tabPanel("活動レベル一覧（都道府県別）", icon=icon("border-all"),
         tags$div(style="padding:10px 6px 4px;",
-          uiOutput("pref_compare_title_ui"),
-          tags$p(style="font-size:0.78em;color:#888;margin-bottom:8px;",
-            "疾患・期間はサイドバーの選択（表示モード・疾患・期間スライダー）と連動します。都道府県は北から南の順に並んでいます。"),
-          plotOutput("pref_compare_plot", height="auto")
+          uiOutput("pref_levels_header"),
+          uiOutput("pref_levels_ui")
         )
       ),
 
@@ -2601,71 +2599,209 @@ server <- function(input, output, session) {
     }))
   })
 
-  # ── 都道府県比較（全47都道府県の流行曲線タイル）──────────────
-  # サイドバーの表示モード（定点/全数）・疾患・期間スライダーと連動し、
-  # 都道府県フィルターの選択には依存しない（常に全47都道府県を表示するため）
-  pref_compare_data <- reactive({
+  # ── 活動レベル一覧（都道府県別）────────────────────────────
+  # サイドバーで選択中の疾患について、全47都道府県の統合活動レベルを
+  # 北から南の順（PREF_MASTER$pref_code順）にタイル表示する。
+  # スコア計算ロジックはall_disease_levels_data（疾患別一覧）と同一で、
+  # ループの軸を「疾患」から「都道府県」に入れ替えたもの。
+  pref_levels_data <- reactive({
     is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
-    if (is_zensu) {
-      d <- ZENSU_DATA
-      if (is.null(d) || nrow(d) == 0) return(NULL)
-      dr <- input$date_range
-      d %>%
-        filter(disease == input$zensu_disease_ts, date >= dr[1], date <= dr[2]) %>%
-        group_by(pref_name, date) %>%
-        summarise(val = sum(cases, na.rm = TRUE), .groups = "drop") %>%
-        inner_join(PREF_MASTER, by = "pref_name")
-    } else {
-      fd <- filtered_data()
-      if (is.null(fd) || nrow(fd) == 0) return(NULL)
-      fd %>%
-        group_by(pref_name, date) %>%
-        summarise(val = mean(reports_per_site, na.rm = TRUE), .groups = "drop") %>%
-        inner_join(PREF_MASTER, by = "pref_name")
+    did <- if (is_zensu) input$zensu_disease_ts else input$disease
+
+    calc_band <- function(val, w, y, hist_d) {
+      ws <- unique(pmax(1L, pmin(53L, (w-2L):(w+2L))))
+      h  <- hist_d %>% filter(week %in% ws, year >= y - 5, year < y)
+      n  <- sum(!is.na(h$reports_per_site))
+      mu <- mean(h$reports_per_site, na.rm=TRUE)
+      s  <- if (n >= 3) sd(h$reports_per_site, na.rm=TRUE) else NA
+      has <- n >= 3 && !is.nan(mu) && !is.na(s) && s > 0
+      list(mu=mu, s=s, has=has,
+           exceed2 = has && !is.na(val) && val > 0 && val >= mu + 2*s,
+           exceed1 = has && !is.na(val) && val > 0 && val >= mu + s,
+           abovemu = has && !is.na(val) && val > 0 && val >= mu)
     }
+    ibs_score_from_bands <- function(cur_b, prev_b) {
+      if (!cur_b$has) return(0L)
+      if (cur_b$exceed2 && prev_b$exceed2) 3L
+      else if (cur_b$exceed2 || cur_b$exceed1) 2L
+      else if (cur_b$abovemu) 1L
+      else 0L
+    }
+
+    ebs_d <- tryCatch(ebs_data(), error=function(e) NULL)
+    weights <- c("Signal High"=3L, "Signal Low"=2L, "FYI"=0L)
+    ebs_score_for_pref <- function(pref_name_i, ref_date = Sys.Date()) {
+      tryCatch({
+        if (is.null(ebs_d) || nrow(ebs_d) == 0) return(0L)
+        if (is.na(ref_date) || as.numeric(Sys.Date() - as.Date(ref_date)) > 56) return(0L)
+        ref_date <- as.Date(ref_date)
+        de <- ebs_d %>% filter(!is.na(pub_date),
+                               is.na(source_id) | source_id != "pubmed",
+                               grepl(did, disease_tags, fixed=TRUE))
+        ps <- sub("(都|道|府|県)$", "", pref_name_i)
+        de <- de %>% filter(
+          (!is.na(ebs_pref) & ebs_pref == pref_name_i) |
+          vapply(paste(coalesce(title,""), coalesce(summary,"")),
+                 function(t) grepl(pref_name_i, t, fixed=TRUE) | grepl(ps, t, fixed=TRUE),
+                 FUN.VALUE = logical(1)))
+        s_this <- sum(weights[as.character(
+          de %>% filter(pub_date >= ref_date - 7, pub_date <= ref_date) %>% pull(signal_level))], na.rm=TRUE)
+        s_prev <- sum(weights[as.character(
+          de %>% filter(pub_date >= ref_date - 14, pub_date < ref_date - 7) %>% pull(signal_level))], na.rm=TRUE)
+        chg <- if (s_prev > 0) (s_this - s_prev)/s_prev*100 else if (s_this > 0) 100 else 0
+        lv <- if (s_this==0 && s_prev==0) -1L
+              else if (chg < -20) -1L else if (chg < 20) 0L
+              else if (chg <  50) 1L  else 2L
+        max(0L, lv)
+      }, error=function(e) 0L)
+    }
+
+    combined_score <- function(ibs_s, ebs_s) {
+      ebs_scaled <- min(3, ebs_s * 1.5)
+      ibs_s * 0.95 + ebs_scaled * 0.05
+    }
+    act_level <- function(sc) min(4L, max(1L, as.integer(round(sc)) + 1L))
+
+    results <- list()
+    pref_order <- PREF_MASTER$pref_name[order(PREF_MASTER$pref_code)]
+
+    if (!is_zensu) {
+      base_d <- SURV_DATA %>% filter(disease == did)
+      for (pr in pref_order) {
+        tryCatch({
+          dd <- base_d %>% filter(pref_name == pr) %>% arrange(date)
+          if (nrow(dd) == 0) return(NULL)
+          recent2 <- slice_tail(dd, n=2)
+          cur  <- slice_tail(recent2, n=1)
+          prev <- if (nrow(recent2) >= 2) slice_head(recent2, n=1) else cur
+          cur_b  <- calc_band(cur$reports_per_site[1],  cur$week[1],  cur$year[1],  dd)
+          prev_b <- calc_band(prev$reports_per_site[1], prev$week[1], prev$year[1], dd)
+          ibs_s  <- ibs_score_from_bands(cur_b, prev_b)
+          ebs_s  <- ebs_score_for_pref(pr, cur$date[1])
+          sc     <- combined_score(ibs_s, ebs_s)
+          results[[pr]] <- list(
+            id=pr, label=pr, region=PREF_MASTER$region[PREF_MASTER$pref_name==pr][1],
+            ibs_score=ibs_s, ebs_score=ebs_s,
+            act_level=act_level(sc), combined=sc,
+            cur_val=cur$reports_per_site[1],
+            ibs_label=c("0"="平均以下","1"="平均〜+1SD","2"="+1〜+2SD","3"="+2SD超過(2週連続)")[as.character(ibs_s)]
+          )
+        }, error=function(e) NULL)
+      }
+    } else {
+      base_d <- ZENSU_DATA %>% filter(disease == did)
+      for (pr in pref_order) {
+        tryCatch({
+          dd <- base_d %>% filter(pref_name == pr) %>%
+            group_by(date, year, week) %>%
+            summarise(reports_per_site = sum(cases, na.rm=TRUE), .groups="drop") %>%
+            arrange(date)
+          if (nrow(dd) == 0) return(NULL)
+          recent2 <- slice_tail(dd, n=2)
+          cur  <- slice_tail(recent2, n=1)
+          prev <- if (nrow(recent2) >= 2) slice_head(recent2, n=1) else cur
+          band <- zensu_ibs_band(
+            cur_val=cur$reports_per_site[1], cur_date=cur$date[1], cur_week=cur$week[1], cur_year=cur$year[1],
+            prev_val=prev$reports_per_site[1], prev_date=prev$date[1], prev_week=prev$week[1], prev_year=prev$year[1],
+            hist_d=dd)
+          ibs_s <- band$score
+          ebs_s <- ebs_score_for_pref(pr, cur$date[1])
+          sc    <- combined_score(ibs_s, ebs_s)
+          results[[pr]] <- list(
+            id=pr, label=pr, region=PREF_MASTER$region[PREF_MASTER$pref_name==pr][1],
+            ibs_score=ibs_s, ebs_score=ebs_s,
+            act_level=act_level(sc), combined=sc,
+            cur_val=cur$reports_per_site[1],
+            ibs_label=band$label, ibs_method=band$method
+          )
+        }, error=function(e) NULL)
+      }
+    }
+
+    Filter(Negate(is.null), results)
   })
 
-  output$pref_compare_title_ui <- renderUI({
+  output$pref_levels_header <- renderUI({
     is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
     did   <- if (is_zensu) input$zensu_disease_ts else input$disease
     label <- tryCatch(
       if (is_zensu) ZENSU_DISEASE_CONFIG[[did]]$label else DISEASE_CONFIG[[did]]$label,
       error = function(e) did)
-    dr <- input$date_range
-    tags$h5(
-      sprintf("%s — 都道府県別流行曲線（%s 〜 %s）",
-              label, format(dr[1], "%Y/%m"), format(dr[2], "%Y/%m")),
-      style = "font-weight:700;margin-bottom:2px;"
+    res <- pref_levels_data()
+    n_by_level <- table(sapply(res, `[[`, "act_level"))
+    tags$div(style="margin-bottom:10px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;",
+      tags$div(style="font-size:0.9em;font-weight:700;color:#333;",
+               paste0(label, " — 都道府県別 統合活動レベル一覧　（北から南の順）　", length(res), "都道府県")),
+      tags$div(style="display:flex;gap:8px;",
+        lapply(4:1, function(lv) {
+          cfg <- list(`4`=list(col="#c0392b",name="流行"),`3`=list(col="#e67e22",name="警戒"),
+                      `2`=list(col="#d4ac0d",name="注意"),`1`=list(col="#27ae60",name="通常"))[[as.character(lv)]]
+          n <- as.integer(n_by_level[as.character(lv)]); if (is.na(n)) n <- 0L
+          tags$span(style=paste0("background:",cfg$col,";color:#fff;border-radius:10px;",
+            "padding:2px 10px;font-size:0.75em;font-weight:700;"),
+            paste0("Lv",lv," ",cfg$name,": ",n,"都道府県"))
+        })
+      )
     )
   })
 
-  output$pref_compare_plot <- renderPlot({
-    d <- pref_compare_data()
-    shiny::validate(shiny::need(!is.null(d) && nrow(d) > 0, "データがありません"))
+  output$pref_levels_ui <- renderUI({
+    res <- pref_levels_data()
+    if (length(res) == 0) return(tags$p("データなし"))
 
-    d$pref_name <- factor(d$pref_name,
-      levels = PREF_MASTER$pref_name[order(PREF_MASTER$pref_code)])
+    lcfg <- list(
+      `1`=list(color="#27ae60", bg="#eafaf1", border="#a9dfbf", name="通常"),
+      `2`=list(color="#d4ac0d", bg="#fefde7", border="#f9e79f", name="注意"),
+      `3`=list(color="#e67e22", bg="#fef5e7", border="#f8c471", name="警戒"),
+      `4`=list(color="#c0392b", bg="#fdedec", border="#f1948a", name="流行")
+    )
 
     is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
-    col <- tryCatch(
-      if (is_zensu) ZENSU_DISEASE_CONFIG[[input$zensu_disease_ts]]$color
-      else DISEASE_CONFIG[[input$disease]]$color,
-      error = function(e) "#2980b9")
-    if (is.null(col) || is.na(col)) col <- "#2980b9"
+    cur_fmt_fn <- if (is_zensu)
+      function(v) sprintf("%d件", as.integer(coalesce(v, 0)))
+    else
+      function(v) sprintf("%.2f", coalesce(v, 0))
 
-    ggplot(d, aes(x = date, y = val)) +
-      geom_line(color = col, linewidth = 0.4) +
-      facet_wrap(~pref_name, ncol = 8, scales = "free_y") +
-      theme_minimal(base_size = 9) +
-      theme(
-        strip.text      = element_text(size = 8, face = "bold"),
-        axis.text.x     = element_text(size = 6, angle = 45, hjust = 1),
-        axis.text.y     = element_text(size = 6),
-        panel.spacing   = unit(0.5, "lines"),
-        plot.margin     = margin(4, 8, 4, 4)
-      ) +
-      labs(x = NULL, y = NULL)
-  }, height = function() ceiling(47 / 8) * 160)
+    cards <- lapply(res, function(r) {
+      cfg <- lcfg[[as.character(r$act_level)]]
+      tags$div(
+        style=paste0(
+          "border:1px solid ",cfg$border,";border-left:5px solid ",cfg$color,";",
+          "background:",cfg$bg,";border-radius:6px;padding:8px 10px;",
+          "display:flex;flex-direction:column;gap:3px;height:100%;box-sizing:border-box;"
+        ),
+        tags$div(style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;",
+          tags$div(style="font-size:0.82em;font-weight:700;color:#222;line-height:1.3;flex:1;",
+                   r$label),
+          tags$span(style=paste0("font-size:0.62em;background:#2980b9;",
+            "color:#fff;border-radius:8px;padding:1px 5px;white-space:nowrap;flex-shrink:0;"),
+            r$region)
+        ),
+        tags$div(
+          tags$span(style=paste0(
+            "display:inline-block;padding:2px 8px;border-radius:10px;",
+            "background:",cfg$color,";color:#fff;font-size:0.75em;font-weight:700;"),
+            paste0("Lv",r$act_level," ",cfg$name))
+        ),
+        tags$div(style="font-size:0.7em;color:#666;",
+          paste0(cur_fmt_fn(r$cur_val), "　", r$ibs_label)),
+        if (!is.null(r$ibs_method)) tags$div(
+          style="font-size:0.62em;color:#999;",
+          paste0("判定方式: ", if (identical(r$ibs_method,"seasonal")) "季節性あり" else "散発疾患向け", "　"),
+          tags$a(href="javascript:void(0)", onclick="goToNotes('notes-zensu-ibs')", "詳細")
+        )
+      )
+    })
+
+    n <- length(cards)
+    cols_per_row <- 4L
+    rows <- split(seq_len(n), ceiling(seq_len(n) / cols_per_row))
+    do.call(tagList, lapply(rows, function(idx) {
+      fluidRow(style="margin-bottom:8px;",
+        lapply(idx, function(i) column(3, style="padding:4px;", cards[[i]]))
+      )
+    }))
+  })
 
   # ── 病原体検出（IASR）────────────────────────────────────
 
