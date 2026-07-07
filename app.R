@@ -2799,13 +2799,17 @@ server <- function(input, output, session) {
       rowspan <- coalesce(r$grid_rowspan, 1L)
       col_span <- if (colspan > 1) paste0(r$grid_col," / span ",colspan) else as.character(r$grid_col)
       row_span <- if (rowspan > 1) paste0(r$grid_row," / span ",rowspan) else as.character(r$grid_row)
+      # 愛媛・香川・高知・徳島は、グリッド線を変えずに見た目だけ0.5マス右にずらす
+      # （自身の幅の50%分だけmargin-leftを付与する）
+      half_shift <- if (r$label %in% c("愛媛県","香川県","高知県","徳島県")) "margin-left:50%;" else ""
       tags$div(
         style=paste0(
           "grid-row:",row_span,";grid-column:",col_span,";",
           "border:1px solid ",cfg$border,";border-left:4px solid ",cfg$color,";",
           "background:",cfg$bg,";border-radius:5px;padding:4px 6px;",
           "display:flex;flex-direction:column;gap:1px;box-sizing:border-box;",
-          "font-size:0.68em;min-width:0;overflow:hidden;"
+          "font-size:0.68em;min-width:0;overflow:hidden;",
+          half_shift
         ),
         title = paste0(r$label, "　Lv", r$act_level, " ", cfg$name,
                        "　", cur_fmt_fn(r$cur_val), "　", r$ibs_label),
