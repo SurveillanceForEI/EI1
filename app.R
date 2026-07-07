@@ -2804,10 +2804,14 @@ server <- function(input, output, session) {
       # 半分の幅に縮んでしまう問題が起きない）
       half_shift <- if (r$label %in% c("愛媛県","香川県","高知県","徳島県")) "transform:translateX(50%);"
                     else if (r$label == "沖縄県") "transform:translateX(-150%);"
+                    else if (r$label %in% c("大阪府","奈良県","和歌山県")) "transform:translateY(-50%);"
                     else ""
       # 青森は、グリッド上は北海道と同じ2マス分を確保したまま、見た目の幅だけ
       # 1.5マス分（2マスの75%）に縮小する（右側の0.5マス分は空白として残る）
-      size_override <- if (identical(r$label, "青森県")) "width:75%;" else ""
+      # 兵庫・京都も同様に、縦2マス分を確保したまま高さだけ1.5マス分に縮小する
+      size_override <- if (identical(r$label, "青森県")) "width:75%;"
+                        else if (r$label %in% c("兵庫県","京都府")) "height:75%;"
+                        else ""
       tags$div(
         style=paste0(
           "grid-row:",row_span,";grid-column:",col_span,";",
