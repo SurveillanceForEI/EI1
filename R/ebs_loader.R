@@ -2742,6 +2742,16 @@ tag_diseases <- function(text, hint = NA) {
   paste(unique(matched), collapse=",")
 }
 
+# disease_tags（カンマ区切りの疾患IDリスト、例:"gi,other"）に特定の疾患IDが
+# 含まれるかを判定する。grepl(did, disease_tags, fixed=TRUE)による単純な部分一致では
+# 例えば did="gi" が "legionella"（"le-gi-onella"の中に"gi"を含む）に誤ってマッチして
+# しまうため、カンマで分割した完全一致で判定する。
+has_disease_tag <- function(disease_tags, did) {
+  vapply(strsplit(as.character(disease_tags), ",", fixed = TRUE), function(tags) {
+    did %in% trimws(tags)
+  }, logical(1))
+}
+
 signal_weight <- function(level) {
   c("Signal High"=3, "Signal Low"=2, "FYI"=0.5)[as.character(level)]
 }

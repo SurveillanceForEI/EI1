@@ -2284,7 +2284,7 @@ server <- function(input, output, session) {
       if (!is.null(d) && nrow(d) > 0) {
         d <- d %>% filter(!is.na(pub_date),
                           is.na(source_id) | source_id != "pubmed",
-                          grepl(did, disease_tags, fixed=TRUE))
+                          has_disease_tag(disease_tags, did))
         if (!is.null(pref)) {
           pref_short <- sub("(都|道|府|県)$", "", pref)
           d <- d %>% filter(
@@ -2430,7 +2430,7 @@ server <- function(input, output, session) {
         ref_date <- as.Date(ref_date)
         de <- ebs_d %>% filter(!is.na(pub_date),
                                is.na(source_id) | source_id != "pubmed",
-                               grepl(did, disease_tags, fixed=TRUE))
+                               has_disease_tag(disease_tags, did))
         if (!is.null(pref)) {
           ps <- sub("(都|道|府|県)$", "", pref)
           de <- de %>% filter(
@@ -2669,7 +2669,7 @@ server <- function(input, output, session) {
         ref_date <- as.Date(ref_date)
         de <- ebs_d %>% filter(!is.na(pub_date),
                                is.na(source_id) | source_id != "pubmed",
-                               grepl(did, disease_tags, fixed=TRUE))
+                               has_disease_tag(disease_tags, did))
         ps <- sub("(都|道|府|県)$", "", pref_name_i)
         de <- de %>% filter(
           (!is.na(ebs_pref) & ebs_pref == pref_name_i) |
@@ -3067,7 +3067,7 @@ server <- function(input, output, session) {
       weights <- c("Signal High"=3, "Signal Low"=2, "FYI"=0)
       if (!is.null(d) && nrow(d) > 0 && "pub_date" %in% names(d)) {
         d <- d %>% filter(!is.na(pub_date), source_id != "pubmed",
-                          grepl(did, disease_tags, fixed=TRUE))
+                          has_disease_tag(disease_tags, did))
         if (!is.null(pref)) {
           pref_short <- sub("(都|道|府|県)$", "", pref)
           if ("ebs_pref" %in% names(d)) {
@@ -3637,7 +3637,7 @@ server <- function(input, output, session) {
     if (!ebs_show_all_flag()) {
       did <- sidebar_disease_id()
       if (!is.null(did) && did != "すべて")
-        d <- d %>% filter(grepl(did, disease_tags, fixed = TRUE))
+        d <- d %>% filter(has_disease_tag(disease_tags, did))
     }
     pf <- input$pref_filter
     if (!is.null(pf) && pf != "全国") {
@@ -3669,7 +3669,7 @@ server <- function(input, output, session) {
     if (!pubmed_show_all_flag()) {
       did <- sidebar_disease_id()
       if (!is.null(did) && did != "すべて")
-        d <- d %>% filter(grepl(did, disease_tags, fixed = TRUE))
+        d <- d %>% filter(has_disease_tag(disease_tags, did))
     }
     d %>% arrange(signal_level, desc(pub_date))
   })
@@ -3909,7 +3909,7 @@ server <- function(input, output, session) {
     if (!ebs_ov_show_all_flag()) {
       did <- sidebar_disease_id()
       if (!is.null(did) && did != "すべて")
-        d <- d %>% filter(grepl(did, disease_tags, fixed = TRUE))
+        d <- d %>% filter(has_disease_tag(disease_tags, did))
     }
     d %>% arrange(signal_level, desc(pub_date))
   })
@@ -4087,7 +4087,7 @@ server <- function(input, output, session) {
         !is.na(pub_date),
         pub_date >= today - 60,
         source_id != "pubmed",
-        grepl(did, disease_tags, fixed = TRUE),
+        has_disease_tag(disease_tags, did),
         as.character(signal_level) %in% c("Signal High", "Signal Low")
       ) %>%
       mutate(
