@@ -2808,7 +2808,7 @@ server <- function(input, output, session) {
                     else if (identical(r$label, "群馬県")) "transform:translateY(50%);"
                     # 山梨は高さを150%に広げた後の座標系で0.5マス（=元の高さの50%）分
                     # 上にずらすため、拡大後の高さに対する比率(-50%/1.5)を使う
-                    else if (identical(r$label, "山梨県")) "transform:translateY(-33.3333%);"
+                    else if (r$label %in% c("山梨県","北海道")) "transform:translateY(-33.3333%);"
                     else ""
       # 青森は、グリッド上は北海道と同じ2マス分を確保したまま、見た目の幅だけ
       # 1.5マス分（2マスの75%）に縮小する（右側の0.5マス分は空白として残る）
@@ -2818,7 +2818,7 @@ server <- function(input, output, session) {
       size_override <- if (identical(r$label, "青森県")) "width:75%;"
                         else if (r$label %in% c("兵庫県","京都府","千葉県")) "height:75%;"
                         else if (identical(r$label, "静岡県")) "width:150%;"
-                        else if (r$label %in% c("新潟県","山梨県")) "height:150%;"
+                        else if (r$label %in% c("新潟県","山梨県","北海道")) "height:150%;"
                         else ""
       tags$div(
         style=paste0(
