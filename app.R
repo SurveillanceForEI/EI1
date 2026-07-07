@@ -1097,6 +1097,21 @@ function ebsUntranslateCards(containerId) {
           ),
           tags$br(),
 
+          # ── 活動レベル一覧（疾患別／都道府県別） ──────────────
+          tags$h4(id="notes-levels", "■ 活動レベル一覧（疾患別・都道府県別）", style="border-bottom:2px solid #6c3483;padding-bottom:4px;color:#2c3e50;"),
+          tags$p(
+            "上記「統合活動レベルカード」と", tags$strong("同じ計算方法"), "を、疾患ごと・都道府県ごとに一括表示するタブです。",
+            "「活動レベル一覧（疾患別）」はサイドバーで選択中の都道府県・表示モードについて全疾患のレベルをタイルで並べ、",
+            "「活動レベル一覧（都道府県別）」は選択中の疾患について全47都道府県のレベルを、日本列島の相対位置に近いデフォルメ配置のタイルで表示します。"
+          ),
+          tags$ul(
+            tags$li("全数把握疾患のIBSスコアは、季節性の有無で評価方式が自動的に切り替わります（詳細は",
+              tags$a(href="javascript:void(0)", onclick="goToNotes('notes-zensu-ibs')", "こちら"), "）。"),
+            tags$li("いずれのタブも、期間スライダー（date_range）で選択した期間の末尾週を評価対象とします。"),
+            tags$li(tags$strong("タイルをクリックすると"), "、その疾患・都道府県（もう一方の軸は現在の選択を維持）に絞り込んだ「流行曲線」タブへ移動します。")
+          ),
+          tags$br(),
+
           # ── 病原体検出（IASR）────────────────────────────────
           tags$h4(id="notes-iasr", "■ 病原体検出タブ", style="border-bottom:2px solid #16a085;padding-bottom:4px;color:#2c3e50;"),
           tags$h5("データソース"),
