@@ -2861,7 +2861,7 @@ server <- function(input, output, session) {
         "gap:3px;max-width:760px;margin:0 auto;"
       ), tiles),
       tags$p(style="font-size:0.7em;color:#999;text-align:center;margin-top:8px;",
-        "※ 実際の地理的形状ではなく、相対位置をおおまかに表したデフォルメ配置です。タイルをクリックするとその都道府県・疾患の流行曲線タブに移動します。")
+        "※ タイルをクリックするとその都道府県・疾患の流行曲線タブに移動します。")
     )
   })
 
