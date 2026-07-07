@@ -1276,8 +1276,9 @@ server <- function(input, output, session) {
     if (!is.null(s$multi_view))
       updateSelectInput(session, "multi_view", selected = s$multi_view)
     # 実効再生産数
-    if (!is.null(s$rt_disease))
-      updateSelectInput(session, "rt_disease", selected = s$rt_disease)
+    # rt_disease はサイドバーの疾患選択と双方向同期しているため、ここで独立に
+    # 復元すると保存時の値とずれて起動直後にプルダウンが勝手に切り替わる原因に
+    # なる。disease の復元（上記）に伴う同期に任せ、ここでは復元しない。
     if (!is.null(s$rt_zensu_disease))
       updateSelectInput(session, "rt_zensu_disease", selected = s$rt_zensu_disease)
     # アクティブタブ
@@ -2012,15 +2013,19 @@ server <- function(input, output, session) {
 
   # ── サイドバー疾患 ↔ Rt タブ 双方向同期 ────────────────────
   # サイドバー → Rt タブ（Rt対応疾患の場合のみ）
+  # 値が既に一致している場合は更新しない（双方向同期による無限ループ・
+  # プルダウンの値が行ったり来たりする不具合を防ぐためのガード）
   observeEvent(input$disease, {
-    if (input$disease %in% RT_DISEASE_IDS) {
+    if (input$disease %in% RT_DISEASE_IDS && !identical(input$rt_disease, input$disease)) {
       updateSelectInput(session, "rt_disease", selected = input$disease)
     }
   }, ignoreInit = TRUE)
 
   # Rt タブ → サイドバー
   observeEvent(input$rt_disease, {
-    updateSelectInput(session, "disease", selected = input$rt_disease)
+    if (!identical(input$disease, input$rt_disease)) {
+      updateSelectInput(session, "disease", selected = input$rt_disease)
+    }
   }, ignoreInit = TRUE)
 
   # ── グループフィルターで複数疾患比較のチェックボックスを更新 ──
