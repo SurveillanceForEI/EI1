@@ -2694,6 +2694,8 @@ server <- function(input, output, session) {
           sc     <- combined_score(ibs_s, ebs_s)
           results[[pr]] <- list(
             id=pr, label=pr, region=PREF_MASTER$region[PREF_MASTER$pref_name==pr][1],
+            grid_row=PREF_MASTER$grid_row[PREF_MASTER$pref_name==pr][1],
+            grid_col=PREF_MASTER$grid_col[PREF_MASTER$pref_name==pr][1],
             ibs_score=ibs_s, ebs_score=ebs_s,
             act_level=act_level(sc), combined=sc,
             cur_val=cur$reports_per_site[1],
@@ -2725,6 +2727,8 @@ server <- function(input, output, session) {
           sc    <- combined_score(ibs_s, ebs_s)
           results[[pr]] <- list(
             id=pr, label=pr, region=PREF_MASTER$region[PREF_MASTER$pref_name==pr][1],
+            grid_row=PREF_MASTER$grid_row[PREF_MASTER$pref_name==pr][1],
+            grid_col=PREF_MASTER$grid_col[PREF_MASTER$pref_name==pr][1],
             ibs_score=ibs_s, ebs_score=ebs_s,
             act_level=act_level(sc), combined=sc,
             cur_val=cur$reports_per_site[1],
@@ -2778,45 +2782,42 @@ server <- function(input, output, session) {
     else
       function(v) sprintf("%.2f", coalesce(v, 0))
 
-    cards <- lapply(res, function(r) {
+    # デフォルメした日本地図のグリッド上に、都道府県ごとのタイルを配置する
+    # （grid_row/grid_colはPREF_MASTERで定義した簡易的な相対配置）
+    max_row <- max(sapply(res, `[[`, "grid_row"))
+    max_col <- max(sapply(res, `[[`, "grid_col"))
+
+    tiles <- lapply(res, function(r) {
       cfg <- lcfg[[as.character(r$act_level)]]
       tags$div(
         style=paste0(
-          "border:1px solid ",cfg$border,";border-left:5px solid ",cfg$color,";",
-          "background:",cfg$bg,";border-radius:6px;padding:8px 10px;",
-          "display:flex;flex-direction:column;gap:3px;height:100%;box-sizing:border-box;"
+          "grid-row:",r$grid_row,";grid-column:",r$grid_col,";",
+          "border:1px solid ",cfg$border,";border-left:4px solid ",cfg$color,";",
+          "background:",cfg$bg,";border-radius:5px;padding:4px 6px;",
+          "display:flex;flex-direction:column;gap:1px;box-sizing:border-box;",
+          "font-size:0.68em;min-width:0;overflow:hidden;"
         ),
-        tags$div(style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;",
-          tags$div(style="font-size:0.82em;font-weight:700;color:#222;line-height:1.3;flex:1;",
-                   r$label),
-          tags$span(style=paste0("font-size:0.62em;background:#2980b9;",
-            "color:#fff;border-radius:8px;padding:1px 5px;white-space:nowrap;flex-shrink:0;"),
-            r$region)
-        ),
-        tags$div(
-          tags$span(style=paste0(
-            "display:inline-block;padding:2px 8px;border-radius:10px;",
-            "background:",cfg$color,";color:#fff;font-size:0.75em;font-weight:700;"),
-            paste0("Lv",r$act_level," ",cfg$name))
-        ),
-        tags$div(style="font-size:0.7em;color:#666;",
-          paste0(cur_fmt_fn(r$cur_val), "　", r$ibs_label)),
-        if (!is.null(r$ibs_method)) tags$div(
-          style="font-size:0.62em;color:#999;",
-          paste0("判定方式: ", if (identical(r$ibs_method,"seasonal")) "季節性あり" else "散発疾患向け", "　"),
-          tags$a(href="javascript:void(0)", onclick="goToNotes('notes-zensu-ibs')", "詳細")
-        )
+        title = paste0(r$label, "　Lv", r$act_level, " ", cfg$name,
+                       "　", cur_fmt_fn(r$cur_val), "　", r$ibs_label),
+        tags$div(style="font-weight:700;color:#222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;",
+                 sub("[都道府県]$", "", r$label)),
+        tags$span(style=paste0(
+          "display:inline-block;padding:0 5px;border-radius:8px;align-self:flex-start;",
+          "background:",cfg$color,";color:#fff;font-size:0.95em;font-weight:700;"),
+          paste0("Lv",r$act_level))
       )
     })
 
-    n <- length(cards)
-    cols_per_row <- 4L
-    rows <- split(seq_len(n), ceiling(seq_len(n) / cols_per_row))
-    do.call(tagList, lapply(rows, function(idx) {
-      fluidRow(style="margin-bottom:8px;",
-        lapply(idx, function(i) column(3, style="padding:4px;", cards[[i]]))
-      )
-    }))
+    tagList(
+      tags$div(style=paste0(
+        "display:grid;",
+        "grid-template-columns:repeat(",max_col,", minmax(38px, 1fr));",
+        "grid-template-rows:repeat(",max_row,", 46px);",
+        "gap:3px;max-width:760px;margin:0 auto;"
+      ), tiles),
+      tags$p(style="font-size:0.7em;color:#999;text-align:center;margin-top:8px;",
+        "※ 実際の地理的形状ではなく、相対位置をおおまかに表したデフォルメ配置です。タイルにマウスを乗せると詳細を表示します。")
+    )
   })
 
   # ── 病原体検出（IASR）────────────────────────────────────
