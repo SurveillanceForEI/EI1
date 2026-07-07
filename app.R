@@ -2810,7 +2810,7 @@ server <- function(input, output, session) {
       # 1.5マス分（2マスの75%）に縮小する（右側の0.5マス分は空白として残る）
       # 兵庫・京都も同様に、縦2マス分を確保したまま高さだけ1.5マス分に縮小する
       size_override <- if (identical(r$label, "青森県")) "width:75%;"
-                        else if (r$label %in% c("兵庫県","京都府")) "height:75%;"
+                        else if (r$label %in% c("兵庫県","京都府","千葉県")) "height:75%;"
                         else ""
       tags$div(
         style=paste0(
