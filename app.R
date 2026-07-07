@@ -1747,10 +1747,13 @@ server <- function(input, output, session) {
   })
 
   # スライダーUI（整数インデックス方式 — Dateスライダーはdate_rangeと干渉するため使用しない）
+  # 目盛り・つまみの表示ラベルは素のインデックス番号のままだと分かりにくいため、
+  # ionRangeSliderのprettifyコールバックで実際の日付文字列に置き換える
   output$map_week_selector_ui <- renderUI({
     dates <- map_available_dates()
     n <- length(dates)
     if (n == 0) return(NULL)
+    date_labels <- format(dates, "%Y/%m/%d")
     tags$div(
       style = "padding:2px 4px 6px 4px;",
       # 選択週の日付テキスト表示
@@ -1769,7 +1772,23 @@ server <- function(input, output, session) {
           playButton  = tags$span(icon("play"),  " 再生"),
           pauseButton = tags$span(icon("pause"), " 一時停止")
         )
-      )
+      ),
+      tags$script(HTML(sprintf(
+        "(function(){
+           var labels = %s;
+           function applyPrettify(){
+             var el = $('#map_week_idx');
+             var inst = el.data('ionRangeSlider');
+             if (inst) {
+               inst.update({ prettify: function(num){ return labels[num-1] || num; } });
+             } else {
+               setTimeout(applyPrettify, 100);
+             }
+           }
+           applyPrettify();
+         })();",
+        jsonlite::toJSON(date_labels)
+      )))
     )
   })
 
