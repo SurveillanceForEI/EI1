@@ -256,9 +256,9 @@ ui <- dashboardPage(
       max   = as.Date(paste0(format(Sys.Date(), "%Y"), "-12-31")),
       value = c(Sys.Date() - 365*3, Sys.Date()),
       timeFormat = "%Y/%m", step = 7, width = "100%"),
-    tags$div(style="padding:0 15px 6px 15px;",
+    tags$div(style="padding:0 15px 6px 15px;text-align:center;",
       actionButton("date_range_reset", "最新表示に戻す", icon=icon("rotate-right"),
-        class="btn-default btn-sm btn-block")),
+        class="btn-default btn-sm", style="font-size:0.78em;padding:3px 10px;")),
 
     tags$div(class="sidebar-section-title", style="padding-left:15px", "都道府県"),
     selectInput("pref_filter",NULL,
