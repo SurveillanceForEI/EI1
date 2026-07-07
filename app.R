@@ -2802,15 +2802,20 @@ server <- function(input, output, session) {
       # 愛媛・香川・高知・徳島は、グリッド線を変えずに見た目だけ0.5マス右にずらす
       # （transformは要素自身のレイアウト幅に影響しないため、marginと違いカードが
       # 半分の幅に縮んでしまう問題が起きない）
-      half_shift <- if (r$label %in% c("愛媛県","香川県","高知県","徳島県")) "transform:translateX(50%);"
+      half_shift <- if (r$label %in% c("愛媛県","香川県","高知県","徳島県","神奈川県")) "transform:translateX(50%);"
                     else if (r$label == "沖縄県") "transform:translateX(-150%);"
                     else if (r$label %in% c("大阪府","奈良県","和歌山県")) "transform:translateY(-50%);"
+                    else if (identical(r$label, "群馬県")) "transform:translateY(50%);"
                     else ""
       # 青森は、グリッド上は北海道と同じ2マス分を確保したまま、見た目の幅だけ
       # 1.5マス分（2マスの75%）に縮小する（右側の0.5マス分は空白として残る）
       # 兵庫・京都も同様に、縦2マス分を確保したまま高さだけ1.5マス分に縮小する
+      # 静岡・新潟は逆に、グリッド上は1マス分のまま見た目だけ1.5マス分に拡大する
+      # （隣接マス（神奈川・群馬）が0.5マスずれて空いた分に視覚的に重なる想定）
       size_override <- if (identical(r$label, "青森県")) "width:75%;"
                         else if (r$label %in% c("兵庫県","京都府","千葉県")) "height:75%;"
+                        else if (identical(r$label, "静岡県")) "width:150%;"
+                        else if (identical(r$label, "新潟県")) "height:150%;"
                         else ""
       tags$div(
         style=paste0(
