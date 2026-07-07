@@ -2832,7 +2832,7 @@ server <- function(input, output, session) {
         title = paste0(r$label, "　Lv", r$act_level, " ", cfg$name,
                        "　", cur_fmt_fn(r$cur_val), "　", r$ibs_label),
         tags$div(style="font-weight:700;color:#222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;",
-                 sub("[都道府県]$", "", r$label)),
+                 if (identical(r$label, "北海道")) r$label else sub("[都道府県]$", "", r$label)),
         tags$span(style=paste0(
           "display:inline-block;padding:0 5px;border-radius:8px;align-self:flex-start;",
           "background:",cfg$color,";color:#fff;font-size:0.95em;font-weight:700;"),
