@@ -1,0 +1,13 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+.claude/
+rsconnect/
+startup*.log
+data/cache/
+data/cache_iasr/
+data/cache_zensu/
+data/*.log
+data/*.rds
+data/last_update.txt

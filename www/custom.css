@@ -1,0 +1,127 @@
+/* 感染症サーベイランスダッシュボード カスタムスタイル */
+
+body {
+  font-family: "Noto Sans JP", "Yu Gothic", "Hiragino Sans", sans-serif;
+  background-color: #f4f6f9;
+}
+
+.skin-blue .main-header .logo {
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  height: 64px;
+  line-height: 1.25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.skin-blue .main-header .navbar {
+  min-height: 64px;
+}
+.skin-blue .main-header {
+  min-height: 64px;
+}
+
+/* KPI カード */
+.kpi-box {
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  text-align: center;
+  margin-bottom: 6px;
+  min-height: 98px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+.kpi-value {
+  font-size: 1.6em;
+  font-weight: 700;
+  line-height: 1.0;
+}
+.kpi-label {
+  font-size: 0.7em;
+  color: #666;
+  margin-top: 1px;
+  line-height: 1.15;
+}
+.kpi-delta {
+  font-size: 0.74em;
+  margin-top: 2px;
+  font-weight: 600;
+  line-height: 1.15;
+}
+.kpi-delta.up   { color: #e74c3c; }
+.kpi-delta.down { color: #27ae60; }
+.kpi-delta.flat { color: #7f8c8d; }
+
+/* アラートバッジ */
+.alert-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.78em;
+  font-weight: 600;
+  color: #fff;
+}
+
+/* サイドバー内 radioButtons を selectInput と同じ左位置に揃える */
+.skin-blue .sidebar #ts_mode {
+  padding-left: 0;
+}
+.skin-blue .sidebar #ts_mode .radio {
+  margin: 2px 0;
+}
+.skin-blue .sidebar #ts_mode .radio label {
+  padding-left: 20px;
+  font-size: 0.9em;
+}
+
+/* サイドバー */
+.sidebar-section-title {
+  color: #aaa;
+  font-size: 0.72em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 16px 0 6px 4px;
+}
+
+/* タブパネル */
+.nav-tabs > li > a {
+  font-size: 0.88em;
+}
+
+/* データ出典バー */
+.data-source-bar {
+  background: #ecf0f1;
+  border-left: 4px solid #3498db;
+  padding: 6px 12px;
+  font-size: 0.78em;
+  color: #555;
+  margin-bottom: 12px;
+  border-radius: 0 4px 4px 0;
+}
+
+/* デモデータバナー */
+.demo-banner {
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 0.82em;
+  color: #856404;
+  margin-bottom: 12px;
+}
+
+/* leafletマップ高さ */
+#map_panel { height: 480px !important; }
+
+/* テーブル */
+.dataTables_wrapper { font-size: 0.85em; }
+
+/* Rt チャートの参照線ラベル */
+.rt-reference { color: #888; font-size: 0.8em; }

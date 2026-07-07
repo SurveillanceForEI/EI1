@@ -1,0 +1,6 @@
+scripts/
+install_packages.R
+deploy.R
+*.log
+.git/
+data/cache_zensu/
