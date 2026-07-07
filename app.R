@@ -2802,7 +2802,9 @@ server <- function(input, output, session) {
       # 愛媛・香川・高知・徳島は、グリッド線を変えずに見た目だけ0.5マス右にずらす
       # （transformは要素自身のレイアウト幅に影響しないため、marginと違いカードが
       # 半分の幅に縮んでしまう問題が起きない）
-      half_shift <- if (r$label %in% c("愛媛県","香川県","高知県","徳島県")) "transform:translateX(50%);" else ""
+      half_shift <- if (r$label %in% c("愛媛県","香川県","高知県","徳島県")) "transform:translateX(50%);"
+                    else if (r$label == "沖縄県") "transform:translateX(-150%);"
+                    else ""
       tags$div(
         style=paste0(
           "grid-row:",row_span,";grid-column:",col_span,";",
