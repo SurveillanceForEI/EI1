@@ -2789,9 +2789,11 @@ server <- function(input, output, session) {
 
     tiles <- lapply(res, function(r) {
       cfg <- lcfg[[as.character(r$act_level)]]
+      # 北海道は面積が大きいため、タイルも2列分の幅で表示する
+      col_span <- if (identical(r$label, "北海道")) paste0(r$grid_col," / span 2") else as.character(r$grid_col)
       tags$div(
         style=paste0(
-          "grid-row:",r$grid_row,";grid-column:",r$grid_col,";",
+          "grid-row:",r$grid_row,";grid-column:",col_span,";",
           "border:1px solid ",cfg$border,";border-left:4px solid ",cfg$color,";",
           "background:",cfg$bg,";border-radius:5px;padding:4px 6px;",
           "display:flex;flex-direction:column;gap:1px;box-sizing:border-box;",
