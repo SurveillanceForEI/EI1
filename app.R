@@ -1021,9 +1021,13 @@ function ebsUntranslateCards(containerId) {
             tags$li(tags$strong("指数平滑法（Holt法）: "),
               "水準とトレンド（増減の勢い）を指数的に重み付けしながら逐次更新するHolt線形トレンド法",
               "（季節成分なし）です。直近のデータほど重視しつつ、過去の推移も緩やかに反映します。"),
-            tags$li(tags$strong("Rtベース（実効再生産数）: "),
-              "直近の実効再生産数（Rt）が今後も一定と仮定し、週あたり成長率 = Rt^(7/シリアルインターバル[日])",
-              "で指数的に延長します。Rt自体の推定誤差を踏まえ、参考区間として±30%の簡易バンドを付しています。",
+            tags$li(tags$strong("Rtベース（renewal equation）: "),
+              "感染症の数理モデルにおける更新方程式（renewal equation／分枝過程モデル）に基づく手法です。",
+              tags$code("I(t) = Rt × Σ I(t-s)×w(s)"),
+              "の式で、過去の実測値をシリアルインターバル分布（Rt推定と同じガンマ分布近似）で",
+              "重み付け合成し、直近の実効再生産数（Rt）が今後も一定と仮定して1週ずつ将来値を生成します。",
+              "直近1点だけを外挿する単純な指数近似と異なり、過去複数週の推移の形状を踏まえた予測になります。",
+              "Rt自体の推定誤差を踏まえ、参考区間として±30%の簡易バンドを付しています。",
               "Rtが推定できない疾患ではこの手法は使用できません。"),
             tags$li(tags$strong("アンサンブル（推奨）: "),
               "上記3手法のうち算出できたものの単純平均です。個々の手法の誤差や前提の偏りを緩和し、",
@@ -3479,7 +3483,9 @@ server <- function(input, output, session) {
       }, error=function(e) NA_real_)
       fc <- tryCatch(
         compute_forecast(nat$date, nat$reports_per_site, fc_method,
-                          horizon=4, rt_value=rt_val, si_days=if (!is.null(si)) si$mean else NA_real_),
+                          horizon=4, rt_value=rt_val,
+                          si_mean=if (!is.null(si)) si$mean else NA_real_,
+                          si_sd=if (!is.null(si)) si$sd else NA_real_),
         error=function(e) NULL)
       if (!is.null(fc) && nrow(fc) > 0) {
         last_pt <- tail(nat, 1)
@@ -4464,7 +4470,9 @@ server <- function(input, output, session) {
       }, error=function(e) NA_real_)
       fc <- tryCatch(
         compute_forecast(d_agg$date, d_agg$cases, fc_method,
-                          horizon=4, rt_value=rt_val, si_days=if (!is.null(si)) si$mean else NA_real_),
+                          horizon=4, rt_value=rt_val,
+                          si_mean=if (!is.null(si)) si$mean else NA_real_,
+                          si_sd=if (!is.null(si)) si$sd else NA_real_),
         error=function(e) NULL)
       if (!is.null(fc) && nrow(fc) > 0) {
         last_pt <- tail(d_agg, 1)

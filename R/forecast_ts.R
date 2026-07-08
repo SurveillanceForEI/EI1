@@ -8,7 +8,7 @@ FORECAST_METHOD_LABELS <- c(
   ensemble = "アンサンブル（複数手法平均）",
   poisson  = "ポアソン回帰（GLM）",
   holt     = "指数平滑法（Holt法）",
-  rt       = "Rtベース（実効再生産数）"
+  rt       = "Rtベース（renewal equation）"
 )
 
 # ポアソン回帰（準ポアソンGLM）: 感染症の週次報告数のような非負のカウントデータに対して
@@ -59,18 +59,40 @@ forecast_holt <- function(values, horizon = 4) {
   )
 }
 
-# Rtベース予測: 直近の実効再生産数が今後も一定と仮定した指数的な増減を延長
-# 週あたり成長率 = Rt^(7/シリアルインターバル[日])
-# Rt自体の推定誤差を反映するため、参考区間として±30%の簡易バンドを付す
-forecast_rt <- function(last_value, rt_value, si_days, horizon = 4) {
-  if (is.na(last_value) || is.na(rt_value) || is.na(si_days) || si_days <= 0) return(NULL)
-  growth_per_week <- rt_value ^ (7 / si_days)
-  vals <- last_value * growth_per_week ^ seq_len(horizon)
+# Rtベース予測（renewal equation / 分枝過程モデル）:
+# I(t) = Rt × Σ_s I(t-s)×w(s) で将来値を逐次生成する。w(s)はシリアルインターバル分布
+# （Rt推定 estimate_rt_simple() と同一のガンマ分布近似）に基づく重みで、直近1点のみに
+# 依存する単純な指数外挿と異なり、過去複数週の実績の形状を反映した予測になる。
+# 直近の実効再生産数（Rt）が今後も一定と仮定し、Rt自体の推定誤差を踏まえた
+# 参考区間として±30%の簡易バンドを付す。
+forecast_rt <- function(values, rt_value, si_mean, si_sd, horizon = 4) {
+  n <- length(values)
+  if (n < 4 || is.na(rt_value) || is.na(si_mean) || is.na(si_sd) || si_mean <= 0 || si_sd <= 0) return(NULL)
+
+  k     <- (si_mean / si_sd)^2
+  theta <- si_sd^2 / si_mean
+  w <- pgamma(1:20, shape = k, scale = theta) - pgamma(0:19, shape = k, scale = theta)
+  w <- w / sum(w)
+  L <- length(w)
+
+  sim <- pmax(0, values)
+  sim[is.na(sim)] <- 0
+
+  preds <- numeric(horizon)
+  for (h in seq_len(horizon)) {
+    m <- length(sim)
+    lags   <- seq_len(min(L, m))
+    lambda <- sum(sim[m - lags + 1] * w[lags])
+    next_val <- rt_value * lambda
+    preds[h] <- next_val
+    sim <- c(sim, next_val)
+  }
+
   data.frame(
     step  = seq_len(horizon),
-    value = vals,
-    lower = vals * 0.7,
-    upper = vals * 1.3
+    value = preds,
+    lower = preds * 0.7,
+    upper = preds * 1.3
   )
 }
 
@@ -86,7 +108,7 @@ forecast_ensemble <- function(forecast_list) {
 # 予測ディスパッチャ: method に応じて手法を選択し、日付付きの予測データフレームを返す
 # dates: 実測データの日付ベクトル（昇順）, values: 対応する値
 compute_forecast <- function(dates, values, method, horizon = 4,
-                              rt_value = NA_real_, si_days = NA_real_) {
+                              rt_value = NA_real_, si_mean = NA_real_, si_sd = NA_real_) {
   ord <- order(dates)
   dates  <- dates[ord]
   values <- values[ord]
@@ -95,7 +117,7 @@ compute_forecast <- function(dates, values, method, horizon = 4,
 
   poi  <- forecast_poisson(values, horizon)
   holt <- forecast_holt(values, horizon)
-  rt   <- forecast_rt(values[n], rt_value, si_days, horizon)
+  rt   <- forecast_rt(values, rt_value, si_mean, si_sd, horizon)
 
   picked <- switch(method,
     poisson  = poi,
