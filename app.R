@@ -607,6 +607,9 @@ function ebsUntranslateCards(containerId) {
               icon("info-circle"), " 疾患・都道府県はサイドバーで選択"),
             selectInput("ebs_page_size","表示件数",
               choices=c("10件"=10,"50件"=50,"100件"=100,"全部"=9999), selected=50),
+            radioButtons("ebs_sort", "並び順",
+              choices = c("シグナル優先"="signal", "日付順（新しい順）"="date"),
+              selected = "signal"),
             actionButton("ebs_show_all", "すべて表示",
               icon=icon("list"), class="btn btn-default btn-sm",
               style="width:100%;margin-top:4px;"),
@@ -637,6 +640,9 @@ function ebsUntranslateCards(containerId) {
               icon("info-circle"), " 疾患はサイドバーで選択"),
             selectInput("ebs_ov_page_size","表示件数",
               choices=c("10件"=10,"50件"=50,"100件"=100,"全部"=9999), selected=50),
+            radioButtons("ebs_ov_sort", "並び順",
+              choices = c("シグナル優先"="signal", "日付順（新しい順）"="date"),
+              selected = "signal"),
             actionButton("ebs_ov_show_all", "すべて表示",
               icon=icon("list"), class="btn btn-default btn-sm",
               style="width:100%;margin-top:4px;"),
@@ -3863,7 +3869,11 @@ server <- function(input, output, session) {
         )
       }
     }
-    d %>% arrange(signal_level, desc(pub_date))
+    if (!is.null(input$ebs_sort) && input$ebs_sort == "date") {
+      d %>% arrange(desc(pub_date))
+    } else {
+      d %>% arrange(signal_level, desc(pub_date))
+    }
   })
   output$ebs_last_updated <- renderUI({ NULL })
 
@@ -4117,7 +4127,11 @@ server <- function(input, output, session) {
       if (!is.null(did) && did != "すべて")
         d <- d %>% filter(has_disease_tag(disease_tags, did))
     }
-    d %>% arrange(signal_level, desc(pub_date))
+    if (!is.null(input$ebs_ov_sort) && input$ebs_ov_sort == "date") {
+      d %>% arrange(desc(pub_date))
+    } else {
+      d %>% arrange(signal_level, desc(pub_date))
+    }
   })
 
   output$ebs_ov_signal_summary <- renderUI({
