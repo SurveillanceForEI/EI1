@@ -477,7 +477,7 @@ function ebsUntranslateCards(containerId) {
             tags$div(style="display:flex;align-items:center;gap:6px;",
               tags$label("予測手法:", style="font-size:0.85em;margin:0;color:#555;"),
               selectInput("forecast_method", NULL,
-                choices = c("アンサンブル（推奨）"="ensemble", "線形トレンド外挿"="linear",
+                choices = c("アンサンブル（推奨）"="ensemble", "ポアソン回帰（GLM）"="poisson",
                             "指数平滑法（Holt法）"="holt", "Rtベース（実効再生産数）"="rt"),
                 selected = "ensemble", width = "230px")
             )
@@ -1013,9 +1013,11 @@ function ebsUntranslateCards(containerId) {
             "以下のいずれかの手法（プルダウンで選択）により算出しています。"
           ),
           tags$ul(
-            tags$li(tags$strong("線形トレンド外挿: "),
-              "直近8週の実測値に単純回帰直線をあてはめ、そのまま延長します。80%予測区間つき。",
-              "短期的な増減の勢いをそのまま将来に投影する、最もシンプルな手法です。"),
+            tags$li(tags$strong("ポアソン回帰（GLM）: "),
+              "感染症の週次報告数のような非負のカウントデータに標準的に用いられる回帰手法です。",
+              "直近8週の実測値に対数リンクの準ポアソン回帰（quasipoisson GLM）をあてはめ、",
+              "乗法的な増減として延長します（過分散に対応、80%予測区間つき）。",
+              "単純な直線回帰と異なり、値が負にならず、増減が指数的に働く点が実際の流行動態に近い挙動です。"),
             tags$li(tags$strong("指数平滑法（Holt法）: "),
               "水準とトレンド（増減の勢い）を指数的に重み付けしながら逐次更新するHolt線形トレンド法",
               "（季節成分なし）です。直近のデータほど重視しつつ、過去の推移も緩やかに反映します。"),

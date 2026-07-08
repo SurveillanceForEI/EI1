@@ -6,31 +6,34 @@
 
 FORECAST_METHOD_LABELS <- c(
   ensemble = "アンサンブル（複数手法平均）",
-  linear   = "線形トレンド外挿",
+  poisson  = "ポアソン回帰（GLM）",
   holt     = "指数平滑法（Holt法）",
   rt       = "Rtベース（実効再生産数）"
 )
 
-# 線形トレンド外挿: 直近n_recent週の単純回帰直線を延長し、予測区間(80%)を付す
-forecast_linear <- function(values, horizon = 4, n_recent = 8) {
+# ポアソン回帰（準ポアソンGLM）: 感染症の週次報告数のような非負のカウントデータに対して
+# 標準的に用いられる回帰手法。対数リンクにより乗法的な増減を仮定し、直近n_recent週の
+# データにあてはめて延長する。過分散に対応するためquasipoissonを使用。
+forecast_poisson <- function(values, horizon = 4, n_recent = 8) {
   n <- length(values)
   if (n < 4 || all(is.na(values))) return(NULL)
   idx_use <- max(1, n - n_recent + 1):n
   x <- idx_use
-  y <- values[idx_use]
+  y <- pmax(0, values[idx_use])
   if (sum(!is.na(y)) < 3 || length(unique(na.omit(y))) < 2) return(NULL)
-  fit <- tryCatch(lm(y ~ x), error = function(e) NULL)
+  fit <- tryCatch(glm(y ~ x, family = quasipoisson()), error = function(e) NULL)
   if (is.null(fit)) return(NULL)
   newx <- (n + 1):(n + horizon)
   pred <- tryCatch(
-    predict(fit, newdata = data.frame(x = newx), interval = "prediction", level = 0.8),
+    predict(fit, newdata = data.frame(x = newx), type = "link", se.fit = TRUE),
     error = function(e) NULL)
-  if (is.null(pred)) return(NULL)
+  if (is.null(pred) || any(is.na(pred$se.fit))) return(NULL)
+  z <- stats::qnorm(0.9)  # 80%区間
   data.frame(
     step  = seq_len(horizon),
-    value = pmax(0, pred[, "fit"]),
-    lower = pmax(0, pred[, "lwr"]),
-    upper = pmax(0, pred[, "upr"])
+    value = exp(pred$fit),
+    lower = exp(pred$fit - z * pred$se.fit),
+    upper = exp(pred$fit + z * pred$se.fit)
   )
 }
 
@@ -90,15 +93,15 @@ compute_forecast <- function(dates, values, method, horizon = 4,
   n <- length(values)
   if (n < 4) return(NULL)
 
-  lin  <- forecast_linear(values, horizon)
+  poi  <- forecast_poisson(values, horizon)
   holt <- forecast_holt(values, horizon)
   rt   <- forecast_rt(values[n], rt_value, si_days, horizon)
 
   picked <- switch(method,
-    linear   = lin,
+    poisson  = poi,
     holt     = holt,
     rt       = rt,
-    ensemble = forecast_ensemble(list(lin, holt, rt)),
+    ensemble = forecast_ensemble(list(poi, holt, rt)),
     NULL
   )
   if (is.null(picked) || nrow(picked) == 0) return(NULL)
