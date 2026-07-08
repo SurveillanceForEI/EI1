@@ -104,6 +104,7 @@ tryCatch({
     "R/iasr_loader.R",
     "R/correlation.R",
     "R/change_tracker.R",
+    "R/forecast_ts.R",
     "www/custom.css",
     "data/japan_map.rds",
     "data/ebs_startup_cache.rds",
