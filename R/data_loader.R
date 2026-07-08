@@ -622,12 +622,21 @@ alert_color <- function(level) {
 # 季節性判定: 週別（week of year）の平均報告数を算出し、そのばらつき（変動係数=CV）
 # が一定以上であれば「特定の時期に集中する=季節性あり」とみなす。
 # データが少ない（3年未満）／報告がほぼ皆無の疾患は季節性なし扱いとする。
+#
+# 低頻度疾患への追加ガード: 回帰熱のように年間報告数が数件程度の疾患では、
+# 数少ない散発例がたまたま特定の週に集中しただけでCVが高くなり、統計的に
+# 不安定なまま「季節性あり」と誤判定されやすい。年平均報告数が閾値未満の
+# 場合は、CVの値によらず季節性なし（散発疾患向けのEARS C2方式）を強制する。
+MIN_ANNUAL_CASES_FOR_SEASONALITY <- 10
+
 detect_seasonality <- function(hist_d, value_col = "reports_per_site") {
   if (is.null(hist_d) || nrow(hist_d) == 0) return(FALSE)
   v <- hist_d[[value_col]]
   if (is.null(v) || all(is.na(v)) || sum(v, na.rm = TRUE) <= 0) return(FALSE)
   n_years <- length(unique(hist_d$year[!is.na(v) & v > 0]))
   if (n_years < 3) return(FALSE)
+  annual_avg <- sum(v, na.rm = TRUE) / n_years
+  if (annual_avg < MIN_ANNUAL_CASES_FOR_SEASONALITY) return(FALSE)
   wk_mean <- tapply(v, hist_d$week, mean, na.rm = TRUE)
   wk_mean <- wk_mean[!is.na(wk_mean)]
   if (length(wk_mean) < 10) return(FALSE)
