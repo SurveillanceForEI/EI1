@@ -24,6 +24,7 @@ source("R/ebs_loader.R")
 source("R/zensu_loader.R")
 source("R/iasr_loader.R")
 source("R/change_tracker.R")
+source("R/forecast_ts.R")
 
 # shinyapps.io 上での実行かどうかを判定
 # R_CONFIG_ACTIVE, HOME パス, またはアプリIDのいずれかで判定
@@ -468,6 +469,23 @@ function ebsUntranslateCards(containerId) {
             style="color:#888;text-decoration:none;",
             icon("circle-info"), " 全数把握 注意事項")),
         uiOutput("filter_bar_ts"),
+        tags$div(style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:2px 4px 6px;padding:6px 10px;background:#f4f4f4;border-radius:6px;",
+          tags$div(style="display:flex;align-items:center;gap:6px;",
+            checkboxInput("show_forecast", "予測を表示（4週後まで）", value = FALSE, width = "auto")
+          ),
+          conditionalPanel("input.show_forecast",
+            tags$div(style="display:flex;align-items:center;gap:6px;",
+              tags$label("予測手法:", style="font-size:0.85em;margin:0;color:#555;"),
+              selectInput("forecast_method", NULL,
+                choices = c("アンサンブル（推奨）"="ensemble", "線形トレンド外挿"="linear",
+                            "指数平滑法（Holt法）"="holt", "Rtベース（実効再生産数）"="rt"),
+                selected = "ensemble", width = "230px")
+            )
+          ),
+          tags$a(href="javascript:void(0)", onclick="goToNotes('notes-forecast')",
+            style="font-size:0.78em;color:#888;text-decoration:none;",
+            icon("circle-info"), " 予測手法について")
+        ),
         # 定点把握（線グラフ＋ヒートマップ＋地域比較）
         conditionalPanel("input.ts_mode === 'teiten'",
           fluidRow(column(12,
@@ -984,6 +1002,37 @@ function ebsUntranslateCards(containerId) {
             tags$li("95%信頼区間が広い場合はデータ不足の可能性があります"),
             tags$li("SI値が未定義の疾患は「推定対象外」と表示されます"),
             tags$li("「潜伏期間より推定」と表示される疾患のRt値は参考値として扱ってください")
+          ),
+          tags$br(),
+
+          # ── 短期予測 ────────────────────────────────────
+          tags$h4(id="notes-forecast", "■ 短期予測（4週先まで）", style="border-bottom:2px solid #8e44ad;padding-bottom:4px;color:#2c3e50;"),
+          tags$p(
+            "流行曲線タブの「予測を表示」をオンにすると、直近の実測データから4週先までの参考予測を",
+            "紫色の破線・帯（予測区間の目安）で重ねて表示します。追加のパッケージを使わず、",
+            "以下のいずれかの手法（プルダウンで選択）により算出しています。"
+          ),
+          tags$ul(
+            tags$li(tags$strong("線形トレンド外挿: "),
+              "直近8週の実測値に単純回帰直線をあてはめ、そのまま延長します。80%予測区間つき。",
+              "短期的な増減の勢いをそのまま将来に投影する、最もシンプルな手法です。"),
+            tags$li(tags$strong("指数平滑法（Holt法）: "),
+              "水準とトレンド（増減の勢い）を指数的に重み付けしながら逐次更新するHolt線形トレンド法",
+              "（季節成分なし）です。直近のデータほど重視しつつ、過去の推移も緩やかに反映します。"),
+            tags$li(tags$strong("Rtベース（実効再生産数）: "),
+              "直近の実効再生産数（Rt）が今後も一定と仮定し、週あたり成長率 = Rt^(7/シリアルインターバル[日])",
+              "で指数的に延長します。Rt自体の推定誤差を踏まえ、参考区間として±30%の簡易バンドを付しています。",
+              "Rtが推定できない疾患ではこの手法は使用できません。"),
+            tags$li(tags$strong("アンサンブル（推奨）: "),
+              "上記3手法のうち算出できたものの単純平均です。個々の手法の誤差や前提の偏りを緩和し、",
+              "より安定した予測になる傾向があります。")
+          ),
+          tags$div(style="background:#fff8e1;border-left:4px solid #f39c12;padding:8px 12px;margin-bottom:8px;font-size:0.9em;",
+            tags$strong("注意: "),
+            "いずれの手法も統計的な外挿にすぎず、変異株の出現、施策変更、報告体制の変化等の",
+            "予測不能な要因は反映されません。特に報告数が少ない疾患では区間が大きく広がる、",
+            "またはRtベース手法が使用できない場合があります。予測値は参考情報としてのみ利用し、",
+            "実際の判断は最新の実測データと専門家の評価に基づいて行ってください。"
           ),
           tags$br(),
 
@@ -3418,6 +3467,35 @@ server <- function(input, output, session) {
         marker=list(color="#e74c3c", size=6, symbol="circle"),
         name="+2SD超過", hovertemplate="%{x|%Y-W%W}: %{y:.2f}<extra></extra>")
     }
+    # ── 短期予測（4週先まで）─────────────────────────────
+    if (isTRUE(input$show_forecast) && nrow(nat) >= 4) {
+      fc_method <- if (is.null(input$forecast_method)) "ensemble" else input$forecast_method
+      si <- SERIAL_INTERVALS[[input$disease]]
+      rt_val <- tryCatch({
+        rd <- rt_series() %>% filter(!is.na(rt)) %>% slice_tail(n=1)
+        if (nrow(rd)==0) NA_real_ else rd$rt[1]
+      }, error=function(e) NA_real_)
+      fc <- tryCatch(
+        compute_forecast(nat$date, nat$reports_per_site, fc_method,
+                          horizon=4, rt_value=rt_val, si_days=if (!is.null(si)) si$mean else NA_real_),
+        error=function(e) NULL)
+      if (!is.null(fc) && nrow(fc) > 0) {
+        last_pt <- tail(nat, 1)
+        fc_line <- rbind(
+          data.frame(date=last_pt$date[1], value=last_pt$reports_per_site[1],
+                     lower=last_pt$reports_per_site[1], upper=last_pt$reports_per_site[1]),
+          fc[, c("date","value","lower","upper")]
+        )
+        p <- p %>%
+          add_ribbons(data=fc_line, x=~date, ymin=~pmax(0,lower), ymax=~upper,
+            fillcolor="rgba(155,89,182,0.18)", line=list(color="transparent"),
+            name="予測区間（目安）", hoverinfo="skip") %>%
+          add_lines(data=fc_line, x=~date, y=~value,
+            line=list(color="#8e44ad", width=2, dash="dash"),
+            name=paste0("予測（", FORECAST_METHOD_LABELS[[fc_method]], "）"),
+            hovertemplate="%{x|%Y-%m-%d}　予測 %{y:.2f}<extra></extra>")
+      }
+    }
     keiho_start <- alert_threshold_keiho_start(thresh)
     if (!is.null(keiho_start)) {
       p <- p %>% add_lines(x=range(nat$date), y=c(keiho_start,keiho_start),
@@ -4367,6 +4445,41 @@ server <- function(input, output, session) {
         marker = list(color = "#e74c3c", size = 6, symbol = "circle"),
         name = "+2SD超過",
         hovertemplate = "%{x|%Y-%m-%d}: %{y}件<extra></extra>")
+    }
+
+    # ── 短期予測（4週先まで）─────────────────────────────
+    if (isTRUE(input$show_forecast) && nrow(d_agg) >= 4) {
+      fc_method <- if (is.null(input$forecast_method)) "ensemble" else input$forecast_method
+      did <- input$zensu_disease_ts
+      si  <- SERIAL_INTERVALS[[did]]
+      pref_f <- if (!is.null(input$pref_filter) && input$pref_filter != "全国") input$pref_filter else NULL
+      rt_val <- tryCatch({
+        if (is.null(ZENSU_DATA) || nrow(ZENSU_DATA) == 0) NA_real_
+        else {
+          rd <- compute_rt_series_zensu(ZENSU_DATA, did, pref_f) %>% filter(!is.na(rt)) %>% slice_tail(n=1)
+          if (nrow(rd)==0) NA_real_ else rd$rt[1]
+        }
+      }, error=function(e) NA_real_)
+      fc <- tryCatch(
+        compute_forecast(d_agg$date, d_agg$cases, fc_method,
+                          horizon=4, rt_value=rt_val, si_days=if (!is.null(si)) si$mean else NA_real_),
+        error=function(e) NULL)
+      if (!is.null(fc) && nrow(fc) > 0) {
+        last_pt <- tail(d_agg, 1)
+        fc_line <- rbind(
+          data.frame(date=last_pt$date[1], value=last_pt$cases[1],
+                     lower=last_pt$cases[1], upper=last_pt$cases[1]),
+          fc[, c("date","value","lower","upper")]
+        )
+        p <- p %>%
+          add_ribbons(data=fc_line, x=~date, ymin=~pmax(0,lower), ymax=~upper,
+            fillcolor="rgba(155,89,182,0.18)", line=list(color="transparent"),
+            name="予測区間（目安）", hoverinfo="skip") %>%
+          add_lines(data=fc_line, x=~date, y=~value,
+            line=list(color="#8e44ad", width=2, dash="dash"),
+            name=paste0("予測（", FORECAST_METHOD_LABELS[[fc_method]], "）"),
+            hovertemplate="%{x|%Y-%m-%d}　予測 %{y:.1f}件<extra></extra>")
+      }
     }
 
     p %>% layout(
