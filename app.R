@@ -941,23 +941,24 @@ function ebsUntranslateCards(containerId) {
             tags$li("最低データ要件: 15週以上の連続データ"),
             tags$li("Rt > 1.0: 流行拡大傾向、Rt < 1.0: 流行縮小傾向")
           ),
-          tags$h5("シリアルインターバル（SI）の出典"),
-          tags$ul(
-            tags$li("インフルエンザ: mean=2.6日、SD=1.5日　Vink et al. (2014) Am J Epidemiol 180:865-875"),
-            tags$li("COVID-19: mean=3.3日、SD=2.0日　Nishiura et al. (2020) Int J Infect Dis 93:284-286"),
-            tags$li("麻疹: mean=12.0日、SD=2.5日　Vink et al. (2014)"),
-            tags$li("風疹: mean=18.0日、SD=3.0日　Vink et al. (2014)"),
-            tags$li("百日咳: mean=9.0日、SD=2.0日　Vink et al. (2014)"),
-            tags$li("エムポックス: mean=9.6日、SD=3.5日　Miura et al. (2022) J Infect Dis"),
-            tags$li("Ａ型肝炎: mean=23.9日、SD=20.9日　Zhang & Iacono (2018) PLoS ONE")
-          ),
-          tags$h5("シリアルインターバル（SI）の更新（文献検索2026年7月）"),
-          tags$ul(
-            tags$li("感染性胃腸炎（ロタウイルス）: mean=4.9日　Grimwood et al. (1983) BMJ 287:575-577 [家庭内伝播研究]"),
-            tags$li("急性呼吸器感染症（ARI）: mean=3.1日, SD=1.5日　Levy et al. (2013) Am J Epidemiol 177:1443-1451 [Bangkok, PMID:23629874]"),
-            tags$li("Ａ群溶血性レンサ球菌咽頭炎: 中央値2日（範囲0–28日）　Mearkle et al. (2017) Euro Surveill 22:30532 [英国家庭内, PMC5476984]"),
-            tags$li("Ａ型肝炎: mean=23.9日　Zhang & Iacono (2018) PLoS ONE [中国集団発生]"),
-            tags$li("急性出血性結膜炎: 潜伏期間12–72時間に修正（従来値3日→1.5日）")
+          tags$h5("シリアルインターバル（SI）の出典（実際に使用しているデータ）"),
+          tags$table(class="table table-bordered table-sm", style="font-size:0.8em;",
+            tags$thead(tags$tr(tags$th("疾患"), tags$th("平均(日)"), tags$th("SD(日)"), tags$th("区分"), tags$th("出典"))),
+            tags$tbody(
+              lapply(names(SERIAL_INTERVALS), function(id) {
+                si  <- SERIAL_INTERVALS[[id]]
+                lbl <- if (id %in% names(DISEASE_CONFIG)) DISEASE_CONFIG[[id]]$label
+                       else if (id %in% names(ZENSU_DISEASE_CONFIG)) ZENSU_DISEASE_CONFIG[[id]]$label
+                       else id
+                tags$tr(
+                  tags$td(lbl),
+                  tags$td(sprintf("%.1f", si$mean)),
+                  tags$td(sprintf("%.1f", si$sd)),
+                  tags$td(if (isTRUE(si$published)) "文献SI" else "潜伏期間からの推定値"),
+                  tags$td(si$source)
+                )
+              })
+            )
           ),
           tags$h5("潜伏期間代用について"),
           tags$p(
@@ -972,7 +973,7 @@ function ebsUntranslateCards(containerId) {
           tags$ul(
             tags$li(tags$strong("腸管出血性大腸菌（EHEC）: "), "症例の約80%は食品媒介（共通感染源）。Rtが1を超えても食品汚染源を反映している可能性があり、ヒト間伝播の指標としては過大推定になりやすい。"),
             tags$li(tags$strong("細菌性髄膜炎: "), "散発性・稀少疾患のためCori法による週次Rt推定は統計的に不安定。接触者予防投薬により二次感染がほぼ防止される。"),
-            tags$li(tags$strong("Ａ群溶血性レンサ球菌咽頭炎: "), "家庭内二次攻撃率<0.22%と非常に低く、週次サーベイランスデータからのRt推定は解釈に注意が必要。"),
+            tags$li(tags$strong("劇症型溶血性レンサ球菌感染症: "), "家庭内二次アタックレート<0.22%と非常に低く、週次サーベイランスデータからのRt推定は解釈に注意が必要。"),
             tags$li(tags$strong("伝染性紅斑（リンゴ病）: "), "発疹出現時にはすでに感染性を失っている。報告データは過去2–3週の伝播を遅れて反映する。")
           ),
           tags$h5("注意事項"),

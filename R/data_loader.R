@@ -197,7 +197,7 @@ SERIAL_INTERVALS <- list(
   mpox       = list(mean=9.6,  sd=3.5,  published=TRUE,
     source="Miura et al. (2022) Euro Surveill 27:2200682 [2022年流行データ]"),
   igas       = list(mean=2.0,  sd=4.0,  published=TRUE,
-    source="Mearkle et al. (2017) Euro Surveill 22(19):30532 [英国家庭内発症間隔 中央値2日, 範囲0–28日, n=24クラスター] PMC5476984; 二次攻撃率<0.22%のためRt解釈は限定的"),
+    source="Mearkle et al. (2017) Euro Surveill 22(19):30532 [英国家庭内発症間隔 中央値2日, 範囲0–28日, n=24クラスター] PMC5476984; 二次アタックレート<0.22%のためRt解釈は限定的"),
   ehec       = list(mean=4.0,  sd=2.0,  published=FALSE, derived_from="incubation_period",
     source="推定値（EHEC O157潜伏期間1–10日, 典型的3–4日; WHO/CDC; 症例の約80%は食品媒介のためRtは過大推定の可能性; PMID:19715594）"),
   # ── 追加：A型肝炎・デング熱 ──────────────────────────────
