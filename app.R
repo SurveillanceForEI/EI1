@@ -3406,11 +3406,11 @@ server <- function(input, output, session) {
         line=list(color="#e74c3c", dash="dash", width=1.5),
         name=paste0("警報開始基準値(",keiho_start,")"), hoverinfo="skip")
     }
-    keiho_end <- if (is.list(thresh)) thresh$keiho_end else NULL
-    if (!is.null(keiho_end)) {
-      p <- p %>% add_lines(x=range(nat$date), y=c(keiho_end,keiho_end),
+    chuiho_start <- if (is.list(thresh)) thresh$chuiho_start else NULL
+    if (!is.null(chuiho_start)) {
+      p <- p %>% add_lines(x=range(nat$date), y=c(chuiho_start,chuiho_start),
         line=list(color="#f39c12", dash="dot", width=1.5),
-        name=paste0("警報終息基準値(",keiho_end,")"), hoverinfo="skip")
+        name=paste0("注意報開始基準値(",chuiho_start,")"), hoverinfo="skip")
     }
     if (is_pref) {
       nd <- national_avg()
@@ -3440,8 +3440,9 @@ server <- function(input, output, session) {
       if (!is.null(thresh)) tags$span(
         tags$span(style="display:inline-block;width:20px;border-top:2px dashed #e74c3c;margin-right:4px;vertical-align:middle;"),
         if (is.list(thresh))
-          paste0("赤破線: 警報開始基準値／オレンジ点線: 警報終息基準値（", format_alert_threshold(thresh),
-                 " 報告/定点、研究班報告書ベース）")
+          paste0("赤破線: 警報開始基準値",
+                 if (!is.null(thresh$chuiho_start)) "／オレンジ点線: 注意報開始基準値" else "",
+                 "（", format_alert_threshold(thresh), " 報告/定点、研究班報告書ベース）")
         else
           paste0("赤破線: 参考基準値（", thresh, " 報告/定点、文献等で提唱された参考基準）")
       ),
