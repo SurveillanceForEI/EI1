@@ -304,7 +304,9 @@ DISEASE_KEYWORDS <- list(
   rabies        = c("狂犬病","rabies","rabid","rabies case","rabies death","rabies exposure",
                     "rabies post-exposure","lyssavirus"),
   coccidioides  = c("コクシジオイデス","coccidioidomycosis","Valley fever","Coccidioides"),
-  zika          = c("ジカ","Zika","ZIKV","zika virus","zika outbreak","zika microcephaly"),
+  # "ジカ"（2文字）は「フィジカル」等に埋め込まれて誤マッチするため、
+  # より特定的な「ジカ熱」「ジカウイルス」を使用する
+  zika          = c("ジカ熱","ジカウイルス","Zika","ZIKV","zika virus","zika outbreak","zika microcephaly"),
   sfts          = c("SFTS","重症熱性血小板減少","severe fever with thrombocytopenia","SFTSV",
                     "thrombocytopenia syndrome","SFTS virus","SFTS case"),
   hfrs          = c("腎症候性出血熱","ハンタウイルス","HFRS","hemorrhagic fever with renal","hantavirus renal",
@@ -2729,15 +2731,17 @@ classify_signal <- function(text, disease_tags = NA) {
   "参考"
 }
 
-# キーワード一致判定: "CRE"「AFP」のような短い（2〜5文字）全大文字の略語は、
-# fixed=TRUE の単純部分一致だと "increase"「screening」等ありふれた英単語の内部に
-# たまたま出現して誤マッチしやすい（例: CRE ⊂ increase / screen / decrease / created）。
-# そのため元表記が全て大文字の短い略語のみ単語境界(\b)付き正規表現でマッチさせ、
-# それ以外（日本語や3文字超の英語フレーズ等）は従来どおりfixed文字列一致とする。
+# キーワード一致判定: "CRE"「HeV」「Hib」のような短い（2〜5文字）英字の略語は、
+# fixed=TRUE の単純部分一致だと "increase"「screening」「two weeks」等ありふれた
+# 英単語・英語表現の内部にたまたま出現して誤マッチしやすい
+# （例: CRE ⊂ increase、WEE ⊂ two weeks、Hib ⊂ exhibit/inhibit）。
+# そのため元表記が英数字のみで構成される短い略語（大文字小文字問わず）は
+# 単語境界(\b)付き正規表現でマッチさせ、それ以外（日本語や3文字超の英語フレーズ等）は
+# 従来どおりfixed文字列一致とする。
 keyword_matches <- function(keyword, text_lower) {
   kw_lower <- tolower(keyword)
-  is_short_acronym <- grepl("^[A-Z0-9-]{2,5}$", keyword)
-  if (is_short_acronym) {
+  is_short_token <- grepl("^[A-Za-z0-9-]{2,5}$", keyword)
+  if (is_short_token) {
     grepl(paste0("\\b", kw_lower, "\\b"), text_lower, perl = TRUE)
   } else {
     grepl(kw_lower, text_lower, fixed = TRUE)
