@@ -1033,6 +1033,23 @@ function ebsUntranslateCards(containerId) {
               "上記3手法のうち算出できたものの単純平均です。個々の手法の誤差や前提の偏りを緩和し、",
               "より安定した予測になる傾向があります。")
           ),
+          tags$h5("季節性の反映について"),
+          tags$p(
+            "IBS方式・過去5年比較の季節性自動判定（",
+            tags$a(href="javascript:void(0)", onclick="goToNotes('notes-zensu-ibs')", "詳細"),
+            "）と同じロジックで疾患ごとに季節性の有無を判定し、季節性ありと判定された疾患",
+            "（かつ約2年分以上のデータがある場合）は、ポアソン回帰・指数平滑法の2手法に",
+            "暦週（week of year）に基づく季節成分を追加します。凡例に「・季節性反映」と表示されます。"
+          ),
+          tags$ul(
+            tags$li(tags$strong("ポアソン回帰: "),
+              "直近3年分のデータで、暦週の調和項（sin/cos(2π×週/52)）をトレンド項に追加してフィットします。"),
+            tags$li(tags$strong("指数平滑法: "),
+              "Holt線形トレンド法から、季節成分（周期52週）を含む三重指数平滑法（Holt-Winters）に切り替えます。"),
+            tags$li(tags$strong("Rtベース（renewal equation）: "),
+              "季節成分は追加しません。Rtは実効再生産数＝リアルタイムの伝播動態そのものであり、",
+              "暦の季節性をさらに重ねると二重に加味することになるため、現状のまま据え置いています。")
+          ),
           tags$div(style="background:#fff8e1;border-left:4px solid #f39c12;padding:8px 12px;margin-bottom:8px;font-size:0.9em;",
             tags$strong("注意: "),
             "いずれの手法も統計的な外挿にすぎず、変異株の出現、施策変更、報告体制の変化等の",
@@ -3474,21 +3491,27 @@ server <- function(input, output, session) {
         name="+2SD超過", hovertemplate="%{x|%Y-W%W}: %{y:.2f}<extra></extra>")
     }
     # ── 短期予測（4週先まで）─────────────────────────────
-    if (isTRUE(input$show_forecast) && nrow(nat) >= 4) {
+    # 学習・起点にはスライダー(date_range)に依存しない全期間データ(ts_hist_data)を使う
+    # （季節成分の学習に十分な長さのデータが必要、かつ直近の実測にスライダーの影響を受けない）
+    if (isTRUE(input$show_forecast)) {
+      hist_d <- ts_hist_data() %>% filter(!is.na(reports_per_site)) %>% arrange(date)
+      if (nrow(hist_d) >= 4) {
       fc_method <- if (is.null(input$forecast_method)) "ensemble" else input$forecast_method
       si <- SERIAL_INTERVALS[[input$disease]]
+      seasonal <- tryCatch(detect_seasonality(hist_d, value_col="reports_per_site"), error=function(e) FALSE)
       rt_val <- tryCatch({
         rd <- rt_series() %>% filter(!is.na(rt)) %>% slice_tail(n=1)
         if (nrow(rd)==0) NA_real_ else rd$rt[1]
       }, error=function(e) NA_real_)
       fc <- tryCatch(
-        compute_forecast(nat$date, nat$reports_per_site, fc_method,
+        compute_forecast(hist_d$date, hist_d$reports_per_site, fc_method,
                           horizon=4, rt_value=rt_val,
                           si_mean=if (!is.null(si)) si$mean else NA_real_,
-                          si_sd=if (!is.null(si)) si$sd else NA_real_),
+                          si_sd=if (!is.null(si)) si$sd else NA_real_,
+                          seasonal=seasonal),
         error=function(e) NULL)
       if (!is.null(fc) && nrow(fc) > 0) {
-        last_pt <- tail(nat, 1)
+        last_pt <- tail(hist_d, 1)
         fc_line <- rbind(
           data.frame(date=last_pt$date[1], value=last_pt$reports_per_site[1],
                      lower=last_pt$reports_per_site[1], upper=last_pt$reports_per_site[1]),
@@ -3500,8 +3523,10 @@ server <- function(input, output, session) {
             name="予測区間（目安）", hoverinfo="skip") %>%
           add_lines(data=fc_line, x=~date, y=~value,
             line=list(color="#8e44ad", width=2, dash="dash"),
-            name=paste0("予測（", FORECAST_METHOD_LABELS[[fc_method]], "）"),
+            name=paste0("予測（", FORECAST_METHOD_LABELS[[fc_method]],
+                        if (seasonal) "・季節性反映" else "", "）"),
             hovertemplate="%{x|%Y-%m-%d}　予測 %{y:.2f}<extra></extra>")
+      }
       }
     }
     keiho_start <- alert_threshold_keiho_start(thresh)
@@ -4456,11 +4481,15 @@ server <- function(input, output, session) {
     }
 
     # ── 短期予測（4週先まで）─────────────────────────────
-    if (isTRUE(input$show_forecast) && nrow(d_agg) >= 4) {
+    # 学習・起点にはスライダー(date_range)に依存しない全期間データ(zensu_hist)を使う
+    if (isTRUE(input$show_forecast)) {
+      hist_d <- zh %>% filter(!is.na(cases)) %>% arrange(date)
+      if (nrow(hist_d) >= 4) {
       fc_method <- if (is.null(input$forecast_method)) "ensemble" else input$forecast_method
       did <- input$zensu_disease_ts
       si  <- SERIAL_INTERVALS[[did]]
       pref_f <- if (!is.null(input$pref_filter) && input$pref_filter != "全国") input$pref_filter else NULL
+      seasonal <- tryCatch(detect_seasonality(hist_d, value_col="cases"), error=function(e) FALSE)
       rt_val <- tryCatch({
         if (is.null(ZENSU_DATA) || nrow(ZENSU_DATA) == 0) NA_real_
         else {
@@ -4469,13 +4498,14 @@ server <- function(input, output, session) {
         }
       }, error=function(e) NA_real_)
       fc <- tryCatch(
-        compute_forecast(d_agg$date, d_agg$cases, fc_method,
+        compute_forecast(hist_d$date, hist_d$cases, fc_method,
                           horizon=4, rt_value=rt_val,
                           si_mean=if (!is.null(si)) si$mean else NA_real_,
-                          si_sd=if (!is.null(si)) si$sd else NA_real_),
+                          si_sd=if (!is.null(si)) si$sd else NA_real_,
+                          seasonal=seasonal),
         error=function(e) NULL)
       if (!is.null(fc) && nrow(fc) > 0) {
-        last_pt <- tail(d_agg, 1)
+        last_pt <- tail(hist_d, 1)
         fc_line <- rbind(
           data.frame(date=last_pt$date[1], value=last_pt$cases[1],
                      lower=last_pt$cases[1], upper=last_pt$cases[1]),
@@ -4487,8 +4517,10 @@ server <- function(input, output, session) {
             name="予測区間（目安）", hoverinfo="skip") %>%
           add_lines(data=fc_line, x=~date, y=~value,
             line=list(color="#8e44ad", width=2, dash="dash"),
-            name=paste0("予測（", FORECAST_METHOD_LABELS[[fc_method]], "）"),
+            name=paste0("予測（", FORECAST_METHOD_LABELS[[fc_method]],
+                        if (seasonal) "・季節性反映" else "", "）"),
             hovertemplate="%{x|%Y-%m-%d}　予測 %{y:.1f}件<extra></extra>")
+      }
       }
     }
 
