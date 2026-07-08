@@ -2429,7 +2429,7 @@ server <- function(input, output, session) {
               if (rt_latest>=2.0) "#c0392b" else if (rt_latest>=1.0) "#d4ac0d" else "#27ae60")
           ),
           tags$div(style="font-size:0.73em;color:#777;margin-top:4px;text-align:center;",
-            paste0("現在値 ", ibs_info$detail,
+            paste0(if (is_zensu) "報告数 " else "定点あたり ", ibs_info$detail,
                    if (!is.null(rt_lbl)) paste0("　", rt_lbl) else "",
                    "　EBS今週 ", ebs_info$n, "件",
                    if (ebs_info$high > 0) paste0("（高シグナル", ebs_info$high, "件）") else ""))
