@@ -2429,7 +2429,7 @@ server <- function(input, output, session) {
               if (rt_latest>=2.0) "#c0392b" else if (rt_latest>=1.0) "#d4ac0d" else "#27ae60")
           ),
           tags$div(style="font-size:0.73em;color:#777;margin-top:4px;text-align:center;",
-            paste0("過去5年比 ", ibs_info$detail,
+            paste0("現在値 ", ibs_info$detail,
                    if (!is.null(rt_lbl)) paste0("　", rt_lbl) else "",
                    "　EBS今週 ", ebs_info$n, "件",
                    if (ebs_info$high > 0) paste0("（高シグナル", ebs_info$high, "件）") else ""))
@@ -3061,7 +3061,7 @@ server <- function(input, output, session) {
         recent_annotations <- list(list(
           xref = "x domain", yref = "paper",
           x = 1 - 0.5 / n_labels, y = 1.03, xanchor = "center", yanchor = "bottom",
-          text = "速報（後日修正の可能性）", showarrow = FALSE,
+          text = "直近は参考値", showarrow = FALSE,
           font = list(size = 9, color = "#888")
         ))
       }
