@@ -1166,6 +1166,7 @@ function ebsUntranslateCards(containerId) {
             tags$li("報告は参加施設（地方衛生研究所等）からの自発的報告に基づくため、全数を反映しているわけではありません"),
             tags$li("施設数・検査体制の変化により経年比較には注意が必要です"),
             tags$li("速報値のため、後日修正される場合があります"),
+            tags$li("直近のデータは今後遅れて報告される可能性があります（グラフ上では直近1か月をグレーの網掛けで示しています）"),
             tags$li("グラフ下の表はCSVダウンロードが可能です（現在の絞り込み・期間設定を反映）")
           ),
           tags$br(),
@@ -3044,6 +3045,28 @@ server <- function(input, output, session) {
       }
     }
 
+    # 直近1か月は今後遅れて報告される可能性があるため、グレーの網掛けで示す
+    # （月別表示のみ。年別表示は「1か月」の区切りに対応しないため対象外）
+    recent_shapes <- list()
+    recent_annotations <- list()
+    if (input$iasr_time_type == "monthly") {
+      n_labels <- length(unique(d$label))
+      if (n_labels >= 1) {
+        recent_shapes <- list(list(
+          type = "rect", xref = "x domain", yref = "paper",
+          x0 = 1 - 1 / n_labels, x1 = 1, y0 = 0, y1 = 1,
+          fillcolor = "rgba(128,128,128,0.25)", line = list(width = 0),
+          layer = "above"
+        ))
+        recent_annotations <- list(list(
+          xref = "x domain", yref = "paper",
+          x = 1 - 0.5 / n_labels, y = 1.03, xanchor = "center", yanchor = "bottom",
+          text = "速報（後日修正の可能性）", showarrow = FALSE,
+          font = list(size = 9, color = "#888")
+        ))
+      }
+    }
+
     p %>% layout(
       title = list(text = paste0(cat_label, "　ウイルス検出状況"), x = 0, font = list(size = 14)),
       xaxis  = list(title = xlab, showgrid = FALSE, tickangle = -45),
@@ -3052,6 +3075,8 @@ server <- function(input, output, session) {
       hovermode  = "x unified",
       plot_bgcolor  = "#fff",
       paper_bgcolor = "#fff",
+      shapes = recent_shapes,
+      annotations = recent_annotations,
       margin = list(t = 40, b = 80, l = 60, r = 160)
     )
   })
