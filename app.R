@@ -2475,9 +2475,16 @@ server <- function(input, output, session) {
       }, error=function(e) 0L)
     }
 
-    combined_score <- function(ibs_s, ebs_s) {
+    # ── 統合スコア: 「現在の流行フェーズ」カード（kpi_alert）と同一ロジック ──
+    # ①注意報・警報基準値・②Rt・③IBS過去5年比較(季節性自動判定)を2段階加重平均で
+    # 統合したのち、EBS(5%)とブレンドする（compute_alert_score参照）
+    combined_score <- function(value, thresh, rt_value, ibs_s, ebs_s) {
+      ibs_blended <- tryCatch({
+        s <- compute_alert_score(value = value, thresh = thresh, rt_value = rt_value, ibs_score = ibs_s)
+        if (is.na(s)) ibs_s else s
+      }, error = function(e) ibs_s)
       ebs_scaled <- min(3, ebs_s * 1.5)
-      ibs_s * 0.95 + ebs_scaled * 0.05
+      ibs_blended * 0.95 + ebs_scaled * 0.05
     }
     act_level <- function(sc) min(4L, max(1L, as.integer(round(sc)) + 1L))
 
@@ -2509,7 +2516,12 @@ server <- function(input, output, session) {
           hist_d=dd, detail_fmt="rate")
         ibs_s  <- band$score
         ebs_s  <- ebs_score_for(did, cur$date[1])
-        sc     <- combined_score(ibs_s, ebs_s)
+        rt_latest <- tryCatch({
+          rd <- compute_rt_series(SURV_DATA %>% filter(disease == did, date >= dr[1], date <= dr[2]), did, pref) %>%
+            filter(!is.na(rt)) %>% slice_tail(n=1)
+          if (nrow(rd)==0) NA_real_ else rd$rt[1]
+        }, error=function(e) NA_real_)
+        sc     <- combined_score(cur$reports_per_site[1], dconf$alert_threshold, rt_latest, ibs_s, ebs_s)
         results[[did]] <- list(
           id=did, label=dconf$label, type="定点", color=dconf$color,
           ibs_score=ibs_s, ebs_score=ebs_s,
@@ -2545,7 +2557,15 @@ server <- function(input, output, session) {
           hist_d=dd)
         ibs_s  <- band$score
         ebs_s  <- ebs_score_for(did, cur$date[1])
-        sc     <- combined_score(ibs_s, ebs_s)
+        rt_latest <- tryCatch({
+          if (is.null(ZENSU_DATA) || nrow(ZENSU_DATA) == 0) {
+            NA_real_
+          } else {
+            rd <- compute_rt_series_zensu(ZENSU_DATA, did, pref) %>% filter(!is.na(rt)) %>% slice_tail(n=1)
+            if (nrow(rd)==0) NA_real_ else rd$rt[1]
+          }
+        }, error=function(e) NA_real_)
+        sc     <- combined_score(cur$reports_per_site[1], NULL, rt_latest, ibs_s, ebs_s)
         results[[paste0("z_",did)]] <- list(
           id=did, label=dconf$label, type=dconf$class, color=dconf$color,
           ibs_score=ibs_s, ebs_score=ebs_s,
@@ -2695,11 +2715,18 @@ server <- function(input, output, session) {
       }, error=function(e) 0L)
     }
 
-    combined_score <- function(ibs_s, ebs_s) {
+    # ── 統合スコア: 「現在の流行フェーズ」カード（kpi_alert）と同一ロジック ──
+    combined_score <- function(value, thresh, rt_value, ibs_s, ebs_s) {
+      ibs_blended <- tryCatch({
+        s <- compute_alert_score(value = value, thresh = thresh, rt_value = rt_value, ibs_score = ibs_s)
+        if (is.na(s)) ibs_s else s
+      }, error = function(e) ibs_s)
       ebs_scaled <- min(3, ebs_s * 1.5)
-      ibs_s * 0.95 + ebs_scaled * 0.05
+      ibs_blended * 0.95 + ebs_scaled * 0.05
     }
     act_level <- function(sc) min(4L, max(1L, as.integer(round(sc)) + 1L))
+
+    thresh_val <- if (!is_zensu) tryCatch(DISEASE_CONFIG[[did]]$alert_threshold, error=function(e) NULL) else NULL
 
     results <- list()
     pref_order <- PREF_MASTER$pref_name[order(PREF_MASTER$pref_code)]
@@ -2725,7 +2752,12 @@ server <- function(input, output, session) {
             hist_d=dd, detail_fmt="rate")
           ibs_s  <- band$score
           ebs_s  <- ebs_score_for_pref(pr, cur$date[1])
-          sc     <- combined_score(ibs_s, ebs_s)
+          rt_latest <- tryCatch({
+            rd <- compute_rt_series(SURV_DATA %>% filter(disease == did, date >= dr[1], date <= dr[2]), did, pr) %>%
+              filter(!is.na(rt)) %>% slice_tail(n=1)
+            if (nrow(rd)==0) NA_real_ else rd$rt[1]
+          }, error=function(e) NA_real_)
+          sc     <- combined_score(cur$reports_per_site[1], thresh_val, rt_latest, ibs_s, ebs_s)
           results[[pr]] <- list(
             id=pr, label=pr, region=PREF_MASTER$region[PREF_MASTER$pref_name==pr][1],
             grid_row=PREF_MASTER$grid_row[PREF_MASTER$pref_name==pr][1],
@@ -2760,7 +2792,15 @@ server <- function(input, output, session) {
             hist_d=dd)
           ibs_s <- band$score
           ebs_s <- ebs_score_for_pref(pr, cur$date[1])
-          sc    <- combined_score(ibs_s, ebs_s)
+          rt_latest <- tryCatch({
+            if (is.null(ZENSU_DATA) || nrow(ZENSU_DATA) == 0) {
+              NA_real_
+            } else {
+              rd <- compute_rt_series_zensu(ZENSU_DATA, did, pr) %>% filter(!is.na(rt)) %>% slice_tail(n=1)
+              if (nrow(rd)==0) NA_real_ else rd$rt[1]
+            }
+          }, error=function(e) NA_real_)
+          sc    <- combined_score(cur$reports_per_site[1], NULL, rt_latest, ibs_s, ebs_s)
           results[[pr]] <- list(
             id=pr, label=pr, region=PREF_MASTER$region[PREF_MASTER$pref_name==pr][1],
             grid_row=PREF_MASTER$grid_row[PREF_MASTER$pref_name==pr][1],
