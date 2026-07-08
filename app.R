@@ -1242,6 +1242,28 @@ EBS_DLABEL <- c(
 
 server <- function(input, output, session) {
 
+  # ── 初回アクセス時の注意事項ポップアップ ─────────────────
+  showModal(modalDialog(
+    title = "ご利用にあたっての注意事項",
+    tags$div(style="line-height:1.8;font-size:0.95em;",
+      tags$p(
+        "本サイトは、文部科学省科学研究費助成事業「IBSとEBSの統合解析によるEpidemic Intelligence活動支援モデル構築（研究代表：小林祐介）」により開発し、試行運用しています。"
+      ),
+      tags$p(
+        "試験運用中のため、サイト内の内容、レイアウト、データソース等は変更される可能性があります。"
+      ),
+      tags$p(
+        "本ダッシュボードは公開情報のみを使用していますが一部暫定データを利用しているため、データの正確性・完全性・最新性について保証するものではありません。最新データは公式サイトを参照してください。"
+      ),
+      tags$p(
+        "本サイトで用いている評価は試験的なアルゴリズムによる判定であり、情報に基づく判断は専門家を代替するものではありません。必ず、元データを参照し、利用者自身の責任において利用してください。"
+      )
+    ),
+    footer = modalButton("同意して閉じる"),
+    easyClose = TRUE,
+    size = "m"
+  ))
+
   # ── 状態復元（localStorage → Shiny inputs） ───────────────
   observeEvent(input[["_restored_state"]], {
     s <- input[["_restored_state"]]
