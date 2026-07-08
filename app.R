@@ -554,12 +554,12 @@ function ebsUntranslateCards(containerId) {
           column(4,
             # 定点把握モード
             conditionalPanel("input.ts_mode === 'teiten'",
-              selectInput("rt_disease", "疾患（サイドバーと連動・SI/潜伏期間推定あり）:",
+              selectInput("rt_disease", "定点把握疾患:",
                 choices = RT_DISEASE_CHOICES, selected = "flu", width = "100%")
             ),
             # 全数把握モード
             conditionalPanel("input.ts_mode === 'zensu'",
-              selectInput("rt_zensu_disease", "全数把握疾患（SI/潜伏期間推定あり）:",
+              selectInput("rt_zensu_disease", "全数把握疾患:",
                 choices = RT_ZENSU_CHOICES, selected = "measles", width = "100%")
             )
           ),
@@ -2254,20 +2254,9 @@ server <- function(input, output, session) {
     # ── IBS スコア: 直近2週を過去5年・5週MA±SDと比較 ──────
     # +2SD超過は2週連続で該当した場合のみ score=3
     ibs_info <- tryCatch({
-      # 週ごとのバンドを計算するヘルパー
-      # returns list(val, mu, s, exceeds2sd, has_hist)
-      calc_week_band <- function(val, w, y, hist_d) {
-        ws <- unique(pmax(1L, pmin(53L, (w-2L):(w+2L))))
-        h  <- hist_d %>% filter(week %in% ws, year >= y - 5, year < y)
-        n  <- sum(!is.na(h$reports_per_site))
-        mu <- mean(h$reports_per_site, na.rm=TRUE)
-        s  <- if (n >= 3) sd(h$reports_per_site, na.rm=TRUE) else NA
-        has <- n >= 3 && !is.nan(mu) && !is.na(s)
-        list(val=val, mu=mu, s=s, has_hist=has,
-             exceeds2sd = has && !is.na(val) && val > 0 && val >= mu + 2*s)
-      }
-
       if (!is_zensu) {
+        # 定点把握疾患: 既存データから季節性を自動判定し、評価方式を切替
+        #（季節性あり=同時期×過去5年比較、季節性なし=直近推移比較。zensu_ibs_band参照）
         base_d <- SURV_DATA %>% filter(disease == did)
         if (!is.null(pref)) {
           hist_d <- base_d %>%
@@ -2287,25 +2276,11 @@ server <- function(input, output, session) {
         cur  <- slice_tail(recent2, n=1)
         prev <- if (nrow(recent2) >= 2) slice_head(recent2, n=1) else cur
         cur_val  <- cur$reports_per_site[1]
-        val_fmt  <- function(v, mu, s) sprintf("%.2f（基準 %.2f±%.2f）", v, mu, s)
-        val_short <- function(v) sprintf("%.2f", v)
-        cur_band  <- calc_week_band(cur_val,  cur$week[1],  cur$year[1],  hist_d)
-        prev_band <- calc_week_band(prev$reports_per_site[1], prev$week[1], prev$year[1], hist_d)
-        cb <- cur_band
-        if (!cb$has_hist) {
-          list(score=0, label="基準値なし", detail="過去データ不足")
-        } else if (cb$exceeds2sd && prev_band$exceeds2sd) {
-          # 2週連続 +2SD 超過
-          list(score=3, label="+2SD超過（2週連続）",
-               detail=val_fmt(cur_val, cb$mu, cb$s))
-        } else if (!is.na(cur_val) && cur_val > 0 && cur_val >= cb$mu + cb$s) {
-          # 現週が +1〜+2SD（または1週のみ +2SD 超過）
-          list(score=2, label="+1〜+2SD",   detail=val_short(cur_val))
-        } else if (!is.na(cur_val) && cur_val > 0 && cur_val >= cb$mu) {
-          list(score=1, label="平均〜+1SD", detail=val_short(cur_val))
-        } else {
-          list(score=0, label="平均以下",   detail=val_short(coalesce(cur_val, 0)))
-        }
+        band <- zensu_ibs_band(
+          cur_val=cur_val, cur_date=cur$date[1], cur_week=cur$week[1], cur_year=cur$year[1],
+          prev_val=prev$reports_per_site[1], prev_date=prev$date[1], prev_week=prev$week[1], prev_year=prev$year[1],
+          hist_d=hist_d, detail_fmt="rate")
+        band[c("score","label","detail")]
       } else {
         # 全数把握疾患: 既存データから季節性を自動判定し、評価方式を切替
         #（季節性あり=同時期×過去5年比較、季節性なし=直近推移比較。zensu_ibs_band参照）
@@ -2466,28 +2441,6 @@ server <- function(input, output, session) {
     pref     <- if (!is.null(input$pref_filter) && input$pref_filter != "全国") input$pref_filter else NULL
     is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
 
-    # ── バンド計算ヘルパー ──────────────────────────────
-    calc_band <- function(val, w, y, hist_d) {
-      ws <- unique(pmax(1L, pmin(53L, (w-2L):(w+2L))))
-      h  <- hist_d %>% filter(week %in% ws, year >= y - 5, year < y)
-      n  <- sum(!is.na(h$reports_per_site))
-      mu <- mean(h$reports_per_site, na.rm=TRUE)
-      s  <- if (n >= 3) sd(h$reports_per_site, na.rm=TRUE) else NA
-      has <- n >= 3 && !is.nan(mu) && !is.na(s) && s > 0
-      list(mu=mu, s=s, has=has,
-           exceed2 = has && !is.na(val) && val > 0 && val >= mu + 2*s,
-           exceed1 = has && !is.na(val) && val > 0 && val >= mu + s,
-           abovemu = has && !is.na(val) && val > 0 && val >= mu)
-    }
-
-    ibs_score_from_bands <- function(cur_b, prev_b) {
-      if (!cur_b$has) return(0L)
-      if (cur_b$exceed2 && prev_b$exceed2) 3L
-      else if (cur_b$exceed2 || cur_b$exceed1) 2L
-      else if (cur_b$abovemu) 1L
-      else 0L
-    }
-
     # ── EBS 疾患別スコアを一括計算 ─────────────────────
     ebs_d <- tryCatch(ebs_data(), error=function(e) NULL)
     weights <- c("Signal High"=3L, "Signal Low"=2L, "FYI"=0L)
@@ -2540,15 +2493,18 @@ server <- function(input, output, session) {
         dd <- all_teiten %>% filter(disease == did) %>% arrange(date)
         if (nrow(dd) == 0) return(NULL)
         # スライダー(date_range)で選択した期間の末尾2週を評価対象とする
-        # （calc_bandの過去5年比較baselineにはddの全期間データをそのまま使う）
+        # （過去5年比較baselineにはddの全期間データをそのまま使う）
         dd_sel <- dd %>% filter(date >= dr[1], date <= dr[2])
         if (nrow(dd_sel) == 0) return(NULL)
         recent2 <- slice_tail(dd_sel, n=2)
         cur  <- slice_tail(recent2, n=1)
         prev <- if (nrow(recent2) >= 2) slice_head(recent2, n=1) else cur
-        cur_b  <- calc_band(cur$reports_per_site[1],  cur$week[1],  cur$year[1],  dd)
-        prev_b <- calc_band(prev$reports_per_site[1], prev$week[1], prev$year[1], dd)
-        ibs_s  <- ibs_score_from_bands(cur_b, prev_b)
+        # 定点把握疾患: 既存データから季節性を自動判定し評価方式を切替（zensu_ibs_band参照）
+        band   <- zensu_ibs_band(
+          cur_val=cur$reports_per_site[1], cur_date=cur$date[1], cur_week=cur$week[1], cur_year=cur$year[1],
+          prev_val=prev$reports_per_site[1], prev_date=prev$date[1], prev_week=prev$week[1], prev_year=prev$year[1],
+          hist_d=dd, detail_fmt="rate")
+        ibs_s  <- band$score
         ebs_s  <- ebs_score_for(did, cur$date[1])
         sc     <- combined_score(ibs_s, ebs_s)
         results[[did]] <- list(
@@ -2556,7 +2512,7 @@ server <- function(input, output, session) {
           ibs_score=ibs_s, ebs_score=ebs_s,
           act_level=act_level(sc), combined=sc,
           cur_val=cur$reports_per_site[1],
-          ibs_label=c("0"="平均以下","1"="平均〜+1SD","2"="+1〜+2SD","3"="+2SD超過(2週連続)")[as.character(ibs_s)]
+          ibs_label=band$label, ibs_method=band$method
         )
       }, error=function(e) NULL)
     }
@@ -2708,26 +2664,6 @@ server <- function(input, output, session) {
     is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
     did <- if (is_zensu) input$zensu_disease_ts else input$disease
 
-    calc_band <- function(val, w, y, hist_d) {
-      ws <- unique(pmax(1L, pmin(53L, (w-2L):(w+2L))))
-      h  <- hist_d %>% filter(week %in% ws, year >= y - 5, year < y)
-      n  <- sum(!is.na(h$reports_per_site))
-      mu <- mean(h$reports_per_site, na.rm=TRUE)
-      s  <- if (n >= 3) sd(h$reports_per_site, na.rm=TRUE) else NA
-      has <- n >= 3 && !is.nan(mu) && !is.na(s) && s > 0
-      list(mu=mu, s=s, has=has,
-           exceed2 = has && !is.na(val) && val > 0 && val >= mu + 2*s,
-           exceed1 = has && !is.na(val) && val > 0 && val >= mu + s,
-           abovemu = has && !is.na(val) && val > 0 && val >= mu)
-    }
-    ibs_score_from_bands <- function(cur_b, prev_b) {
-      if (!cur_b$has) return(0L)
-      if (cur_b$exceed2 && prev_b$exceed2) 3L
-      else if (cur_b$exceed2 || cur_b$exceed1) 2L
-      else if (cur_b$abovemu) 1L
-      else 0L
-    }
-
     ebs_d <- tryCatch(ebs_data(), error=function(e) NULL)
     weights <- c("Signal High"=3L, "Signal Low"=2L, "FYI"=0L)
     ebs_score_for_pref <- function(pref_name_i, ref_date = Sys.Date()) {
@@ -2773,15 +2709,18 @@ server <- function(input, output, session) {
           dd <- base_d %>% filter(pref_name == pr) %>% arrange(date)
           if (nrow(dd) == 0) return(NULL)
           # スライダー(date_range)で選択した期間の末尾2週を評価対象とする
-          # （calc_bandの過去5年比較baselineにはddの全期間データをそのまま使う）
+          # （過去5年比較baselineにはddの全期間データをそのまま使う）
           dd_sel <- dd %>% filter(date >= dr[1], date <= dr[2])
           if (nrow(dd_sel) == 0) return(NULL)
           recent2 <- slice_tail(dd_sel, n=2)
           cur  <- slice_tail(recent2, n=1)
           prev <- if (nrow(recent2) >= 2) slice_head(recent2, n=1) else cur
-          cur_b  <- calc_band(cur$reports_per_site[1],  cur$week[1],  cur$year[1],  dd)
-          prev_b <- calc_band(prev$reports_per_site[1], prev$week[1], prev$year[1], dd)
-          ibs_s  <- ibs_score_from_bands(cur_b, prev_b)
+          # 定点把握疾患: 既存データから季節性を自動判定し評価方式を切替（zensu_ibs_band参照）
+          band   <- zensu_ibs_band(
+            cur_val=cur$reports_per_site[1], cur_date=cur$date[1], cur_week=cur$week[1], cur_year=cur$year[1],
+            prev_val=prev$reports_per_site[1], prev_date=prev$date[1], prev_week=prev$week[1], prev_year=prev$year[1],
+            hist_d=dd, detail_fmt="rate")
+          ibs_s  <- band$score
           ebs_s  <- ebs_score_for_pref(pr, cur$date[1])
           sc     <- combined_score(ibs_s, ebs_s)
           results[[pr]] <- list(
@@ -2793,7 +2732,7 @@ server <- function(input, output, session) {
             ibs_score=ibs_s, ebs_score=ebs_s,
             act_level=act_level(sc), combined=sc,
             cur_val=cur$reports_per_site[1],
-            ibs_label=c("0"="平均以下","1"="平均〜+1SD","2"="+1〜+2SD","3"="+2SD超過(2週連続)")[as.character(ibs_s)]
+            ibs_label=band$label, ibs_method=band$method
           )
         }, error=function(e) NULL)
       }

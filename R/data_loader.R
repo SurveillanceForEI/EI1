@@ -643,7 +643,9 @@ detect_seasonality <- function(hist_d, value_col = "reports_per_site") {
 #              分散を用いた閾値判定。年単位の周期比較が成立しない散発疾患向け）
 zensu_ibs_band <- function(cur_val, cur_date, cur_week, cur_year,
                             prev_val, prev_date, prev_week, prev_year,
-                            hist_d, value_col = "reports_per_site") {
+                            hist_d, value_col = "reports_per_site",
+                            detail_fmt = "count") {
+  val_str <- function(v) if (identical(detail_fmt, "rate")) sprintf("%.2f", v) else sprintf("%d件", as.integer(v))
   seasonal <- detect_seasonality(hist_d, value_col)
 
   if (seasonal) {
@@ -670,7 +672,7 @@ zensu_ibs_band <- function(cur_val, cur_date, cur_week, cur_year,
     label <- if (!cb$has_hist) "基準値なし" else
       c("0"="平均以下","1"="平均〜+1SD","2"="+1〜+2SD","3"="+2SD超過（2週連続）")[as.character(score)]
     detail <- if (!cb$has_hist) "過去データ不足"
-              else sprintf("%d件（基準 %.1f±%.1f）", as.integer(cur_val), cb$mu, cb$s)
+              else sprintf("%s（基準 %.2f±%.2f）", val_str(cur_val), cb$mu, cb$s)
     list(score = score, label = unname(label), detail = detail,
          method = "seasonal", has_hist = cb$has_hist)
   } else {
@@ -694,7 +696,7 @@ zensu_ibs_band <- function(cur_val, cur_date, cur_week, cur_year,
              else if (val > mu) 1L
              else 0L
     label <- c("0"="平常（散発なし）","1"="やや増加","2"="増加","3"="急増")[as.character(score)]
-    detail <- sprintf("%d件（直近%d週平均 %.1f）", as.integer(val), length(baseline), mu)
+    detail <- sprintf("%s（直近%d週平均 %.2f）", val_str(val), length(baseline), mu)
     list(score = score, label = unname(label), detail = detail,
          method = "sporadic", has_hist = TRUE)
   }
