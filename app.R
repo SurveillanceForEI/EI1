@@ -3238,10 +3238,10 @@ server <- function(input, output, session) {
 
     tags$div(class="kpi-box", style="text-align:center;",
       tags$div(style="background:#e67e22;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "EBS"),
-      tags$div(style=paste0("font-size:1.6em;font-weight:700;color:",trend_col,";"),
+      tags$div(class="kpi-value", style=paste0("color:",trend_col,";"),
                if (!ebs_evaluable) "評価不能" else paste0(trend_icon, " ", trend_label)),
       tags$div(class="kpi-label", paste0("EBS/Trends 流行トレンド（直近14日）", wk)),
-      tags$div(style="font-size:0.78em;color:#666;margin-top:4px;",
+      tags$div(class="kpi-delta flat",
                paste0(ebs_txt, "　", gt_txt))
     )
   })
