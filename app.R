@@ -2529,7 +2529,8 @@ server <- function(input, output, session) {
           ibs_score=ibs_s, ebs_score=ebs_s,
           act_level=act_level(sc), combined=sc,
           cur_val=cur$reports_per_site[1],
-          ibs_label=band$label, ibs_method=band$method
+          ibs_label=band$label, ibs_method=band$method,
+          year=cur$year[1], week=cur$week[1]
         )
       }, error=function(e) NULL)
     }
@@ -2573,7 +2574,8 @@ server <- function(input, output, session) {
           ibs_score=ibs_s, ebs_score=ebs_s,
           act_level=act_level(sc), combined=sc,
           cur_val=cur$reports_per_site[1],
-          ibs_label=band$label, ibs_method=band$method
+          ibs_label=band$label, ibs_method=band$method,
+          year=cur$year[1], week=cur$week[1]
         )
       }, error=function(e) NULL)
     }
@@ -2592,9 +2594,15 @@ server <- function(input, output, session) {
     mode_lbl <- if (is_zensu) "全数把握" else "定点把握"
     res  <- all_disease_levels_data()
     n_by_level <- if (length(res) > 0) table(sapply(res, `[[`, "act_level")) else table(integer(0))
+    wk_txt <- if (length(res) > 0) {
+      wk_key <- sapply(res, function(r) paste0(r$year, "-", r$week))
+      top_key <- names(sort(table(wk_key), decreasing = TRUE))[1]
+      parts <- strsplit(top_key, "-")[[1]]
+      sprintf("　%s年 第%s週時点", parts[1], parts[2])
+    } else ""
     tags$div(style="margin-bottom:10px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;",
       tags$div(style="font-size:0.9em;font-weight:700;color:#333;",
-               paste0("疾患別 統合活動レベル一覧　（", pref, " / ", mode_lbl, "）　", length(res), "疾患")),
+               paste0("疾患別 統合活動レベル一覧　（", pref, " / ", mode_lbl, "）　", length(res), "疾患", wk_txt)),
       tags$div(style="display:flex;gap:8px;",
         lapply(4:1, function(lv) {
           cfg <- list(`4`=list(col="#c0392b",name="流行"),`3`=list(col="#e67e22",name="警戒"),
@@ -2769,7 +2777,8 @@ server <- function(input, output, session) {
             ibs_score=ibs_s, ebs_score=ebs_s,
             act_level=act_level(sc), combined=sc,
             cur_val=cur$reports_per_site[1],
-            ibs_label=band$label, ibs_method=band$method
+            ibs_label=band$label, ibs_method=band$method,
+            year=cur$year[1], week=cur$week[1]
           )
         }, error=function(e) NULL)
       }
@@ -2812,7 +2821,8 @@ server <- function(input, output, session) {
             ibs_score=ibs_s, ebs_score=ebs_s,
             act_level=act_level(sc), combined=sc,
             cur_val=cur$reports_per_site[1],
-            ibs_label=band$label, ibs_method=band$method
+            ibs_label=band$label, ibs_method=band$method,
+            year=cur$year[1], week=cur$week[1]
           )
         }, error=function(e) NULL)
       }
@@ -2829,9 +2839,15 @@ server <- function(input, output, session) {
       error = function(e) did)
     res <- pref_levels_data()
     n_by_level <- if (length(res) > 0) table(sapply(res, `[[`, "act_level")) else table(integer(0))
+    wk_txt <- if (length(res) > 0) {
+      wk_key <- sapply(res, function(r) paste0(r$year, "-", r$week))
+      top_key <- names(sort(table(wk_key), decreasing = TRUE))[1]
+      parts <- strsplit(top_key, "-")[[1]]
+      sprintf("　%s年 第%s週時点", parts[1], parts[2])
+    } else ""
     tags$div(style="margin-bottom:10px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;",
       tags$div(style="font-size:0.9em;font-weight:700;color:#333;",
-               paste0(label, " — 都道府県別 統合活動レベル一覧　", length(res), "都道府県")),
+               paste0(label, " — 都道府県別 統合活動レベル一覧　", length(res), "都道府県", wk_txt)),
       tags$div(style="display:flex;gap:8px;",
         lapply(4:1, function(lv) {
           cfg <- list(`4`=list(col="#c0392b",name="流行"),`3`=list(col="#e67e22",name="警戒"),
