@@ -2729,11 +2729,26 @@ classify_signal <- function(text, disease_tags = NA) {
   "参考"
 }
 
+# キーワード一致判定: "CRE"「AFP」のような短い（2〜5文字）全大文字の略語は、
+# fixed=TRUE の単純部分一致だと "increase"「screening」等ありふれた英単語の内部に
+# たまたま出現して誤マッチしやすい（例: CRE ⊂ increase / screen / decrease / created）。
+# そのため元表記が全て大文字の短い略語のみ単語境界(\b)付き正規表現でマッチさせ、
+# それ以外（日本語や3文字超の英語フレーズ等）は従来どおりfixed文字列一致とする。
+keyword_matches <- function(keyword, text_lower) {
+  kw_lower <- tolower(keyword)
+  is_short_acronym <- grepl("^[A-Z0-9-]{2,5}$", keyword)
+  if (is_short_acronym) {
+    grepl(paste0("\\b", kw_lower, "\\b"), text_lower, perl = TRUE)
+  } else {
+    grepl(kw_lower, text_lower, fixed = TRUE)
+  }
+}
+
 tag_diseases <- function(text, hint = NA) {
   tl <- tolower(text)
   matched <- c()
   for (disease in names(DISEASE_KEYWORDS)) {
-    if (any(sapply(DISEASE_KEYWORDS[[disease]], function(k) grepl(tolower(k), tl, fixed=TRUE)))) {
+    if (any(sapply(DISEASE_KEYWORDS[[disease]], function(k) keyword_matches(k, tl)))) {
       matched <- c(matched, disease)
     }
   }
@@ -2867,8 +2882,7 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
       vapply(full_text, function(txt) {
         tryCatch({
           tl <- tolower(txt)
-          isTRUE(any(sapply(INFECT_FILTER_KEYWORDS, function(kw)
-            grepl(tolower(kw), tl, fixed = TRUE))))
+          isTRUE(any(sapply(INFECT_FILTER_KEYWORDS, function(kw) keyword_matches(kw, tl))))
         }, error = function(e) FALSE)
       }, FUN.VALUE = logical(1), USE.NAMES = FALSE)
     ) %>%
