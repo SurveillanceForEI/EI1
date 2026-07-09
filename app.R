@@ -1173,6 +1173,13 @@ function ebsUntranslateCards(containerId) {
             "※ EBSスコア = Signal High（重み3）× 件数 + Signal Low（重み2）× 件数の合計。FYIは評価に含めない。"),
           tags$p(style="color:#888;font-size:0.85em;",
             "※ 都道府県フィルター選択時はその都道府県に関連する記事のみで評価。"),
+          tags$div(style="background:#fff8e1;border-left:4px solid #f39c12;padding:8px 12px;margin-bottom:8px;font-size:0.9em;",
+            tags$strong("注意（少数記事の前週比について）: "),
+            "感染症発生動向調査（IDWR）は週1回の公表のため、その報道を伝える記事が公表日周辺に定例的にまとまって",
+            "出やすい傾向があります。記事数が少ない週は、1〜2件の増減だけで前週比が大きく振れやすく",
+            "（例: 1件→2件で+100%）、この定例的な増減を実際の流行拡大のシグナルと誤判定しやすいため、",
+            "直近1週間の記事数が3件未満の場合は前週比によらず「横ばい」扱いとしています。"
+          ),
           tags$br(),
 
           # ── 統合活動レベル（IBS + EBS）─────────────────────
@@ -3299,7 +3306,14 @@ server <- function(input, output, session) {
     # ── 総合評価 ──
     # EBS前週比: -20%以下=低下, ±20%=横ばい, +20%=上昇, +50%=急上昇
     # 記事なし(score=0)は横ばい扱い
+    # 発生動向調査（IDWR）は週1回の公表のため、その報道を伝える記事が公表日周辺に
+    # 定例的にまとまって出やすい。記事数が少ない週は、1〜2件の増減だけで前週比が
+    # 大きく振れやすく（例: 1件→2件で+100%）、この定例的な増減を実際の流行拡大の
+    # シグナルと誤判定しやすいため、直近1週間の記事数(ebs_n)が一定件数未満の場合は
+    # 変化率によらず「横ばい」扱いとする
+    EBS_TREND_MIN_ARTICLES <- 3
     ebs_level <- if (ebs_score == 0 && ebs_score_prev == 0) 0
+                 else if (ebs_n < EBS_TREND_MIN_ARTICLES) 0
                  else if (ebs_change_pct < -20) -1
                  else if (ebs_change_pct < 20)   0
                  else if (ebs_change_pct < 50)   1
@@ -3326,8 +3340,11 @@ server <- function(input, output, session) {
 
     ebs_txt <- if (!ebs_evaluable) "EBS: 評価不能（対象期間が直近1年より前）"
                else if (ebs_n == 0) "EBS今週: 記事なし"
-               else sprintf("EBS今週: %d件 (High:%d Low:%d) 前週比%+.0f%%",
-                            ebs_n, ebs_calc$n_event, ebs_calc$n_signal, ebs_change_pct)
+               else paste0(
+                 sprintf("EBS今週: %d件 (High:%d Low:%d) 前週比%+.0f%%",
+                         ebs_n, ebs_calc$n_event, ebs_calc$n_signal, ebs_change_pct),
+                 if (ebs_n < EBS_TREND_MIN_ARTICLES) "（少数のため横ばい扱い）" else ""
+               )
     gt_txt <- if (gt_score == 0) "Trends: データなし"
               else sprintf("Trends: %+.0f%%", gt_score)
 
