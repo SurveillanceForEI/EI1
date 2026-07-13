@@ -3152,15 +3152,14 @@ server <- function(input, output, session) {
     })
   })
 
-  hosp_filtered <- reactive({
+  # date_range（表示範囲スライダー）に依存しない全期間データ。
+  # ±2SD帯の過去5年比較の基準として使う（スライダーで表示範囲を絞っても
+  # 過去の比較対象データが欠落しないようにするため）
+  hosp_agg_all <- reactive({
     d <- hosp_reactive()
     if (is.null(d) || nrow(d) == 0) return(NULL)
     if (!is.null(input$pref_filter) && input$pref_filter != "全国") {
       d <- d %>% filter(pref_name == input$pref_filter)
-    }
-    dr <- input$date_range
-    if (!is.null(dr) && length(dr) == 2) {
-      d <- d %>% filter(date >= dr[1], date <= dr[2])
     }
     d %>%
       group_by(year, week, date) %>%
@@ -3168,6 +3167,17 @@ server <- function(input, output, session) {
                 covid_hosp = if (all(is.na(covid_hosp))) NA_real_ else sum(covid_hosp, na.rm = TRUE),
                 .groups = "drop") %>%
       arrange(date)
+  })
+
+  # 表示範囲スライダー（date_range）で絞り込んだ主系列
+  hosp_filtered <- reactive({
+    d <- hosp_agg_all()
+    if (is.null(d) || nrow(d) == 0) return(NULL)
+    dr <- input$date_range
+    if (!is.null(dr) && length(dr) == 2) {
+      d <- d %>% filter(date >= dr[1], date <= dr[2])
+    }
+    d
   })
 
   output$hosp_last_updated <- renderUI({
@@ -3178,22 +3188,47 @@ server <- function(input, output, session) {
 
   output$hosp_plot <- renderPlotly({
     d <- hosp_filtered()
+    hist_all <- hosp_agg_all()
     if (is.null(d) || nrow(d) == 0)
       return(plot_ly() %>% add_annotations(
         text = "データなし（「入院データ更新」を押して取得してください）", showarrow = FALSE))
 
     p <- plot_ly()
     if ("flu" %in% input$hosp_disease) {
-      p <- p %>% add_lines(data = d, x = ~date, y = ~flu_hosp,
-        line = list(color = "#3498db", width = 2.5), name = "インフルエンザ（入院患者）",
-        hovertemplate = "%{x|%Y-%m-%d}　インフルエンザ入院 %{y}例<extra></extra>")
+      d_flu <- compute_hosp_band(d, hist_all, "flu_hosp")
+      p <- p %>%
+        add_ribbons(data = d_flu %>% filter(has_hist), x = ~date, ymin = ~ymin, ymax = ~ymax,
+          fillcolor = "#3498db33", line = list(color = "transparent"),
+          name = "インフルエンザ　過去5年平均±2SD", hoverinfo = "skip") %>%
+        add_lines(data = d_flu, x = ~date, y = ~flu_hosp,
+          line = list(color = "#3498db", width = 2.5), name = "インフルエンザ（入院患者）",
+          hovertemplate = "%{x|%Y-%m-%d}　インフルエンザ入院 %{y}例<extra></extra>")
+      exceed_flu <- d_flu %>% filter(has_hist, flu_hosp > ymax)
+      if (nrow(exceed_flu) > 0) {
+        p <- p %>% add_markers(data = exceed_flu, x = ~date, y = ~flu_hosp,
+          marker = list(color = "#e74c3c", size = 6, symbol = "circle"),
+          name = "インフルエンザ +2SD超過",
+          hovertemplate = "%{x|%Y-%m-%d}: %{y}例<extra></extra>")
+      }
     }
     if ("covid" %in% input$hosp_disease) {
       d_covid <- d %>% filter(!is.na(covid_hosp))
       if (nrow(d_covid) > 0) {
-        p <- p %>% add_lines(data = d_covid, x = ~date, y = ~covid_hosp,
-          line = list(color = "#e74c3c", width = 2.5), name = "新型コロナウイルス感染症（入院患者）",
-          hovertemplate = "%{x|%Y-%m-%d}　新型コロナ入院 %{y}例<extra></extra>")
+        d_covid <- compute_hosp_band(d_covid, hist_all, "covid_hosp")
+        p <- p %>%
+          add_ribbons(data = d_covid %>% filter(has_hist), x = ~date, ymin = ~ymin, ymax = ~ymax,
+            fillcolor = "#e74c3c22", line = list(color = "transparent"),
+            name = "新型コロナ　過去5年平均±2SD", hoverinfo = "skip") %>%
+          add_lines(data = d_covid, x = ~date, y = ~covid_hosp,
+            line = list(color = "#e74c3c", width = 2.5), name = "新型コロナウイルス感染症（入院患者）",
+            hovertemplate = "%{x|%Y-%m-%d}　新型コロナ入院 %{y}例<extra></extra>")
+        exceed_covid <- d_covid %>% filter(has_hist, covid_hosp > ymax)
+        if (nrow(exceed_covid) > 0) {
+          p <- p %>% add_markers(data = exceed_covid, x = ~date, y = ~covid_hosp,
+            marker = list(color = "#c0392b", size = 6, symbol = "circle"),
+            name = "新型コロナ +2SD超過",
+            hovertemplate = "%{x|%Y-%m-%d}: %{y}例<extra></extra>")
+        }
       }
     }
     p %>% layout(
@@ -3207,10 +3242,17 @@ server <- function(input, output, session) {
   })
 
   output$hosp_legend <- renderUI({
-    tags$div(style="font-size:0.75em;color:#666;margin-top:2px;padding-left:4px;",
-      "出典: 感染症発生動向調査週報（IDWR）基幹定点 入院サーベイランス。",
-      "新型コロナウイルス感染症（入院患者）は2023年5月の5類移行後のみ集計対象。",
-      tags$a(href="javascript:void(0)", onclick="goToNotes('notes-hosp')", "詳細")
+    tags$div(style="font-size:0.75em;color:#666;margin-top:2px;padding-left:4px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;",
+      tags$span(
+        tags$span(style="display:inline-block;width:8px;height:8px;background:#e74c3c;border-radius:50%;margin-right:4px;vertical-align:middle;"),
+        "+2SD超過"
+      ),
+      tags$span("帯: 過去5年間・同時期（±2週）平均±2SD（3年分以上のデータがある週のみ表示）"),
+      tags$span(
+        "出典: 感染症発生動向調査週報（IDWR）基幹定点 入院サーベイランス。",
+        "新型コロナウイルス感染症（入院患者）は2023年5月の5類移行後のみ集計対象。",
+        tags$a(href="javascript:void(0)", onclick="goToNotes('notes-hosp')", "詳細")
+      )
     )
   })
 

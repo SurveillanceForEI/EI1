@@ -189,3 +189,28 @@ load_hosp_cached <- function() {
     tryCatch(readRDS(HOSP_DATA_CACHE), error = function(e) NULL)
   } else NULL
 }
+
+# ── 過去5年・同時期（±2週）平均±2SD帯を計算する ────────────
+# 定点把握疾患の流行曲線（compute_ibs_band）と同様のロジック。
+# main_df: 表示対象の週次データ（year, week, date, <value_col>列を含む）
+# hist_df: 比較対象の過去データ（date_rangeスライダーに依存しない全期間データ）
+# value_col: 対象列名（"flu_hosp" または "covid_hosp"）
+compute_hosp_band <- function(main_df, hist_df, value_col) {
+  if (is.null(main_df) || nrow(main_df) == 0) return(main_df)
+  rows <- lapply(seq_len(nrow(main_df)), function(i) {
+    w <- main_df$week[i]; y <- main_df$year[i]
+    ws <- unique(pmax(1L, pmin(53L, (w - 2L):(w + 2L))))
+    h <- hist_df[hist_df$week %in% ws & hist_df$year >= y - 5 & hist_df$year < y, , drop = FALSE]
+    v <- h[[value_col]]
+    n <- sum(!is.na(v))
+    mu <- mean(v, na.rm = TRUE)
+    s  <- if (n >= 3) sd(v, na.rm = TRUE) else NA_real_
+    has <- n >= 3 && !is.nan(mu) && !is.na(s)
+    data.frame(
+      ymin = if (has) max(0, mu - 2 * s) else NA_real_,
+      ymax = if (has) mu + 2 * s else NA_real_,
+      has_hist = has
+    )
+  })
+  cbind(main_df, do.call(rbind, rows))
+}
