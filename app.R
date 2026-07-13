@@ -221,6 +221,10 @@ RT_ZENSU_IDS <- RT_ZENSU_IDS[RT_ZENSU_IDS %in% names(ZENSU_DISEASE_CONFIG) &
 RT_ZENSU_CHOICES <- setNames(RT_ZENSU_IDS,
   sapply(RT_ZENSU_IDS, function(x) ZENSU_DISEASE_CONFIG[[x]]$label))
 
+# 「定点把握疾患」選択肢に混在する月次報告（性感染症・薬剤耐性菌）の疾患ID一覧
+# （UI側のconditionalPanelで週次/月次表示を振り分けるためのJS配列リテラル）
+std_ids_js <- paste0("[", paste0("'", names(STD_DISEASE_CONFIG), "'", collapse = ","), "]")
+
 # ============================================================
 # UI
 # ============================================================
@@ -241,14 +245,14 @@ ui <- dashboardPage(
   dashboardSidebar(width=240,
     tags$div(class="sidebar-section-title", style="padding-left:15px", "表示モード"),
     radioButtons("ts_mode", NULL,
-      choices = c("定点把握疾患" = "teiten", "全数把握疾患" = "zensu", "月報疾患" = "std"),
+      choices = c("定点把握疾患" = "teiten", "全数把握疾患" = "zensu"),
       selected = "teiten", inline = TRUE),
 
     tags$div(class="sidebar-section-title", style="padding-left:15px", "定点把握疾患"),
     selectInput("disease", NULL,
-      choices=setNames(
-        names(DISEASE_CONFIG),
-        sapply(DISEASE_CONFIG, `[[`, "label")
+      choices = list(
+        "週次報告" = setNames(names(DISEASE_CONFIG), sapply(DISEASE_CONFIG, `[[`, "label")),
+        "月次報告（性感染症・薬剤耐性菌）" = setNames(names(STD_DISEASE_CONFIG), sapply(STD_DISEASE_CONFIG, `[[`, "label"))
       ),
       selected="flu"),
 
@@ -270,11 +274,6 @@ ui <- dashboardPage(
         grp
       }),
       selected="measles", width="100%"),
-
-    tags$div(class="sidebar-section-title", style="padding-left:15px", "月報疾患（性感染症・薬剤耐性菌）"),
-    selectInput("std_disease_ts", NULL,
-      choices = setNames(names(STD_DISEASE_CONFIG), sapply(STD_DISEASE_CONFIG, `[[`, "label")),
-      selected = "chlamydia_genital", width = "100%"),
 
     tags$div(class="sidebar-section-title", style="padding-left:15px", "期間"),
     sliderInput("date_range", NULL,
@@ -507,8 +506,10 @@ function ebsUntranslateCards(containerId) {
             style="font-size:0.78em;color:#888;text-decoration:none;",
             icon("circle-info"), " 予測手法について")
         ),
-        # 定点把握（線グラフ＋ヒートマップ＋地域比較）
-        conditionalPanel("input.ts_mode === 'teiten'",
+        # 定点把握（線グラフ＋ヒートマップ＋地域比較）。「定点把握疾患」選択肢には
+        # 週次報告の疾患と月次報告（性感染症・薬剤耐性菌）の疾患が混在するため、
+        # 選択中の疾患IDで週次/月次のどちらの表示にするかをJS側で振り分ける
+        conditionalPanel(sprintf("input.ts_mode === 'teiten' && %s.indexOf(input.disease) === -1", std_ids_js),
           fluidRow(column(12,
             tags$h5("定点把握疾患 — 週次報告数（定点あたり）", style="font-weight:700;margin-bottom:2px"),
             uiOutput("ts_source_bar"),
@@ -538,8 +539,8 @@ function ebsUntranslateCards(containerId) {
             plotlyOutput("zensu_yearly_overlay_plot", height="320px")
           ))
         ),
-        # 月報疾患（性感染症・薬剤耐性菌、月次報告数）
-        conditionalPanel("input.ts_mode === 'std'",
+        # 月次報告（性感染症・薬剤耐性菌）
+        conditionalPanel(sprintf("input.ts_mode === 'teiten' && %s.indexOf(input.disease) !== -1", std_ids_js),
           tags$div(style="text-align:right;font-size:0.78em;margin:2px 4px 0;",
             tags$a(href="javascript:void(0)", onclick="goToNotes('notes-std')",
               style="color:#888;text-decoration:none;",
@@ -1833,13 +1834,14 @@ server <- function(input, output, session) {
   }
 
   # 定点/全数 疾患ラベル取得ヘルパー
+  # 定点把握疾患の選択肢には週次報告（DISEASE_CONFIG）と月次報告
+  # （STD_DISEASE_CONFIG）の両方が含まれるため、teiten_idはどちらか一致する方を見る
   get_disease_label <- function(mode, teiten_id, zensu_id, std_id = NULL) {
     if (is.null(mode) || mode == "teiten") {
       dc <- DISEASE_CONFIG[[teiten_id]]
+      if (!is.null(dc)) return(dc$label)
+      dc <- STD_DISEASE_CONFIG[[teiten_id]]
       if (!is.null(dc)) dc$label else teiten_id
-    } else if (mode == "std") {
-      dc <- STD_DISEASE_CONFIG[[std_id]]
-      if (!is.null(dc)) dc$label else std_id
     } else {
       dc <- ZENSU_DISEASE_CONFIG[[zensu_id]]
       if (!is.null(dc)) dc$label else zensu_id
@@ -1848,7 +1850,7 @@ server <- function(input, output, session) {
 
   # 地図タブ
   output$filter_bar_map <- renderUI({
-    disease_label <- get_disease_label(input$ts_mode, input$disease, input$zensu_disease_ts, input$std_disease_ts)
+    disease_label <- get_disease_label(input$ts_mode, input$disease, input$zensu_disease_ts)
     pref_val <- if (!is.null(input$pref_filter)) input$pref_filter else "全国"
     region_val <- NULL
     sel <- map_selected_date()
@@ -1863,7 +1865,7 @@ server <- function(input, output, session) {
 
   # 流行曲線タブ
   output$filter_bar_ts <- renderUI({
-    disease_label <- get_disease_label(input$ts_mode, input$disease, input$zensu_disease_ts, input$std_disease_ts)
+    disease_label <- get_disease_label(input$ts_mode, input$disease, input$zensu_disease_ts)
     pref_val <- if (!is.null(input$pref_filter)) input$pref_filter else "全国"
     dr <- input$date_range
     date_str <- if (!is.null(dr))
@@ -1959,7 +1961,7 @@ server <- function(input, output, session) {
 
   # EBS Trends タブ フィルターバー
   output$filter_bar_trends <- renderUI({
-    disease_label <- get_disease_label(input$ts_mode, input$disease, input$zensu_disease_ts, input$std_disease_ts)
+    disease_label <- get_disease_label(input$ts_mode, input$disease, input$zensu_disease_ts)
     make_filter_bar(list(
       "疾患（Google Trends）" = disease_label
     ))
@@ -2227,12 +2229,10 @@ server <- function(input, output, session) {
     yr <- as.integer(format(latest_dt, "%Y"))
     wk <- if (nrow(d) > 0) { w <- max(d$week, na.rm=TRUE); if (is.infinite(w)) NA_integer_ else as.integer(w) } else NA_integer_
     date_txt <- if (!is.na(wk)) paste0(yr, "年 第", wk, "週（", format(latest_dt, "%m/%d"), "）") else format(latest_dt, "%Y/%m/%d")
-    is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
-    disease_label <- if (is_zensu) {
-      tryCatch(ZENSU_DISEASE_CONFIG[[input$zensu_disease_ts]]$label, error=function(e) "")
-    } else {
-      tryCatch(DISEASE_CONFIG[[input$disease]]$label, error=function(e) "")
-    }
+    disease_label <- tryCatch(
+      get_disease_label(input$ts_mode, input$disease, input$zensu_disease_ts),
+      error = function(e) "")
+    if (is.null(disease_label)) disease_label <- ""
     tags$div(class="kpi-box",
       if (nchar(disease_label) > 0)
         tags$div(style="font-size:1.1em;font-weight:700;color:#2980b9;text-align:center;margin-bottom:4px;letter-spacing:0.03em;", disease_label),
@@ -4934,7 +4934,7 @@ server <- function(input, output, session) {
   std_agg_all <- reactive({
     d <- STD_DATA
     if (is.null(d) || nrow(d) == 0) return(NULL)
-    did <- input$std_disease_ts
+    did <- input$disease
     if (is.null(did)) return(NULL)
     d <- d %>% filter(disease == did)
     if (!is.null(input$pref_filter) && input$pref_filter != "全国") {
@@ -4957,11 +4957,11 @@ server <- function(input, output, session) {
   })
 
   output$std_ts_title_ui <- renderUI({
-    did <- input$std_disease_ts
+    did <- input$disease
     dconf <- STD_DISEASE_CONFIG[[did]]
     pref_txt <- if (is.null(input$pref_filter) || input$pref_filter == "全国") "全国合算" else input$pref_filter
     tags$h5(
-      sprintf("月報疾患 — %s　流行曲線（月次報告数 / %s）", if (!is.null(dconf)) dconf$label else did, pref_txt),
+      sprintf("定点把握疾患（月次報告） — %s　流行曲線（月次報告数 / %s）", if (!is.null(dconf)) dconf$label else did, pref_txt),
       style = "font-weight:700;margin-bottom:4px;"
     )
   })
@@ -4973,7 +4973,7 @@ server <- function(input, output, session) {
       return(plot_ly() %>% add_annotations(
         text = "データなし（月報未掲載の月・期間が含まれます）", showarrow = FALSE))
 
-    did <- input$std_disease_ts
+    did <- input$disease
     dconf <- STD_DISEASE_CONFIG[[did]]
     col <- if (!is.null(dconf)) dconf$color else "#2980b9"
 
