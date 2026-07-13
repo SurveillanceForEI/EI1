@@ -169,7 +169,7 @@ forecast_ensemble <- function(forecast_list) {
 # dates: 実測データの日付ベクトル（昇順）, values: 対応する値
 compute_forecast <- function(dates, values, method, horizon = 4,
                               rt_value = NA_real_, si_mean = NA_real_, si_sd = NA_real_,
-                              seasonal = FALSE) {
+                              seasonal = FALSE, unit = "week") {
   ord <- order(dates)
   dates  <- dates[ord]
   values <- values[ord]
@@ -190,6 +190,10 @@ compute_forecast <- function(dates, values, method, horizon = 4,
   if (is.null(picked) || nrow(picked) == 0) return(NULL)
 
   last_date <- max(dates, na.rm = TRUE)
-  picked$date <- last_date + lubridate::weeks(picked$step)
+  picked$date <- if (identical(unit, "month")) {
+    last_date %m+% months(picked$step)
+  } else {
+    last_date + lubridate::weeks(picked$step)
+  }
   picked
 }

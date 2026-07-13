@@ -1778,7 +1778,12 @@ server <- function(input, output, session) {
 
   output$map_source_bar <- renderUI({
     sel <- map_selected_date()
-    week_label <- if (!is.null(sel)) {
+    is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
+    is_std   <- !is_zensu && input$disease %in% names(STD_DISEASE_CONFIG)
+    week_label <- if (is_std) {
+      if (!is.null(sel)) paste0(format(sel, "%Y年%m月"), " の都道府県別 月次報告数")
+      else "都道府県別 月次報告数"
+    } else if (!is.null(sel)) {
       paste0(format(sel, "%Y年第%W週（%m/%d〜）"), " の都道府県別 定点あたり報告数")
     } else "都道府県別 定点あたり報告数"
     make_source_bar(week_label)
@@ -1857,7 +1862,11 @@ server <- function(input, output, session) {
     pref_val <- if (!is.null(input$pref_filter)) input$pref_filter else "全国"
     region_val <- NULL
     sel <- map_selected_date()
-    week_val <- if (!is.null(sel)) format(sel, "%Y年第%W週（%m/%d〜）") else NULL
+    is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
+    is_std   <- !is_zensu && input$disease %in% names(STD_DISEASE_CONFIG)
+    week_val <- if (is.null(sel)) NULL
+                else if (is_std) format(sel, "%Y年%m月")
+                else format(sel, "%Y年第%W週（%m/%d〜）")
     make_filter_bar(list(
       "疾患"     = disease_label,
       "表示週"   = week_val,
@@ -1989,10 +1998,16 @@ server <- function(input, output, session) {
   # ── 地図タブ：週スライダー ──────────────────────────────────
   # データ中の週日付一覧（昇順: 再生が古→新）
   map_available_dates <- reactive({
-    if (!is.null(input$ts_mode) && input$ts_mode == "zensu") {
+    is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
+    is_std   <- !is_zensu && input$disease %in% names(STD_DISEASE_CONFIG)
+    if (is_zensu) {
       d <- ZENSU_DATA
       if (is.null(d) || nrow(d) == 0) return(as.Date(character(0)))
       sort(unique(d$date[d$disease == input$zensu_disease_ts]))
+    } else if (is_std) {
+      d <- STD_DATA
+      if (is.null(d) || nrow(d) == 0) return(as.Date(character(0)))
+      sort(unique(d$date[d$disease == input$disease]))
     } else {
       sort(unique(filtered_data()$date))
     }
@@ -2057,10 +2072,13 @@ server <- function(input, output, session) {
   output$map_week_label <- renderUI({
     sel <- map_selected_date()
     if (is.null(sel)) return(NULL)
+    is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
+    is_std   <- !is_zensu && input$disease %in% names(STD_DISEASE_CONFIG)
+    lbl <- if (is_std) format(sel, "%Y年%m月") else format(sel, "%Y年 第%W週（%m/%d〜）")
     tags$div(
       style = "font-size:0.85em;font-weight:600;color:#2c5f8a;margin-bottom:2px;",
       icon("calendar-week", style = "margin-right:4px;"),
-      format(sel, "%Y年 第%W週（%m/%d〜）")
+      lbl
     )
   })
 
@@ -2085,6 +2103,18 @@ server <- function(input, output, session) {
       filter(disease == input$zensu_disease_ts, date == sel) %>%
       group_by(pref_name) %>%
       summarise(cases = sum(cases, na.rm = TRUE), .groups = "drop")
+  })
+
+  # 地図用データ（月報疾患・選択月）
+  std_map_week_data <- reactive({
+    d <- STD_DATA
+    if (is.null(d) || nrow(d) == 0) return(NULL)
+    sel <- map_selected_date()
+    if (is.null(sel)) sel <- max(d$date[d$disease == input$disease], na.rm = TRUE)
+    d %>%
+      filter(disease == input$disease, date == sel) %>%
+      group_by(pref_name) %>%
+      summarise(reports = sum(reports, na.rm = TRUE), .groups = "drop")
   })
   national_avg <- reactive({
     filtered_data() %>%
@@ -3856,19 +3886,30 @@ server <- function(input, output, session) {
 
   output$ranking_title_ui <- renderUI({
     sel <- map_selected_date()
-    week_str <- if (!is.null(sel)) format(sel, "%Y年第%W週") else "直近週"
-    if (input$ts_mode == "zensu") {
-      dconf <- ZENSU_DISEASE_CONFIG[[input$zensu_disease_ts]]
-      tags$h5(paste0(dconf$label, " 報告数ランキング（", week_str, "）"),
+    is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
+    is_std   <- !is_zensu && input$disease %in% names(STD_DISEASE_CONFIG)
+    if (is_std) {
+      month_str <- if (!is.null(sel)) format(sel, "%Y年%m月") else "直近月"
+      dconf <- STD_DISEASE_CONFIG[[input$disease]]
+      tags$h5(paste0(if (!is.null(dconf)) dconf$label else input$disease, " 報告数ランキング（", month_str, "）"),
               style = "font-weight:700")
     } else {
-      tags$h5(paste0("都道府県ランキング（", week_str, "）"), style = "font-weight:700")
+      week_str <- if (!is.null(sel)) format(sel, "%Y年第%W週") else "直近週"
+      if (is_zensu) {
+        dconf <- ZENSU_DISEASE_CONFIG[[input$zensu_disease_ts]]
+        tags$h5(paste0(dconf$label, " 報告数ランキング（", week_str, "）"),
+                style = "font-weight:700")
+      } else {
+        tags$h5(paste0("都道府県ランキング（", week_str, "）"), style = "font-weight:700")
+      }
     }
   })
 
   # 凡例スケール固定用: 疾患全期間・全都道府県の最大値
   map_scale_max <- reactive({
-    if (!is.null(input$ts_mode) && input$ts_mode == "zensu") {
+    is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
+    is_std   <- !is_zensu && input$disease %in% names(STD_DISEASE_CONFIG)
+    if (is_zensu) {
       d <- ZENSU_DATA
       if (is.null(d) || nrow(d) == 0) return(1)
       # 都道府県×週 の症例数の最大値
@@ -3877,6 +3918,15 @@ server <- function(input, output, session) {
         group_by(pref_name, date) %>%
         summarise(cases = sum(cases, na.rm = TRUE), .groups = "drop") %>%
         pull(cases) %>% max(na.rm = TRUE)
+      if (!is.finite(mx) || mx <= 0) 1 else mx
+    } else if (is_std) {
+      d <- STD_DATA
+      if (is.null(d) || nrow(d) == 0) return(1)
+      mx <- d %>%
+        filter(disease == input$disease) %>%
+        group_by(pref_name, date) %>%
+        summarise(reports = sum(reports, na.rm = TRUE), .groups = "drop") %>%
+        pull(reports) %>% max(na.rm = TRUE)
       if (!is.finite(mx) || mx <= 0) 1 else mx
     } else {
       mx <- max(filtered_data()$reports_per_site, na.rm = TRUE)
@@ -3909,6 +3959,29 @@ server <- function(input, output, session) {
       } else {
         leaflet() %>% addTiles() %>% fitBounds(lng1 = 123, lat1 = 24, lng2 = 146, lat2 = 46)
       }
+    } else if (input$disease %in% names(STD_DISEASE_CONFIG)) {
+      d <- std_map_week_data()
+      if (is.null(d) || nrow(d) == 0)
+        return(leaflet() %>% addTiles() %>% fitBounds(lng1 = 123, lat1 = 24, lng2 = 146, lat2 = 46))
+      pal <- colorNumeric(c("#ffffcc","#fd8d3c","#800026"),
+                          c(0, max_val * 1.1), na.color = "#cccccc")
+      dconf <- STD_DISEASE_CONFIG[[input$disease]]
+      if (!is.null(JAPAN_MAP)) {
+        md <- JAPAN_MAP %>% left_join(d, by = "pref_name")
+        leaflet(md) %>% addTiles(options = tileOptions(opacity = 0.4)) %>%
+          addPolygons(fillColor = ~pal(reports), fillOpacity = 0.8,
+            color = "#fff", weight = 1,
+            highlight = highlightOptions(weight = 2, color = "#333", bringToFront = TRUE),
+            label = ~paste0(pref_name, ": ",
+              ifelse(is.na(reports), "NA", paste0(reports, "件"))),
+            labelOptions = labelOptions(style = list("font-size" = "12px"))) %>%
+          addLegend(pal = pal, values = c(0, max_val),
+                    title = paste0(if (!is.null(dconf)) dconf$label else input$disease, "<br>報告数（件/月）"),
+                    position = "bottomright", labFormat = labelFormat(digits = 0)) %>%
+          fitBounds(lng1 = 123, lat1 = 24, lng2 = 146, lat2 = 46)
+      } else {
+        leaflet() %>% addTiles() %>% fitBounds(lng1 = 123, lat1 = 24, lng2 = 146, lat2 = 46)
+      }
     } else {
       d <- map_week_data()
       pal <- colorNumeric(c("#ffffcc","#fd8d3c","#800026"),
@@ -3932,7 +4005,7 @@ server <- function(input, output, session) {
   })
 
   output$ranking_table <- renderDT({
-    if (input$ts_mode == "zensu") {
+    if (!is.null(input$ts_mode) && input$ts_mode == "zensu") {
       d <- zensu_map_week_data()
       if (is.null(d) || nrow(d) == 0)
         return(datatable(data.frame(都道府県=character(), 週次報告数=integer()),
@@ -3941,6 +4014,16 @@ server <- function(input, output, session) {
         arrange(desc(cases)) %>%
         mutate(順位 = min_rank(desc(cases))) %>%
         select(順位, 都道府県=pref_name, 週次報告数=cases) %>%
+        datatable(options=list(pageLength=10, dom="tp"), rownames=FALSE)
+    } else if (input$disease %in% names(STD_DISEASE_CONFIG)) {
+      d <- std_map_week_data()
+      if (is.null(d) || nrow(d) == 0)
+        return(datatable(data.frame(都道府県=character(), 月次報告数=integer()),
+                         options=list(dom="t"), rownames=FALSE))
+      d %>%
+        arrange(desc(reports)) %>%
+        mutate(順位 = min_rank(desc(reports))) %>%
+        select(順位, 都道府県=pref_name, 月次報告数=reports) %>%
         datatable(options=list(pageLength=10, dom="tp"), rownames=FALSE)
     } else {
       map_week_data() %>%
@@ -5193,6 +5276,36 @@ server <- function(input, output, session) {
       p <- p %>% add_markers(data = exceed, x = ~date, y = ~reports,
         marker = list(color = "#e74c3c", size = 6, symbol = "circle"),
         name = "+2SD超過", hovertemplate = "%{x|%Y-%m}: %{y}件<extra></extra>")
+    }
+
+    # ── 短期予測（月報疾患は月次データのため1か月先のみ）────────
+    # Rtは推定対象外のため、予測手法にRtベースが選ばれていてもアンサンブル
+    # （ポアソン回帰＋Holt法の平均）にフォールバックする
+    if (isTRUE(input$show_forecast)) {
+      hist_d <- hist_all %>% filter(!is.na(reports)) %>% arrange(date)
+      if (nrow(hist_d) >= 4) {
+        fc_method <- if (is.null(input$forecast_method) || input$forecast_method == "rt") "ensemble" else input$forecast_method
+        fc <- tryCatch(
+          compute_forecast(hist_d$date, hist_d$reports, fc_method,
+                            horizon = 1, seasonal = FALSE, unit = "month"),
+          error = function(e) NULL)
+        if (!is.null(fc) && nrow(fc) > 0) {
+          last_pt <- tail(hist_d, 1)
+          fc_line <- rbind(
+            data.frame(date = last_pt$date[1], value = last_pt$reports[1],
+                       lower = last_pt$reports[1], upper = last_pt$reports[1]),
+            fc[, c("date", "value", "lower", "upper")]
+          )
+          p <- p %>%
+            add_ribbons(data = fc_line, x = ~date, ymin = ~pmax(0, lower), ymax = ~upper,
+              fillcolor = "rgba(155,89,182,0.18)", line = list(color = "transparent"),
+              name = "予測区間（目安）", hoverinfo = "skip") %>%
+            add_lines(data = fc_line, x = ~date, y = ~value,
+              line = list(color = "#8e44ad", width = 2, dash = "dash"),
+              name = paste0("予測（", FORECAST_METHOD_LABELS[[fc_method]], "・1か月後）"),
+              hovertemplate = "%{x|%Y-%m}　予測 %{y:.0f}件<extra></extra>")
+        }
+      }
     }
 
     p %>% layout(
