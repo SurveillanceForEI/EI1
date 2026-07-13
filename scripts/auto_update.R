@@ -29,6 +29,7 @@ source("R/data_loader.R",  local = FALSE)
 source("R/zensu_loader.R", local = FALSE)
 source("R/ebs_loader.R",   local = FALSE)
 source("R/hosp_loader.R",  local = FALSE)
+source("R/std_loader.R",   local = FALSE)
 
 dir.create("data",       showWarnings = FALSE)
 dir.create("data/cache", showWarnings = FALSE)
@@ -86,6 +87,17 @@ tryCatch({
   else
     log("入院サーベイランスデータ: データなし")
 }, error = function(e) log("入院サーベイランスデータ エラー: ", e$message))
+
+# ⑤ 月報疾患（性感染症・薬剤耐性菌、IDWR週報PDF月報）
+log("月報疾患データ取得中...")
+tryCatch({
+  this_year <- as.integer(format(Sys.Date(), "%Y"))
+  d <- update_std_data(years = (this_year - 1):this_year)
+  if (!is.null(d) && nrow(d) > 0)
+    log("月報疾患データ完了: ", nrow(d), " 行")
+  else
+    log("月報疾患データ: データなし")
+}, error = function(e) log("月報疾患データ エラー: ", e$message))
 
 log("===== 自動更新完了 =====")
 

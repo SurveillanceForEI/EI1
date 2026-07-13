@@ -24,6 +24,7 @@ source("R/ebs_loader.R")
 source("R/zensu_loader.R")
 source("R/iasr_loader.R")
 source("R/hosp_loader.R")
+source("R/std_loader.R")
 source("R/change_tracker.R")
 source("R/forecast_ts.R")
 
@@ -172,6 +173,12 @@ tryCatch(
   record_data_change("hosp", compute_recent_signature(HOSP_DATA, "date", 180)),
   error = function(e) NULL
 )
+cat("月報疾患 データ読み込み中（キャッシュ）...\n")
+STD_DATA <- tryCatch(load_std_cached(), error=function(e) { message("月報疾患 ERROR:", e$message); NULL })
+tryCatch(
+  record_data_change("std", compute_recent_signature(STD_DATA, "date", 400)),
+  error = function(e) NULL
+)
 cat("準備完了\n")
 
 CURRENT_YEAR <- if (!is.null(SURV_DATA)) max(SURV_DATA$year, na.rm=TRUE) else as.integer(format(Sys.Date(),"%Y"))
@@ -234,7 +241,7 @@ ui <- dashboardPage(
   dashboardSidebar(width=240,
     tags$div(class="sidebar-section-title", style="padding-left:15px", "表示モード"),
     radioButtons("ts_mode", NULL,
-      choices = c("定点把握疾患" = "teiten", "全数把握疾患" = "zensu"),
+      choices = c("定点把握疾患" = "teiten", "全数把握疾患" = "zensu", "月報疾患" = "std"),
       selected = "teiten", inline = TRUE),
 
     tags$div(class="sidebar-section-title", style="padding-left:15px", "定点把握疾患"),
@@ -263,6 +270,11 @@ ui <- dashboardPage(
         grp
       }),
       selected="measles", width="100%"),
+
+    tags$div(class="sidebar-section-title", style="padding-left:15px", "月報疾患（性感染症・薬剤耐性菌）"),
+    selectInput("std_disease_ts", NULL,
+      choices = setNames(names(STD_DISEASE_CONFIG), sapply(STD_DISEASE_CONFIG, `[[`, "label")),
+      selected = "chlamydia_genital", width = "100%"),
 
     tags$div(class="sidebar-section-title", style="padding-left:15px", "期間"),
     sliderInput("date_range", NULL,
@@ -524,6 +536,18 @@ function ebsUntranslateCards(containerId) {
           fluidRow(column(12,
             tags$h5("年別重ね合わせ（週次報告数）", style="font-weight:700;margin-top:16px"),
             plotlyOutput("zensu_yearly_overlay_plot", height="320px")
+          ))
+        ),
+        # 月報疾患（性感染症・薬剤耐性菌、月次報告数）
+        conditionalPanel("input.ts_mode === 'std'",
+          tags$div(style="text-align:right;font-size:0.78em;margin:2px 4px 0;",
+            tags$a(href="javascript:void(0)", onclick="goToNotes('notes-std')",
+              style="color:#888;text-decoration:none;",
+              icon("circle-info"), " 注意事項・データソース")),
+          fluidRow(column(12,
+            uiOutput("std_ts_title_ui"),
+            plotlyOutput("std_ts_plot", height="380px"),
+            uiOutput("std_ts_legend")
           ))
         )
       ),
@@ -822,7 +846,7 @@ function ebsUntranslateCards(containerId) {
             tags$li(tags$strong("活動レベル一覧（疾患別）:"), "サイドバーで選択中の都道府県・表示モードについて、全疾患の統合活動レベルをタイル表示"),
             tags$li(tags$strong("活動レベル一覧（都道府県別）:"), "選択中の疾患について、全47都道府県の統合活動レベルをデフォルメ日本地図上にタイル表示"),
             tags$li(tags$strong("地図:"), "都道府県別コロプレスマップ（直近週）＋都道府県ランキング"),
-            tags$li(tags$strong("流行曲線:"), "週次報告数推移・年別重ね合わせ・都道府県別ヒートマップ・地域別比較"),
+            tags$li(tags$strong("流行曲線:"), "週次報告数推移・年別重ね合わせ・都道府県別ヒートマップ・地域別比較（定点把握・全数把握）／月次報告数推移（月報疾患：性感染症・薬剤耐性菌）"),
             tags$li(tags$strong("複数疾患比較（定点）:"), "複数疾患の定点報告数を重ね合わせ表示"),
             tags$li(tags$strong("実効再生産数 Rt:"), "Cori法によるRt推定"),
             tags$li(tags$strong("EBSニュース（国内・海外）:"), "報道・行政発表等のニュース記事をシグナルレベル別に一覧表示"),
@@ -1004,6 +1028,23 @@ function ebsUntranslateCards(containerId) {
             "出典: Hutwagner L, et al. \"The bioterrorism preparedness and response Early Aberration Reporting System (EARS).\" J Urban Health. 2003;80(2 Suppl 1):i89-96. ",
             tags$a(href="https://pubmed.ncbi.nlm.nih.gov/12791774/", target="_blank", "PubMed 12791774")
           )),
+          tags$br(),
+
+          # ── 月報疾患 ────────────────────────────────────
+          tags$h4(id="notes-std", "■ 月報疾患（性感染症・薬剤耐性菌）", style="border-bottom:2px solid #9c27b0;padding-bottom:4px;color:#2c3e50;"),
+          tags$h5("データソース"),
+          tags$p("感染症発生動向調査週報（IDWR）　国立健康危機管理研究機構（JIHS）"),
+          tags$ul(
+            tags$li("性器クラミジア感染症・性器ヘルペスウイルス感染症・尖圭コンジローマ・淋菌感染症は定点把握（性感染症定点）、",
+              "メチシリン耐性黄色ブドウ球菌感染症・ペニシリン耐性肺炎球菌感染症は基幹定点からの報告"),
+            tags$li("週報（毎週発行）とは別に、月1回程度「月報」として都道府県別報告数がまとめて掲載される"),
+            tags$li("月報の掲載号・掲載ページは月によって変動するため、該当月のデータが見つかるまで各号を探索して取得している"),
+            tags$li("薬剤耐性緑膿菌感染症は2026年4月6日より全数把握対象疾患（多剤耐性緑膿菌感染症）に変更されたため、",
+              "それ以降の月報には掲載されず、本タブでは扱っていません（全数把握タブの「多剤耐性緑膿菌感染症」を参照）")
+          ),
+          tags$p(style="font-size:0.85em;color:#888;",
+            "※ 月報が発行されなかった月・未取得の月はグラフ上で欠測（線が途切れる）となります。",
+            "過去5年比較の帯は、同月・前後1か月分・過去5年間のデータのうち3年分以上取得できている月のみ表示しています。"),
           tags$br(),
 
           # ── 実効再生産数 Rt ────────────────────────────────
@@ -1792,10 +1833,13 @@ server <- function(input, output, session) {
   }
 
   # 定点/全数 疾患ラベル取得ヘルパー
-  get_disease_label <- function(mode, teiten_id, zensu_id) {
+  get_disease_label <- function(mode, teiten_id, zensu_id, std_id = NULL) {
     if (is.null(mode) || mode == "teiten") {
       dc <- DISEASE_CONFIG[[teiten_id]]
       if (!is.null(dc)) dc$label else teiten_id
+    } else if (mode == "std") {
+      dc <- STD_DISEASE_CONFIG[[std_id]]
+      if (!is.null(dc)) dc$label else std_id
     } else {
       dc <- ZENSU_DISEASE_CONFIG[[zensu_id]]
       if (!is.null(dc)) dc$label else zensu_id
@@ -1804,7 +1848,7 @@ server <- function(input, output, session) {
 
   # 地図タブ
   output$filter_bar_map <- renderUI({
-    disease_label <- get_disease_label(input$ts_mode, input$disease, input$zensu_disease_ts)
+    disease_label <- get_disease_label(input$ts_mode, input$disease, input$zensu_disease_ts, input$std_disease_ts)
     pref_val <- if (!is.null(input$pref_filter)) input$pref_filter else "全国"
     region_val <- NULL
     sel <- map_selected_date()
@@ -1819,7 +1863,7 @@ server <- function(input, output, session) {
 
   # 流行曲線タブ
   output$filter_bar_ts <- renderUI({
-    disease_label <- get_disease_label(input$ts_mode, input$disease, input$zensu_disease_ts)
+    disease_label <- get_disease_label(input$ts_mode, input$disease, input$zensu_disease_ts, input$std_disease_ts)
     pref_val <- if (!is.null(input$pref_filter)) input$pref_filter else "全国"
     dr <- input$date_range
     date_str <- if (!is.null(dr))
@@ -1915,7 +1959,7 @@ server <- function(input, output, session) {
 
   # EBS Trends タブ フィルターバー
   output$filter_bar_trends <- renderUI({
-    disease_label <- get_disease_label(input$ts_mode, input$disease, input$zensu_disease_ts)
+    disease_label <- get_disease_label(input$ts_mode, input$disease, input$zensu_disease_ts, input$std_disease_ts)
     make_filter_bar(list(
       "疾患（Google Trends）" = disease_label
     ))
@@ -4883,6 +4927,95 @@ server <- function(input, output, session) {
       legend= list(orientation="h", y=-0.2),
       plot_bgcolor="#fff", paper_bgcolor="#fff",
       margin=list(t=10, b=60, l=60, r=20)
+    )
+  })
+
+  # ── 月報疾患（性感染症・薬剤耐性菌）────────────────────────
+  std_agg_all <- reactive({
+    d <- STD_DATA
+    if (is.null(d) || nrow(d) == 0) return(NULL)
+    did <- input$std_disease_ts
+    if (is.null(did)) return(NULL)
+    d <- d %>% filter(disease == did)
+    if (!is.null(input$pref_filter) && input$pref_filter != "全国") {
+      d <- d %>% filter(pref_name == input$pref_filter)
+    }
+    d %>%
+      group_by(year, month, date) %>%
+      summarise(reports = sum(reports, na.rm = TRUE), .groups = "drop") %>%
+      arrange(date)
+  })
+
+  std_filtered <- reactive({
+    d <- std_agg_all()
+    if (is.null(d) || nrow(d) == 0) return(NULL)
+    dr <- input$date_range
+    if (!is.null(dr) && length(dr) == 2) {
+      d <- d %>% filter(date >= dr[1], date <= dr[2])
+    }
+    d
+  })
+
+  output$std_ts_title_ui <- renderUI({
+    did <- input$std_disease_ts
+    dconf <- STD_DISEASE_CONFIG[[did]]
+    pref_txt <- if (is.null(input$pref_filter) || input$pref_filter == "全国") "全国合算" else input$pref_filter
+    tags$h5(
+      sprintf("月報疾患 — %s　流行曲線（月次報告数 / %s）", if (!is.null(dconf)) dconf$label else did, pref_txt),
+      style = "font-weight:700;margin-bottom:4px;"
+    )
+  })
+
+  output$std_ts_plot <- renderPlotly({
+    d <- std_filtered()
+    hist_all <- std_agg_all()
+    if (is.null(d) || nrow(d) == 0)
+      return(plot_ly() %>% add_annotations(
+        text = "データなし（月報未掲載の月・期間が含まれます）", showarrow = FALSE))
+
+    did <- input$std_disease_ts
+    dconf <- STD_DISEASE_CONFIG[[did]]
+    col <- if (!is.null(dconf)) dconf$color else "#2980b9"
+
+    d_band <- compute_std_band(d, hist_all, "reports")
+
+    p <- plot_ly() %>%
+      add_ribbons(data = d_band %>% filter(has_hist), x = ~date, ymin = ~ymin, ymax = ~ymax,
+        fillcolor = paste0(col, "33"), line = list(color = "transparent"),
+        name = "過去5年平均±2SD", hoverinfo = "skip") %>%
+      add_lines(data = d_band, x = ~date, y = ~reports,
+        line = list(color = col, width = 2.5),
+        name = if (!is.null(dconf)) dconf$label else did,
+        hovertemplate = "%{x|%Y-%m}　%{y}件<extra></extra>")
+
+    exceed <- d_band %>% filter(has_hist, reports > ymax)
+    if (nrow(exceed) > 0) {
+      p <- p %>% add_markers(data = exceed, x = ~date, y = ~reports,
+        marker = list(color = "#e74c3c", size = 6, symbol = "circle"),
+        name = "+2SD超過", hovertemplate = "%{x|%Y-%m}: %{y}件<extra></extra>")
+    }
+
+    p %>% layout(
+      xaxis = list(title = "", showgrid = FALSE, type = "date"),
+      yaxis = list(title = "報告数（件/月）", gridcolor = "#eee", rangemode = "nonnegative"),
+      legend = list(orientation = "h", y = -0.15),
+      hovermode = "x unified",
+      plot_bgcolor = "#fff", paper_bgcolor = "#fff",
+      margin = list(t = 20, b = 40, l = 60, r = 20)
+    )
+  })
+
+  output$std_ts_legend <- renderUI({
+    tags$div(style="font-size:0.75em;color:#666;margin-top:2px;padding-left:4px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;",
+      tags$span(
+        tags$span(style="display:inline-block;width:8px;height:8px;background:#e74c3c;border-radius:50%;margin-right:4px;vertical-align:middle;"),
+        "+2SD超過"
+      ),
+      tags$span("帯: 過去5年間・同月（前後1か月）平均±2SD（3年分以上のデータがある月のみ表示）"),
+      tags$span(
+        "出典: 感染症発生動向調査週報（IDWR）月報（定点把握・基幹定点）。月1回程度の掲載のため、月報未掲載の月は欠測。",
+        tags$a(href="javascript:void(0)", onclick="goToNotes('notes-std')", "詳細")
+      )
     )
   })
 
