@@ -700,15 +700,10 @@ function ebsUntranslateCards(containerId) {
             style="color:#888;text-decoration:none;",
             icon("circle-info"), " 注意事項・データソース")),
         fluidRow(style="margin:8px 0 4px;",
-          column(3,
+          column(4,
             checkboxGroupInput("hosp_disease", "対象疾患",
               choices = c("インフルエンザ" = "flu", "新型コロナウイルス感染症" = "covid"),
               selected = c("flu", "covid"))
-          ),
-          column(3,
-            selectInput("hosp_pref", "都道府県",
-              choices = c("全国" = "全国", PREF_MASTER$pref_name),
-              selected = "全国", width = "100%")
           )
         ),
         tags$div(class="data-source-bar", "基幹定点 入院サーベイランス — 週次入院患者報告数"),
@@ -3160,8 +3155,8 @@ server <- function(input, output, session) {
   hosp_filtered <- reactive({
     d <- hosp_reactive()
     if (is.null(d) || nrow(d) == 0) return(NULL)
-    if (!is.null(input$hosp_pref) && input$hosp_pref != "全国") {
-      d <- d %>% filter(pref_name == input$hosp_pref)
+    if (!is.null(input$pref_filter) && input$pref_filter != "全国") {
+      d <- d %>% filter(pref_name == input$pref_filter)
     }
     dr <- input$date_range
     if (!is.null(dr) && length(dr) == 2) {
