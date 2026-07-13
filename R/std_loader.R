@@ -177,3 +177,35 @@ compute_std_band <- function(main_df, hist_df, value_col) {
   })
   cbind(main_df, do.call(rbind, rows))
 }
+
+# ── 月報疾患のIBS方式評価（直近2か月×過去5年・同月±1か月比較） ──
+# 定点把握疾患のzensu_ibs_band（季節性ありの分岐）と同一ロジックの月次版。
+# +2SD超過は直近2か月連続で該当した場合のみscore=3。
+std_ibs_score <- function(cur_val, cur_year, cur_month, prev_val, prev_year, prev_month,
+                           hist_d, value_col = "reports") {
+  calc <- function(val, y, mo) {
+    ms <- unique(pmax(1L, pmin(12L, (mo - 1):(mo + 1))))
+    h  <- hist_d[hist_d$month %in% ms & hist_d$year >= y - 5 & hist_d$year < y, , drop = FALSE]
+    v  <- h[[value_col]]
+    n  <- sum(!is.na(v))
+    mu <- mean(v, na.rm = TRUE)
+    s  <- if (n >= 3) sd(v, na.rm = TRUE) else NA_real_
+    has <- n >= 3 && !is.nan(mu) && !is.na(s)
+    list(mu = mu, s = s, has_hist = has,
+         exceeds2sd = has && !is.na(val) && val > 0 && val >= mu + 2 * s,
+         exceeds1sd = has && !is.na(val) && val > 0 && val >= mu + s,
+         abovemu    = has && !is.na(val) && val > 0 && val >= mu)
+  }
+  cb <- calc(cur_val, cur_year, cur_month)
+  pb <- calc(prev_val, prev_year, prev_month)
+  score <- if (!cb$has_hist) 0L
+           else if (cb$exceeds2sd && pb$exceeds2sd) 3L
+           else if (cb$exceeds2sd || cb$exceeds1sd) 2L
+           else if (cb$abovemu) 1L
+           else 0L
+  label <- if (!cb$has_hist) "基準値なし" else
+    c("0"="平均以下","1"="平均〜+1SD","2"="+1〜+2SD","3"="+2SD超過（2か月連続）")[as.character(score)]
+  detail <- if (!cb$has_hist) "過去データ不足"
+            else sprintf("%d件（基準 %.1f±%.1f）", as.integer(cur_val), cb$mu, cb$s)
+  list(score = score, label = unname(label), detail = detail, method = "monthly", has_hist = cb$has_hist)
+}

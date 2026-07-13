@@ -392,6 +392,16 @@ DISEASE_KEYWORDS <- list(
                     "measles spread","measles cluster"),
   dra           = c("薬剤耐性アシネトバクター","MDRA","multidrug-resistant Acinetobacter",
                     "Acinetobacter baumannii","CRAB"),
+  # ── 月報疾患（性感染症・薬剤耐性菌）─────────────────────
+  chlamydia_genital = c("性器クラミジア","クラミジア感染症","chlamydia","genital chlamydia",
+                        "Chlamydia trachomatis"),
+  herpes_genital    = c("性器ヘルペス","genital herpes","HSV-2","genital HSV"),
+  condyloma         = c("尖圭コンジローマ","condyloma","genital warts","HPV genital wart"),
+  gonorrhea         = c("淋菌感染症","淋病","gonorrhea","gonorrhoea","Neisseria gonorrhoeae",
+                        "drug-resistant gonorrhea"),
+  mrsa              = c("メチシリン耐性黄色ブドウ球菌","MRSA","methicillin-resistant Staphylococcus aureus"),
+  prsp              = c("ペニシリン耐性肺炎球菌","PRSP","penicillin-resistant Streptococcus pneumoniae",
+                        "penicillin-resistant pneumococcus"),
   general       = c("感染症","outbreak","流行","epidemic","pandemic",
                     "クラスター","cluster","疫学","公衆衛生","感染拡大")
 )

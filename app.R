@@ -1799,6 +1799,9 @@ server <- function(input, output, session) {
     "igas"="劇症型溶血性レンサ球菌感染症","invasive_pneu"="侵襲性肺炎球菌感染症",
     "legionella"="レジオネラ症","hep_a"="Ａ型肝炎",
     "sfts"="重症熱性血小板減少症候群（SFTS）","ebola"="エボラ出血熱",
+    "chlamydia_genital"="性器クラミジア感染症","herpes_genital"="性器ヘルペスウイルス感染症",
+    "condyloma"="尖圭コンジローマ","gonorrhea"="淋菌感染症",
+    "mrsa"="メチシリン耐性黄色ブドウ球菌感染症","prsp"="ペニシリン耐性肺炎球菌感染症",
     "general"="感染症全般"
   )
 
@@ -2138,6 +2141,36 @@ server <- function(input, output, session) {
   # ── KPI ────────────────────────────────────────────────
   output$kpi_national <- renderUI({
     is_teiten <- is.null(input$ts_mode) || input$ts_mode == "teiten"
+    is_std    <- is_teiten && input$disease %in% names(STD_DISEASE_CONFIG)
+    if (is_std) {
+      pref <- if (!is.null(input$pref_filter) && input$pref_filter != "全国") input$pref_filter else NULL
+      d <- if (is.null(STD_DATA)) NULL else {
+        x <- STD_DATA %>% filter(disease == input$disease)
+        if (!is.null(pref)) x <- x %>% filter(pref_name == pref)
+        x %>% group_by(year, month, date) %>%
+          summarise(reports = sum(reports, na.rm = TRUE), .groups = "drop") %>% arrange(date)
+      }
+      if (is.null(d) || nrow(d) == 0) return(tags$div(class="kpi-box",
+        tags$div(style="background:#2980b9;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
+        tags$div(class="kpi-value","―"),
+        tags$div(class="kpi-label","月次報告数"),
+        tags$div(class="kpi-delta flat","データなし")))
+      recent2 <- slice_tail(d, n = 2)
+      cur  <- slice_tail(recent2, n = 1)
+      prev <- if (nrow(recent2) >= 2) slice_head(recent2, n = 1) else cur
+      val  <- cur$reports[1]
+      prevv <- prev$reports[1]
+      delta_pct <- if (!is.na(prevv) && prevv > 0) (val - prevv) / prevv * 100 else NA
+      dc <- if(is.na(delta_pct))"flat" else if(delta_pct>5)"up" else if(delta_pct < -5)"down" else "flat"
+      dt <- if(is.na(delta_pct))"―" else sprintf("%+.1f%%", delta_pct)
+      label <- paste0(if (is.null(pref)) "全国" else pref, " 月次報告数")
+      col <- STD_DISEASE_CONFIG[[input$disease]]$color
+      return(tags$div(class="kpi-box",
+        tags$div(style="background:#2980b9;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
+        tags$div(class="kpi-value", style=paste0("color:",col), sprintf("%d件", as.integer(val))),
+        tags$div(class="kpi-label", paste0(label, sprintf(" (%d年%d月)", cur$year[1], cur$month[1]))),
+        tags$div(class=paste("kpi-delta",dc), paste0("前月比 ",dt))))
+    }
     if (is_teiten) {
       pref <- if (!is.null(input$pref_filter) && input$pref_filter != "全国") input$pref_filter else NULL
       d <- latest_week_data()
@@ -2289,6 +2322,17 @@ server <- function(input, output, session) {
   }, ignoreInit=TRUE)
   output$kpi_rt <- renderUI({
     is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
+    is_std   <- !is_zensu && input$disease %in% names(STD_DISEASE_CONFIG)
+    if (is_std) {
+      # 性感染症・薬剤耐性菌はヒト→ヒトの短期伝搬連鎖モデルの前提となる
+      # シリアルインターバル文献値が存在せず、月次データのため既存の
+      # Rt推定ロジック（週次想定）を適用すると科学的に誤った値になるため対象外
+      return(tags$div(class="kpi-box",
+        tags$div(style="background:#2980b9;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
+        tags$div(class="kpi-value","―"),
+        tags$div(class="kpi-label","実効再生産数 Rt"),
+        tags$div(class="kpi-delta flat","推定対象外（月報疾患）")))
+    }
     if (is_zensu) {
       did <- input$zensu_disease_ts
       rd <- tryCatch({
@@ -2329,6 +2373,55 @@ server <- function(input, output, session) {
     }
   })
   output$kpi_alert <- renderUI({
+    is_std_alert <- (is.null(input$ts_mode) || input$ts_mode == "teiten") &&
+                    input$disease %in% names(STD_DISEASE_CONFIG)
+    if (is_std_alert) {
+      did <- input$disease
+      pref_f <- if (!is.null(input$pref_filter) && input$pref_filter != "全国") input$pref_filter else NULL
+      hist_d <- if (is.null(STD_DATA)) NULL else {
+        x <- STD_DATA %>% filter(disease == did)
+        if (!is.null(pref_f)) x <- x %>% filter(pref_name == pref_f)
+        x %>% group_by(year, month, date) %>%
+          summarise(reports = sum(reports, na.rm = TRUE), .groups = "drop") %>% arrange(date)
+      }
+      band <- tryCatch({
+        if (is.null(hist_d) || nrow(hist_d) == 0) {
+          NULL
+        } else {
+          recent2 <- slice_tail(hist_d, n = 2)
+          cur  <- slice_tail(recent2, n = 1)
+          prev <- if (nrow(recent2) >= 2) slice_head(recent2, n = 1) else cur
+          std_ibs_score(
+            cur_val = cur$reports[1], cur_year = cur$year[1], cur_month = cur$month[1],
+            prev_val = prev$reports[1], prev_year = prev$year[1], prev_month = prev$month[1],
+            hist_d = hist_d)
+        }
+      }, error = function(e) NULL)
+      wk_txt <- if (!is.null(hist_d) && nrow(hist_d) > 0) {
+        d1 <- slice_tail(hist_d, n = 1)
+        sprintf("(%d年%d月)", d1$year[1], d1$month[1])
+      } else ""
+      if (is.null(band)) return(tags$div(class="kpi-box",
+        tags$div(style="background:#95a5a6;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
+        tags$div(class="kpi-value","―"),
+        tags$div(class="kpi-label", paste0("現在の流行フェーズ", wk_txt)),
+        tags$div(class="kpi-delta flat","データなし")))
+
+      # Rt推定対象外・公式閾値なしのため、IBS（月次±2SD判定）のみで評価
+      score <- compute_alert_score(value=NA_real_, thresh=NULL, rt_value=NA_real_, ibs_score=band$score)
+      labels <- c("基準以下", "流行期（レベル1）", "注意（レベル2）", "警戒（レベル3）")
+      level <- if (is.na(score)) "―" else labels[score + 1]
+      col <- alert_color(level)
+
+      return(tags$div(class="kpi-box",
+        tags$div(style=paste0("background:",col,";color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;"),
+          "IBS 総合判定"),
+        tags$div(class="kpi-value", style=paste0("color:",col,";font-size:1.6em;"), level),
+        tags$div(class="kpi-label", paste0("現在の流行フェーズ", wk_txt)),
+        tags$div(class="kpi-delta flat",
+          "月次報告数の過去5年比のみで判定（Rt・公式基準値は対象外）",
+          tags$a(href="javascript:void(0)", onclick="goToNotes('notes-std')", style="margin-left:4px;", "詳細→"))))
+    }
     if (!is.null(input$ts_mode) && input$ts_mode == "zensu") {
       did  <- input$zensu_disease_ts
       hist_d <- zensu_hist()
@@ -2449,14 +2542,34 @@ server <- function(input, output, session) {
   output$kpi_integrated <- renderUI({
     is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
     did      <- if (is_zensu) input$zensu_disease_ts else input$disease
-    dlabel   <- if (is_zensu) ZENSU_DISEASE_CONFIG[[did]]$label else DISEASE_CONFIG[[did]]$label
+    is_std   <- !is_zensu && did %in% names(STD_DISEASE_CONFIG)
+    dlabel   <- if (is_zensu) ZENSU_DISEASE_CONFIG[[did]]$label
+                else if (is_std) STD_DISEASE_CONFIG[[did]]$label
+                else DISEASE_CONFIG[[did]]$label
     pref     <- if (!is.null(input$pref_filter) && input$pref_filter != "全国") input$pref_filter else NULL
     area_lbl <- if (is.null(pref)) "全国" else pref
 
     # ── IBS スコア: 直近2週を過去5年・5週MA±SDと比較 ──────
     # +2SD超過は2週連続で該当した場合のみ score=3
+    # （月報疾患は月次データのため、直近2か月×過去5年・同月±1か月比較）
     ibs_info <- tryCatch({
-      if (!is_zensu) {
+      if (is_std) {
+        if (is.null(STD_DATA) || nrow(STD_DATA) == 0) return(NULL)
+        base_d <- STD_DATA %>% filter(disease == did)
+        if (!is.null(pref)) base_d <- base_d %>% filter(pref_name == pref)
+        hist_d <- base_d %>% group_by(year, month, date) %>%
+          summarise(reports = sum(reports, na.rm = TRUE), .groups = "drop") %>% arrange(date)
+        if (nrow(hist_d) == 0) return(NULL)
+        recent2 <- slice_tail(hist_d, n = 2)
+        cur  <- slice_tail(recent2, n = 1)
+        prev <- if (nrow(recent2) >= 2) slice_head(recent2, n = 1) else cur
+        cur_val <- cur$reports[1]
+        band <- std_ibs_score(
+          cur_val = cur_val, cur_year = cur$year[1], cur_month = cur$month[1],
+          prev_val = prev$reports[1], prev_year = prev$year[1], prev_month = prev$month[1],
+          hist_d = hist_d)
+        band[c("score","label","detail")]
+      } else if (!is_zensu) {
         # 定点把握疾患: 既存データから季節性を自動判定し、評価方式を切替
         #（季節性あり=同時期×過去5年比較、季節性なし=直近推移比較。zensu_ibs_band参照）
         base_d <- SURV_DATA %>% filter(disease == did)
@@ -2510,7 +2623,10 @@ server <- function(input, output, session) {
     if (is.null(ibs_info)) return(NULL)
 
     # ── Rt（動態指標）: 参考基準値と共線性のある過去5年比較(IBS)とは独立に評価 ──
-    rt_latest <- tryCatch({
+    # 月報疾患（性感染症・薬剤耐性菌）はヒト→ヒトの短期伝搬連鎖モデルが前提の
+    # シリアルインターバル文献値が存在せず、月次データへの適用も科学的に不適切な
+    # ため、Rtは推定対象外（NA）とする
+    rt_latest <- if (is_std) NA_real_ else tryCatch({
       if (is_zensu) {
         if (is.null(ZENSU_DATA) || nrow(ZENSU_DATA) == 0) return(NA_real_)
         rd <- compute_rt_series_zensu(ZENSU_DATA, did, pref) %>% filter(!is.na(rt)) %>% slice_tail(n=1)
@@ -2519,7 +2635,7 @@ server <- function(input, output, session) {
       }
       if (nrow(rd)==0) NA_real_ else rd$rt[1]
     }, error=function(e) NA_real_)
-    thresh_val <- if (!is_zensu) DISEASE_CONFIG[[did]]$alert_threshold else NULL
+    thresh_val <- if (!is_zensu && !is_std) DISEASE_CONFIG[[did]]$alert_threshold else NULL
 
     # ── EBS スコア: 今週 vs 先週の重み付きシグナル変化率 ──
     # 都道府県選択時はタイトル・本文に都道府県名を含む記事に絞る
@@ -2607,10 +2723,14 @@ server <- function(input, output, session) {
         "margin:-10px -14px 8px -14px;border-radius:3px 3px 0 0;"),
         "IBS + EBS　統合活動レベル"),
       tags$div(style="font-size:0.68em;color:#999;text-align:center;margin-bottom:4px;",
-        paste0("評価期間: IBS2週×過去5年比較／Rt7週／EBS7日変化率",
-               if (exists("cur") && !is.null(cur) && nrow(cur)>0)
-                 sprintf("　(IBS/Rt/EBS: %d年第%d週時点)", cur$year[1], cur$week[1]) else "",
-               if (!isTRUE(ebs_info$evaluable)) "　※EBSは直近1年分のみ評価可能" else "")),
+        paste0(
+          if (is_std) "評価期間: IBS2か月×過去5年比較／EBS7日変化率（Rt推定対象外）"
+          else "評価期間: IBS2週×過去5年比較／Rt7週／EBS7日変化率",
+          if (exists("cur") && !is.null(cur) && nrow(cur)>0) {
+            if (is_std) sprintf("　(IBS/EBS: %d年%d月時点)", cur$year[1], cur$month[1])
+            else sprintf("　(IBS/Rt/EBS: %d年第%d週時点)", cur$year[1], cur$week[1])
+          } else "",
+          if (!isTRUE(ebs_info$evaluable)) "　※EBSは直近1年分のみ評価可能" else "")),
       tags$div(style="display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;text-align:center;",
         tags$div(
           tags$span(style=paste0("font-size:2em;font-weight:900;color:",cfg$color,
@@ -2626,7 +2746,7 @@ server <- function(input, output, session) {
               if (rt_latest>=2.0) "#c0392b" else if (rt_latest>=1.0) "#d4ac0d" else "#27ae60")
           ),
           tags$div(style="font-size:0.73em;color:#777;margin-top:4px;text-align:center;",
-            paste0(if (is_zensu) "報告数 " else "定点あたり ", ibs_info$detail,
+            paste0(if (is_zensu || is_std) "報告数 " else "定点あたり ", ibs_info$detail,
                    if (!is.null(rt_lbl)) paste0("　", rt_lbl) else "",
                    "　EBS今週 ", ebs_info$n, "件",
                    if (ebs_info$high > 0) paste0("（高シグナル", ebs_info$high, "件）") else ""))
@@ -2727,9 +2847,46 @@ server <- function(input, output, session) {
           act_level=act_level(sc), combined=sc,
           cur_val=cur$reports_per_site[1],
           ibs_label=band$label, ibs_method=band$method,
-          year=cur$year[1], week=cur$week[1]
+          year=cur$year[1], week=cur$week[1], is_std=FALSE
         )
       }, error=function(e) NULL)
+    }
+
+    # ── 定点把握疾患（月次報告：性感染症・薬剤耐性菌）──────────
+    if (!is_zensu && !is.null(STD_DATA)) {
+      all_std <- STD_DATA %>%
+        { if (!is.null(pref)) filter(., pref_name == pref) else . } %>%
+        group_by(disease, date, year, month) %>%
+        summarise(reports = sum(reports, na.rm=TRUE), .groups="drop")
+
+      for (did in names(STD_DISEASE_CONFIG)) {
+        tryCatch({
+          dconf <- STD_DISEASE_CONFIG[[did]]
+          dd <- all_std %>% filter(disease == did) %>% arrange(date)
+          if (nrow(dd) == 0) return(NULL)
+          dd_sel <- dd %>% filter(date >= dr[1], date <= dr[2])
+          if (nrow(dd_sel) == 0) return(NULL)
+          recent2 <- slice_tail(dd_sel, n=2)
+          cur  <- slice_tail(recent2, n=1)
+          prev <- if (nrow(recent2) >= 2) slice_head(recent2, n=1) else cur
+          band <- std_ibs_score(
+            cur_val=cur$reports[1], cur_year=cur$year[1], cur_month=cur$month[1],
+            prev_val=prev$reports[1], prev_year=prev$year[1], prev_month=prev$month[1],
+            hist_d=dd)
+          ibs_s <- band$score
+          ebs_s <- ebs_score_for(did, cur$date[1])
+          # Rt推定対象外・公式閾値なしのためIBS(月次)+EBSのみで統合
+          sc    <- combined_score(cur$reports[1], NULL, NA_real_, ibs_s, ebs_s)
+          results[[paste0("s_",did)]] <- list(
+            id=did, label=dconf$label, type="定点（月次）", color=dconf$color,
+            ibs_score=ibs_s, ebs_score=ebs_s,
+            act_level=act_level(sc), combined=sc,
+            cur_val=cur$reports[1],
+            ibs_label=band$label, ibs_method=band$method,
+            year=cur$year[1], week=NA_integer_, is_std=TRUE
+          )
+        }, error=function(e) NULL)
+      }
     }
 
     # ── 全数把握疾患 ────────────────────────────────────
@@ -2772,7 +2929,7 @@ server <- function(input, output, session) {
           act_level=act_level(sc), combined=sc,
           cur_val=cur$reports_per_site[1],
           ibs_label=band$label, ibs_method=band$method,
-          year=cur$year[1], week=cur$week[1]
+          year=cur$year[1], week=cur$week[1], is_std=FALSE
         )
       }, error=function(e) NULL)
     }
@@ -2791,8 +2948,9 @@ server <- function(input, output, session) {
     mode_lbl <- if (is_zensu) "全数把握" else "定点把握"
     res  <- all_disease_levels_data()
     n_by_level <- if (length(res) > 0) table(sapply(res, `[[`, "act_level")) else table(integer(0))
-    wk_txt <- if (length(res) > 0) {
-      wk_key <- sapply(res, function(r) paste0(r$year, "-", r$week))
+    res_wk <- Filter(function(r) !is.na(r$week), res)
+    wk_txt <- if (length(res_wk) > 0) {
+      wk_key <- sapply(res_wk, function(r) paste0(r$year, "-", r$week))
       top_key <- names(sort(table(wk_key), decreasing = TRUE))[1]
       parts <- strsplit(top_key, "-")[[1]]
       sprintf("　%s年 第%s週時点", parts[1], parts[2])
@@ -2827,7 +2985,7 @@ server <- function(input, output, session) {
     cards <- lapply(res, function(r) {
       cfg <- lcfg[[as.character(r$act_level)]]
       type_col <- switch(r$type,
-        "定点"="#2980b9", "1類"="#8e0000", "2類"="#c0392b",
+        "定点"="#2980b9", "定点（月次）"="#9c27b0", "1類"="#8e0000", "2類"="#c0392b",
         "3類"="#e67e22", "4類"="#f39c12", "5類全数"="#2980b9", "#7f8c8d")
       cur_fmt <- if (r$type == "定点") sprintf("%.2f", coalesce(r$cur_val, 0))
                  else sprintf("%d件", as.integer(coalesce(r$cur_val, 0)))
@@ -2840,7 +2998,7 @@ server <- function(input, output, session) {
         ),
         onclick=sprintf(
           "Shiny.setInputValue('disease_tile_click', {id:'%s', zensu:%s, t:Date.now()}, {priority:'event'})",
-          r$id, if (identical(r$type, "定点")) "false" else "true"
+          r$id, if (identical(r$type, "定点") || isTRUE(r$is_std)) "false" else "true"
         ),
         title = paste0(r$label, "　Lv", r$act_level, "　", cur_fmt, "　", r$ibs_label, "　（クリックで流行曲線タブへ）"),
         # 疾患名 + 類型バッジ
@@ -2893,6 +3051,7 @@ server <- function(input, output, session) {
   pref_levels_data <- reactive({
     is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
     did <- if (is_zensu) input$zensu_disease_ts else input$disease
+    is_std <- !is_zensu && did %in% names(STD_DISEASE_CONFIG)
 
     ebs_d <- tryCatch(ebs_data(), error=function(e) NULL)
     weights <- c("Signal High"=3L, "Signal Low"=2L, "FYI"=0L)
@@ -2933,13 +3092,48 @@ server <- function(input, output, session) {
     }
     act_level <- function(sc) min(4L, max(1L, as.integer(round(sc)) + 1L))
 
-    thresh_val <- if (!is_zensu) tryCatch(DISEASE_CONFIG[[did]]$alert_threshold, error=function(e) NULL) else NULL
+    thresh_val <- if (!is_zensu && !is_std) tryCatch(DISEASE_CONFIG[[did]]$alert_threshold, error=function(e) NULL) else NULL
 
     results <- list()
     pref_order <- PREF_MASTER$pref_name[order(PREF_MASTER$pref_code)]
     dr <- input$date_range
 
-    if (!is_zensu) {
+    if (is_std) {
+      base_d <- if (is.null(STD_DATA)) STD_DATA[0,] else STD_DATA %>% filter(disease == did)
+      for (pr in pref_order) {
+        tryCatch({
+          dd <- base_d %>% filter(pref_name == pr) %>%
+            group_by(date, year, month) %>%
+            summarise(reports = sum(reports, na.rm=TRUE), .groups="drop") %>%
+            arrange(date)
+          if (nrow(dd) == 0) return(NULL)
+          dd_sel <- dd %>% filter(date >= dr[1], date <= dr[2])
+          if (nrow(dd_sel) == 0) return(NULL)
+          recent2 <- slice_tail(dd_sel, n=2)
+          cur  <- slice_tail(recent2, n=1)
+          prev <- if (nrow(recent2) >= 2) slice_head(recent2, n=1) else cur
+          band <- std_ibs_score(
+            cur_val=cur$reports[1], cur_year=cur$year[1], cur_month=cur$month[1],
+            prev_val=prev$reports[1], prev_year=prev$year[1], prev_month=prev$month[1],
+            hist_d=dd)
+          ibs_s <- band$score
+          ebs_s <- ebs_score_for_pref(pr, cur$date[1])
+          sc    <- combined_score(cur$reports[1], NULL, NA_real_, ibs_s, ebs_s)
+          results[[pr]] <- list(
+            id=pr, label=pr, region=PREF_MASTER$region[PREF_MASTER$pref_name==pr][1],
+            grid_row=PREF_MASTER$grid_row[PREF_MASTER$pref_name==pr][1],
+            grid_col=PREF_MASTER$grid_col[PREF_MASTER$pref_name==pr][1],
+            grid_colspan=PREF_MASTER$grid_colspan[PREF_MASTER$pref_name==pr][1],
+            grid_rowspan=PREF_MASTER$grid_rowspan[PREF_MASTER$pref_name==pr][1],
+            ibs_score=ibs_s, ebs_score=ebs_s,
+            act_level=act_level(sc), combined=sc,
+            cur_val=cur$reports[1],
+            ibs_label=band$label, ibs_method=band$method,
+            year=cur$year[1], week=NA_integer_
+          )
+        }, error=function(e) NULL)
+      }
+    } else if (!is_zensu) {
       base_d <- SURV_DATA %>% filter(disease == did)
       for (pr in pref_order) {
         tryCatch({
@@ -3031,16 +3225,20 @@ server <- function(input, output, session) {
   output$pref_levels_header <- renderUI({
     is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
     did   <- if (is_zensu) input$zensu_disease_ts else input$disease
-    label <- tryCatch(
-      if (is_zensu) ZENSU_DISEASE_CONFIG[[did]]$label else DISEASE_CONFIG[[did]]$label,
-      error = function(e) did)
+    is_std <- !is_zensu && did %in% names(STD_DISEASE_CONFIG)
+    label <- get_disease_label(if (is_zensu) "zensu" else "teiten", did, did)
+    if (is.null(label)) label <- did
     res <- pref_levels_data()
     n_by_level <- if (length(res) > 0) table(sapply(res, `[[`, "act_level")) else table(integer(0))
-    wk_txt <- if (length(res) > 0) {
-      wk_key <- sapply(res, function(r) paste0(r$year, "-", r$week))
+    res_wk <- Filter(function(r) !is.na(r$week), res)
+    wk_txt <- if (length(res_wk) > 0) {
+      wk_key <- sapply(res_wk, function(r) paste0(r$year, "-", r$week))
       top_key <- names(sort(table(wk_key), decreasing = TRUE))[1]
       parts <- strsplit(top_key, "-")[[1]]
       sprintf("　%s年 第%s週時点", parts[1], parts[2])
+    } else if (is_std && length(res) > 0) {
+      ym_key <- sapply(res, function(r) r$year)
+      sprintf("　%s年時点", names(sort(table(ym_key), decreasing = TRUE))[1])
     } else ""
     tags$div(style="margin-bottom:10px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;",
       tags$div(style="font-size:0.9em;font-weight:700;color:#333;",
@@ -3070,7 +3268,9 @@ server <- function(input, output, session) {
     )
 
     is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
-    cur_fmt_fn <- if (is_zensu)
+    did_cur  <- if (is_zensu) input$zensu_disease_ts else input$disease
+    is_std   <- !is_zensu && did_cur %in% names(STD_DISEASE_CONFIG)
+    cur_fmt_fn <- if (is_zensu || is_std)
       function(v) sprintf("%d件", as.integer(coalesce(v, 0)))
     else
       function(v) sprintf("%.2f", coalesce(v, 0))
