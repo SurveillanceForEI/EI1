@@ -291,7 +291,9 @@ ui <- dashboardPage(
         actionButton("ebs_refresh", "EBSニュース更新", icon=icon("newspaper"),
           class="btn-primary btn-sm btn-block", style="margin-bottom:4px;"),
         actionButton("gtrends_refresh", "Google Trends 更新", icon=icon("arrow-trend-up"),
-          class="btn-info btn-sm btn-block"),
+          class="btn-info btn-sm btn-block", style="margin-bottom:4px;"),
+        actionButton("hosp_update", "入院データ更新", icon=icon("rotate"),
+          class="btn-warning btn-sm btn-block"),
         tags$hr(style="margin:6px 0;")
       ),
       uiOutput("data_fetch_times")
@@ -707,11 +709,6 @@ function ebsUntranslateCards(containerId) {
             selectInput("hosp_pref", "都道府県",
               choices = c("全国" = "全国", PREF_MASTER$pref_name),
               selected = "全国", width = "100%")
-          ),
-          column(3,
-            actionButton("hosp_update", "入院データ更新",
-              icon = icon("rotate"), class = "btn btn-warning btn-sm",
-              style = "margin-top:24px;width:100%;")
           )
         ),
         tags$div(class="data-source-bar", "基幹定点 入院サーベイランス — 週次入院患者報告数"),
