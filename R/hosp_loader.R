@@ -97,13 +97,14 @@ parse_idwr_hosp_pdf <- function(pdf_path) {
     # 2026年第19週（5月4日〜5月10日）：通巻第28巻第18・19合併号」）にも同じ
     # パターンの文字列が含まれ、合併号ではどちらの週の表かを誤認識してしまう
     # ため、「報告数・疾病・都道府県別」という見出し文字列より後ろの部分だけを
-    # 対象に検索する
+    # 対象に検索する。また、古い号（〜2013年頃）は「第」の文字がなく
+    # 「YYYY年WW週」という表記のため、「第」は任意（省略可）として扱う
     header_block <- pages[[start_page]]
     heading_pos <- regexpr("報告数・疾病・都道府県別", header_block)
     search_block <- substring(header_block, heading_pos + attr(heading_pos, "match.length"))
-    wk_m <- regmatches(search_block, regexpr("[0-9]{4}年第[0-9]{1,2}週", search_block))
+    wk_m <- regmatches(search_block, regexpr("[0-9]{4}年第?[0-9]{1,2}週", search_block))
     if (length(wk_m) == 0) next
-    yw <- regmatches(wk_m, regexec("([0-9]{4})年第([0-9]{1,2})週", wk_m))[[1]]
+    yw <- regmatches(wk_m, regexec("([0-9]{4})年第?([0-9]{1,2})週", wk_m))[[1]]
     yr <- as.integer(yw[2]); wk <- as.integer(yw[3])
 
     collected <- list()
