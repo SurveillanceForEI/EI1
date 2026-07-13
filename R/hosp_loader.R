@@ -60,18 +60,31 @@ download_idwr_pdf <- function(year, issue, force = FALSE, timeout_sec = 30) {
 
 # 都道府県行かどうかを判定し、末尾の数値（"-"は0件）を取り出す
 # 表の実データ行のみを拾うため、都道府県名の直後が空白・数字・"-"のみで
-# 構成される行だけを対象とする（本文中で都道府県名に言及した文章行は除外）
+# 構成される行だけを対象とする（本文中で都道府県名に言及した文章行は除外）。
+#
+# 2013〜2018年頃のIDWR週報は、入院サーベイランス表が別の疾患表
+# （感染性胃腸炎（ロタウイルス）等）と横並びの2列レイアウトになっており、
+# pdftoolsのテキスト抽出では1行に両方の表の内容が連結されてしまう
+# （例:「北海道　1　0.04　　北海道　25」＝ロタウイルス表の北海道行＋
+# インフルエンザ表の北海道行が同一行に）。この場合、行頭からの単純な
+# 都道府県名一致では左側の表（無関係な疾患）の数値と誤認識するか、
+# 数値以外の文字（小数点・別の都道府県名）が混ざり判定に失敗して
+# しまうため、都道府県名が複数回出現する行では「最後の出現位置」以降を
+# 対象にする（入院サーベイランス表は2列レイアウトの右側に配置される
+# ため）。都道府県名が1回だけの通常レイアウトでは従来どおりの動作。
 .parse_pref_row <- function(line_trim, pref_names) {
   for (p in pref_names) {
-    if (startsWith(line_trim, p)) {
-      rest <- trimws(sub(paste0("^", p), "", line_trim, fixed = FALSE))
-      if (!grepl("^[0-9[:space:]-]+$", rest)) next
-      nums <- regmatches(rest, gregexpr("-|[0-9]+", rest))[[1]]
-      if (length(nums) == 0) next
-      nums <- ifelse(nums == "-", 0L, suppressWarnings(as.integer(nums)))
-      if (any(is.na(nums))) next
-      return(list(pref = p, nums = nums))
-    }
+    positions <- gregexpr(p, line_trim, fixed = TRUE)[[1]]
+    if (positions[1] == -1) next
+    if (positions[1] != 1) next  # 行頭が都道府県名で始まらない行は対象外
+    last_pos <- positions[length(positions)]
+    rest <- trimws(substring(line_trim, last_pos + nchar(p)))
+    if (!grepl("^[0-9[:space:]-]+$", rest)) next
+    nums <- regmatches(rest, gregexpr("-|[0-9]+", rest))[[1]]
+    if (length(nums) == 0) next
+    nums <- ifelse(nums == "-", 0L, suppressWarnings(as.integer(nums)))
+    if (any(is.na(nums))) next
+    return(list(pref = p, nums = nums))
   }
   NULL
 }
