@@ -93,6 +93,10 @@ tryCatch({
     file.path("data/cache_iasr", list.files("data/cache_iasr", pattern="\\.rds$"))
   else character(0)
 
+  hosp_data_file <- if (file.exists("data/cache_hosp/hosp_data.rds"))
+    "data/cache_hosp/hosp_data.rds"
+  else character(0)
+
   app_files <- c(
     "app.R",
     "R/ebs_loader.R",
@@ -102,6 +106,7 @@ tryCatch({
     "R/rt_estimation.R",
     "R/zensu_loader.R",
     "R/iasr_loader.R",
+    "R/hosp_loader.R",
     "R/correlation.R",
     "R/change_tracker.R",
     "R/forecast_ts.R",
@@ -113,7 +118,8 @@ tryCatch({
     "data/data_change_log.rds",
     cache_files,
     cache_zensu_files,
-    cache_iasr_files
+    cache_iasr_files,
+    hosp_data_file
   )
 
   rsconnect::deployApp(

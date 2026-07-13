@@ -8,6 +8,8 @@ startup*.log
 data/cache/
 data/cache_iasr/
 data/cache_zensu/
+data/cache_hosp/
+data/cache_hosp_pdf/
 data/*.log
 data/*.rds
 data/last_update.txt

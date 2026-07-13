@@ -28,6 +28,7 @@ suppressPackageStartupMessages({
 source("R/data_loader.R",  local = FALSE)
 source("R/zensu_loader.R", local = FALSE)
 source("R/ebs_loader.R",   local = FALSE)
+source("R/hosp_loader.R",  local = FALSE)
 
 dir.create("data",       showWarnings = FALSE)
 dir.create("data/cache", showWarnings = FALSE)
@@ -74,6 +75,17 @@ tryCatch({
     log("EBSニュース: 記事なし")
   }
 }, error = function(e) log("EBSニュース エラー: ", e$message))
+
+# ④ 入院サーベイランス（IDWR週報PDF）
+log("入院サーベイランスデータ取得中...")
+tryCatch({
+  this_year <- as.integer(format(Sys.Date(), "%Y"))
+  d <- update_hosp_data(years = (this_year - 1):this_year, force_latest_n = 3)
+  if (!is.null(d) && nrow(d) > 0)
+    log("入院サーベイランスデータ完了: ", nrow(d), " 行")
+  else
+    log("入院サーベイランスデータ: データなし")
+}, error = function(e) log("入院サーベイランスデータ エラー: ", e$message))
 
 log("===== 自動更新完了 =====")
 

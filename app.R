@@ -23,6 +23,7 @@ source("R/ebs_rule_screening.R")   # ebs_loader より先にロード（screen_e
 source("R/ebs_loader.R")
 source("R/zensu_loader.R")
 source("R/iasr_loader.R")
+source("R/hosp_loader.R")
 source("R/change_tracker.R")
 source("R/forecast_ts.R")
 
@@ -163,6 +164,12 @@ cat("IASR データ取得中...\n")
 IASR_DATA <- tryCatch(load_all_iasr(), error=function(e) { message("IASR ERROR:", e$message); NULL })
 tryCatch(
   record_data_change("iasr", compute_recent_signature(IASR_DATA, "date", 180)),
+  error = function(e) NULL
+)
+cat("入院サーベイランス データ読み込み中（キャッシュ）...\n")
+HOSP_DATA <- tryCatch(load_hosp_cached(), error=function(e) { message("入院サーベイランス ERROR:", e$message); NULL })
+tryCatch(
+  record_data_change("hosp", compute_recent_signature(HOSP_DATA, "date", 180)),
   error = function(e) NULL
 )
 cat("準備完了\n")
@@ -684,6 +691,38 @@ function ebsUntranslateCards(containerId) {
         )
       ),
 
+      # ── 入院サーベイランス（IDWR週報PDF）────────────────────
+      tabPanel("入院サーベイランス", icon=icon("bed-pulse"),
+        tags$div(style="text-align:right;font-size:0.78em;margin:2px 4px 0;",
+          tags$a(href="javascript:void(0)", onclick="goToNotes('notes-hosp')",
+            style="color:#888;text-decoration:none;",
+            icon("circle-info"), " 注意事項・データソース")),
+        fluidRow(style="margin:8px 0 4px;",
+          column(3,
+            checkboxGroupInput("hosp_disease", "対象疾患",
+              choices = c("インフルエンザ" = "flu", "新型コロナウイルス感染症" = "covid"),
+              selected = c("flu", "covid"))
+          ),
+          column(3,
+            selectInput("hosp_pref", "都道府県",
+              choices = c("全国" = "全国", PREF_MASTER$pref_name),
+              selected = "全国", width = "100%")
+          ),
+          column(3,
+            actionButton("hosp_update", "入院データ更新",
+              icon = icon("rotate"), class = "btn btn-warning btn-sm",
+              style = "margin-top:24px;width:100%;")
+          )
+        ),
+        tags$div(class="data-source-bar", "基幹定点 入院サーベイランス — 週次入院患者報告数"),
+        uiOutput("hosp_last_updated"),
+        plotlyOutput("hosp_plot", height="380px"),
+        uiOutput("hosp_legend"),
+        tags$hr(),
+        DTOutput("hosp_table"),
+        downloadButton("hosp_table_dl", "CSVダウンロード", class="btn-sm", style="margin-top:8px;")
+      ),
+
       # ── 病原体検出（IASR）────────────────────────────────
       tabPanel("病原体検出", icon=icon("flask"),
         tags$div(style="text-align:right;font-size:0.78em;margin:2px 4px 0;",
@@ -796,6 +835,7 @@ function ebsUntranslateCards(containerId) {
             tags$li(tags$strong("実効再生産数 Rt:"), "Cori法によるRt推定"),
             tags$li(tags$strong("EBSニュース（国内・海外）:"), "報道・行政発表等のニュース記事をシグナルレベル別に一覧表示"),
             tags$li(tags$strong("EBS Trends:"), "EBSニュースとGoogle Trendsを統合した短期トレンド評価"),
+            tags$li(tags$strong("入院サーベイランス:"), "IDWR週報PDFに基づく、インフルエンザ・新型コロナウイルス感染症の入院患者数の推移"),
             tags$li(tags$strong("病原体検出:"), "IASR（病原微生物検出情報）に基づく病原体検出状況"),
             tags$li(tags$strong("文献:"), "PubMed収載論文の一覧"),
             tags$li(tags$strong("データ:"), "現在の絞り込み条件に基づく表形式データとCSVダウンロード"),
@@ -1225,6 +1265,22 @@ function ebsUntranslateCards(containerId) {
           ),
           tags$br(),
 
+          # ── 入院サーベイランス ──────────────────────────────
+          tags$h4(id="notes-hosp", "■ 入院サーベイランスタブ", style="border-bottom:2px solid #2980b9;padding-bottom:4px;color:#2c3e50;"),
+          tags$h5("データソース"),
+          tags$p("感染症発生動向調査週報（IDWR）　国立健康危機管理研究機構（JIHS）"),
+          tags$ul(
+            tags$li("基幹定点医療機関からの、インフルエンザ・新型コロナウイルス感染症による入院患者数（都道府県別）"),
+            tags$li("JIHSが毎週公表するIDWR週報PDF内の「報告数・疾病・都道府県別」表から抽出"),
+            tags$li("新型コロナウイルス感染症（入院患者）は2023年5月8日の5類移行後に開始された集計のため、それ以前はデータがありません"),
+            tags$li("2週分の合併号（年末年始等）が発行される場合があり、1つのPDF内に週ごとの表が離れたページに掲載されることがあります。本タブの取得処理は表見出しを探索して両方の週を抽出します"),
+            tags$li("「入院データ更新」ボタンで直近分を再取得できます（直近3号分は速報値の訂正に備えて毎回再取得）")
+          ),
+          tags$p(style="font-size:0.85em;color:#888;",
+            "※ 定点あたり報告数（流行曲線タブ等）とは異なり、この入院患者数は基幹定点（報告医療機関数が少数）からの実数であり、",
+            "地域の医療体制・報告状況によってばらつきが大きい点にご留意ください。"),
+          tags$br(),
+
           # ── 病原体検出（IASR）────────────────────────────────
           tags$h4(id="notes-iasr", "■ 病原体検出タブ", style="border-bottom:2px solid #16a085;padding-bottom:4px;color:#2c3e50;"),
           tags$h5("データソース"),
@@ -1267,7 +1323,8 @@ function ebsUntranslateCards(containerId) {
               tags$tr(tags$td("全数把握"), tags$td("毎日 03:00 自動"), tags$td("JIHS 感染症発生動向調査")),
               tags$tr(tags$td("EBSニュース"), tags$td("毎日 03:00 自動（1年キャッシュ）"), tags$td("各RSS・Google News")),
               tags$tr(tags$td("Google Trends"), tags$td("毎日 03:00 自動"), tags$td("gtrendsR API")),
-              tags$tr(tags$td("病原体検出（IASR）"), tags$td("毎日 03:00 自動（24時間キャッシュ）"), tags$td("JIHS IASR"))
+              tags$tr(tags$td("病原体検出（IASR）"), tags$td("毎日 03:00 自動（24時間キャッシュ）"), tags$td("JIHS IASR")),
+              tags$tr(tags$td("入院サーベイランス"), tags$td("毎日 03:00 自動（直近3号分を再取得）"), tags$td("JIHS IDWR週報PDF"))
             )
           ),
           tags$br(),
@@ -3060,6 +3117,116 @@ server <- function(input, output, session) {
     }
     updateTabsetPanel(session, "main_tabs", selected = "流行曲線")
   })
+
+  # ── 入院サーベイランス（IDWR週報PDF）──────────────────────
+
+  hosp_reactive <- reactiveVal(NULL)
+  observe({
+    hosp_reactive(HOSP_DATA)
+  })
+
+  observeEvent(input$hosp_update, {
+    withProgress(message = "入院サーベイランスデータ更新中...", value = 0.3, {
+      this_year <- as.integer(format(Sys.Date(), "%Y"))
+      new_d <- tryCatch(
+        update_hosp_data(years = (this_year - 1):this_year, force_latest_n = 3),
+        error = function(e) { showNotification(paste("更新エラー:", e$message), type = "error"); NULL }
+      )
+      if (!is.null(new_d)) {
+        hosp_reactive(new_d)
+        tryCatch(
+          record_data_change("hosp", compute_recent_signature(new_d, "date", 180)),
+          error = function(e) NULL
+        )
+        showNotification("入院サーベイランスデータを更新しました", type = "message")
+      }
+    })
+  })
+
+  hosp_filtered <- reactive({
+    d <- hosp_reactive()
+    if (is.null(d) || nrow(d) == 0) return(NULL)
+    if (!is.null(input$hosp_pref) && input$hosp_pref != "全国") {
+      d <- d %>% filter(pref_name == input$hosp_pref)
+    }
+    dr <- input$date_range
+    if (!is.null(dr) && length(dr) == 2) {
+      d <- d %>% filter(date >= dr[1], date <= dr[2])
+    }
+    d %>%
+      group_by(year, week, date) %>%
+      summarise(flu_hosp = sum(flu_hosp, na.rm = TRUE),
+                covid_hosp = if (all(is.na(covid_hosp))) NA_real_ else sum(covid_hosp, na.rm = TRUE),
+                .groups = "drop") %>%
+      arrange(date)
+  })
+
+  output$hosp_last_updated <- renderUI({
+    t <- tryCatch(get_last_change_time("hosp"), error = function(e) NA)
+    tags$div(style="font-size:0.78em;color:#888;margin:2px 0 6px;",
+      if (!is.na(t)) paste0("更新検知日時: ", format(t, "%Y-%m-%d %H:%M")) else "未取得")
+  })
+
+  output$hosp_plot <- renderPlotly({
+    d <- hosp_filtered()
+    if (is.null(d) || nrow(d) == 0)
+      return(plot_ly() %>% add_annotations(
+        text = "データなし（「入院データ更新」を押して取得してください）", showarrow = FALSE))
+
+    p <- plot_ly()
+    if ("flu" %in% input$hosp_disease) {
+      p <- p %>% add_lines(data = d, x = ~date, y = ~flu_hosp,
+        line = list(color = "#3498db", width = 2.5), name = "インフルエンザ（入院患者）",
+        hovertemplate = "%{x|%Y-%m-%d}　インフルエンザ入院 %{y}例<extra></extra>")
+    }
+    if ("covid" %in% input$hosp_disease) {
+      d_covid <- d %>% filter(!is.na(covid_hosp))
+      if (nrow(d_covid) > 0) {
+        p <- p %>% add_lines(data = d_covid, x = ~date, y = ~covid_hosp,
+          line = list(color = "#e74c3c", width = 2.5), name = "新型コロナウイルス感染症（入院患者）",
+          hovertemplate = "%{x|%Y-%m-%d}　新型コロナ入院 %{y}例<extra></extra>")
+      }
+    }
+    p %>% layout(
+      xaxis = list(title = "", showgrid = FALSE, type = "date"),
+      yaxis = list(title = "入院患者報告数（例）", gridcolor = "#eee", rangemode = "nonnegative"),
+      legend = list(orientation = "h", y = -0.15),
+      hovermode = "x unified",
+      plot_bgcolor = "#fff", paper_bgcolor = "#fff",
+      margin = list(t = 20, b = 40, l = 60, r = 20)
+    )
+  })
+
+  output$hosp_legend <- renderUI({
+    tags$div(style="font-size:0.75em;color:#666;margin-top:2px;padding-left:4px;",
+      "出典: 感染症発生動向調査週報（IDWR）基幹定点 入院サーベイランス。",
+      "新型コロナウイルス感染症（入院患者）は2023年5月の5類移行後のみ集計対象。",
+      tags$a(href="javascript:void(0)", onclick="goToNotes('notes-hosp')", "詳細")
+    )
+  })
+
+  output$hosp_table <- renderDT({
+    d <- hosp_filtered()
+    if (is.null(d) || nrow(d) == 0) return(datatable(data.frame()))
+    d %>%
+      transmute(年 = year, 週 = week, 週開始日 = format(date, "%Y-%m-%d"),
+                `インフルエンザ入院` = flu_hosp,
+                `新型コロナ入院` = covid_hosp) %>%
+      arrange(desc(年), desc(週)) %>%
+      datatable(options = list(pageLength = 15, dom = "tip"), rownames = FALSE)
+  })
+
+  output$hosp_table_dl <- downloadHandler(
+    filename = function() paste0("入院サーベイランス_", Sys.Date(), ".csv"),
+    content = function(file) {
+      d <- hosp_filtered()
+      if (is.null(d) || nrow(d) == 0) { write.csv(data.frame(), file, row.names = FALSE); return() }
+      out <- d %>%
+        transmute(年 = year, 週 = week, 週開始日 = format(date, "%Y-%m-%d"),
+                  インフルエンザ入院 = flu_hosp, 新型コロナ入院 = covid_hosp)
+      write.csv(out, file, row.names = FALSE, fileEncoding = "UTF-8-BOM")
+    }
+  )
 
   # ── 病原体検出（IASR）────────────────────────────────────
 
