@@ -106,9 +106,9 @@ DISEASE_DB <- list(
        category = "Sexually transmitted diseases", name_en = "HIV/AIDS", name_ja = "HIV/AIDS"),
   list(patterns = c("\\bsyphilis\\b","梅毒"),
        category = "Sexually transmitted diseases", name_en = "Syphilis", name_ja = "梅毒"),
-  list(patterns = c("\\bmeasles\\b","麻疹","はしか"),
+  list(patterns = c("\\bmeasles\\b","麻疹","麻しん","はしか"),
        category = "Vaccine-preventable diseases", name_en = "Measles", name_ja = "麻疹"),
-  list(patterns = c("\\brubella\\b","風疹"),
+  list(patterns = c("\\brubella\\b","風疹","風しん"),
        category = "Vaccine-preventable diseases", name_en = "Rubella", name_ja = "風疹"),
   list(patterns = c("\\bpertussis\\b","whooping.?cough","百日咳"),
        category = "Vaccine-preventable diseases", name_en = "Pertussis", name_ja = "百日咳"),
@@ -707,13 +707,18 @@ check_special_pathogen <- function(text) {
 # ============================================================
 CLASS2_IMMEDIATE_KW <- c(
   # 二類感染症（結核除く）
-  "麻疹","はしか","measles",
-  "風疹","rubella",
+  # 「麻しん」「風しん」は行政の報道発表等で使われる交ぜ書き表記（漢字表記との併記）
+  "麻疹","麻しん","はしか","measles",
+  "風疹","風しん","rubella",
   "侵襲性髄膜炎菌","髄膜炎菌","meningococcal","invasive meningococcal","\\bimd\\b",
   "劇症型溶連菌","stss","streptococcal toxic shock",
   "重症熱性血小板減少症候群","\\bsfts\\b",
   "ジフテリア","diphtheria",
   "急性灰白髄炎","ポリオ","polio",
+  # 腸管出血性大腸菌感染症（O157等）
+  "腸管出血性大腸菌","\\behec\\b","\\bo157\\b","\\bo111\\b","\\bo26\\b",
+  "enterohemorrhagic.*e\\.?\\s*coli","shiga.?toxin.*e\\.?\\s*coli","stec",
+  "verotoxin.*e\\.?\\s*coli","ベロ毒素",
   # 一類感染症（国内発生はすべてSignal High）
   "エボラ","ebola","マールブルグ","marburg","ラッサ","lassa",
   "クリミア.コンゴ","痘そう","天然痘","smallpox","ペスト","plague",
