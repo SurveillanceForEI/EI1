@@ -556,12 +556,29 @@ is_japan_source <- function(source_id = "", source_name = "", lang = "", title =
     return(FALSE)
   }
 
+  sid <- trimws(tolower(as.character(source_id)))
+
+  # WHO EIOSは国内外の報道を横断的に集約するニュース監視プラットフォームで
+  # あり、発信元（国際機関）そのものではない。source_name「WHO EIOS」が
+  # 「who 」（国際メディア除外パターン）に部分一致してしまい、実際には
+  # 富山新聞等の国内紙記事まで海外メディア扱いされ、患者発生報がFYIのまま
+  # 埋もれていた。ただしEIOSは感染症と無関係な一般ニュースも大量に含む
+  # 雑多なフィードのため、"eios"というだけでlang=="ja"の緩い判定に
+  # 全面的に委ねると無関係記事まで国内記事として誤判定されてしまう。
+  # そのため、タイトル冒頭に「◯◯新聞」「◯◯テレビ」等の国内メディア名が
+  # 明記されている記事に限定して、国際メディア除外の対象から外す
+  is_eios <- identical(sid, "who_eios") || grepl("eios", sn, fixed = TRUE)
+  title_has_jp_media_prefix <- grepl(
+    "^[一-龥ぁ-んァ-ヶー0-9A-Za-z]{2,12}(新聞|テレビ|放送局|放送)[\\s　]",
+    trimws(as.character(title)), perl = TRUE)
+
   # 国際メディアが含まれていれば除外
-  is_intl_media <- any(sapply(INTL_MEDIA_JA, function(k) grepl(k, check, fixed = TRUE)))
-  if (is_intl_media) return(FALSE)
+  if (!(is_eios && title_has_jp_media_prefix)) {
+    is_intl_media <- any(sapply(INTL_MEDIA_JA, function(k) grepl(k, check, fixed = TRUE)))
+    if (is_intl_media) return(FALSE)
+  }
 
   # source_id が既知の日本国内ソース
-  sid <- trimws(tolower(as.character(source_id)))
   if (sid %in% c(JAPAN_SOURCE_IDS, JAPAN_SOURCE_IDS_EN)) return(TRUE)
 
   # source_name / タイトル末尾が既知の日本国内メディア
@@ -588,6 +605,15 @@ JAPAN_IMPACT_PATTERNS <- c(
   "国内.*感染確認","国内.*発生"
 )
 
+# テキスト中に日本の都道府県名（「都」「道」「府」「県」の接尾辞なし）が
+# 含まれるかを判定する。PREF_MASTER（R/data_loader.R）は本ファイルより先に
+# source()されるため、この関数の呼び出し時点では利用可能
+has_pref_mention <- function(text) {
+  if (!exists("PREF_MASTER")) return(FALSE)
+  pref_bare <- sub("(都|道|府|県)$", "", PREF_MASTER$pref_name)
+  any(vapply(pref_bare, function(p) grepl(p, text, fixed = TRUE), logical(1)))
+}
+
 check_serious_japan <- function(text, source_id = "", source_name = "", lang = "", title = "",
                                is_known_disease = FALSE) {
   # 非感染症記事は除外（疾患DBに一致している場合はゲートをスキップ）
@@ -595,6 +621,13 @@ check_serious_japan <- function(text, source_id = "", source_name = "", lang = "
 
   # 日本への直接影響パターンがある場合は無条件でTrue（全ソース共通）
   if (any_match(text, JAPAN_IMPACT_PATTERNS)) return(TRUE)
+
+  # 麻しん・風しん・EHEC・侵襲性髄膜炎菌等の届出即時対応疾患（CLASS2_IMMEDIATE_KW）
+  # は、都道府県名と共起していれば発信元の分類が曖昧（WHO EIOS等の集約フィード）
+  # でも国内の患者発生報とみなす。都道府県名との共起を必須とすることで、
+  # 経歴紹介記事等での過去の罹患への言及（例:「父を結核で亡くした」）との
+  # 混同を避ける
+  if (any_match(text, CLASS2_IMMEDIATE_KW) && has_pref_mention(text)) return(TRUE)
 
   # タイトル・本文に外国地名が含まれるか確認
   # classify_location はタイトル+本文から主要地名を抽出
