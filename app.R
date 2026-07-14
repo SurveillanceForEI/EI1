@@ -459,8 +459,8 @@ function ebsUntranslateCards(containerId) {
         )
       ),
 
-      # ── 地図 ─────────────────────────────────────────────
-      tabPanel("地図", icon=icon("map"),
+      # ── 地図（地域別比較） ─────────────────────────────────
+      tabPanel("地域別比較", icon=icon("map"),
         tags$div(style="text-align:right;font-size:0.78em;margin:2px 4px 0;",
           tags$a(href="javascript:void(0)", onclick="goToNotes('notes-ibs')",
             style="color:#888;text-decoration:none;",
@@ -479,6 +479,24 @@ function ebsUntranslateCards(containerId) {
           column(4,
             uiOutput("ranking_title_ui"),
             DTOutput("ranking_table")
+          )
+        ),
+        # 都道府県別ヒートマップ・地域別比較（定点把握疾患。週次/月次報告は
+        # input$diseaseの選択IDで振り分ける。全数把握はこれらのグラフを持たない）
+        conditionalPanel(sprintf("input.ts_mode === 'teiten' && %s.indexOf(input.disease) === -1", std_ids_js),
+          fluidRow(
+            column(6, tags$h5("都道府県別ヒートマップ",style="font-weight:700;margin-top:16px"),
+                   plotlyOutput("heatmap_plot", height="340px")),
+            column(6, tags$h5("地域別比較",style="font-weight:700;margin-top:16px"),
+                   plotlyOutput("region_plot", height="340px"))
+          )
+        ),
+        conditionalPanel(sprintf("input.ts_mode === 'teiten' && %s.indexOf(input.disease) !== -1", std_ids_js),
+          fluidRow(
+            column(6, tags$h5("都道府県別ヒートマップ",style="font-weight:700;margin-top:16px"),
+                   plotlyOutput("std_heatmap_plot", height="340px")),
+            column(6, tags$h5("地域別比較",style="font-weight:700;margin-top:16px"),
+                   plotlyOutput("std_region_plot", height="340px"))
           )
         )
       ),
@@ -511,9 +529,10 @@ function ebsUntranslateCards(containerId) {
             style="font-size:0.78em;color:#888;text-decoration:none;",
             icon("circle-info"), " 予測手法について")
         ),
-        # 定点把握（線グラフ＋ヒートマップ＋地域比較）。「定点把握疾患」選択肢には
+        # 定点把握（線グラフ＋年別重ね合わせ）。「定点把握疾患」選択肢には
         # 週次報告の疾患と月次報告（性感染症・薬剤耐性菌）の疾患が混在するため、
         # 選択中の疾患IDで週次/月次のどちらの表示にするかをJS側で振り分ける
+        # （都道府県別ヒートマップ・地域別比較は「地域別比較」タブに移設）
         conditionalPanel(sprintf("input.ts_mode === 'teiten' && %s.indexOf(input.disease) === -1", std_ids_js),
           fluidRow(column(12,
             tags$h5("定点把握疾患 — 週次報告数（定点あたり）", style="font-weight:700;margin-bottom:2px"),
@@ -524,13 +543,7 @@ function ebsUntranslateCards(containerId) {
           fluidRow(column(12,
             tags$h5("年別重ね合わせ（週次・定点あたり報告数）", style="font-weight:700;margin-top:16px"),
             plotlyOutput("yearly_overlay_plot", height="320px")
-          )),
-          fluidRow(
-            column(6, tags$h5("都道府県別ヒートマップ",style="font-weight:700;margin-top:12px"),
-                   plotlyOutput("heatmap_plot", height="340px")),
-            column(6, tags$h5("地域別比較",style="font-weight:700;margin-top:12px"),
-                   plotlyOutput("region_plot", height="340px"))
-          )
+          ))
         ),
         # 全数把握（流行曲線バーグラフ）
         conditionalPanel("input.ts_mode === 'zensu'",
@@ -558,13 +571,7 @@ function ebsUntranslateCards(containerId) {
           fluidRow(column(12,
             tags$h5("年別重ね合わせ（月次報告数）", style="font-weight:700;margin-top:16px"),
             plotlyOutput("std_yearly_overlay_plot", height="320px")
-          )),
-          fluidRow(
-            column(6, tags$h5("都道府県別ヒートマップ",style="font-weight:700;margin-top:12px"),
-                   plotlyOutput("std_heatmap_plot", height="340px")),
-            column(6, tags$h5("地域別比較",style="font-weight:700;margin-top:12px"),
-                   plotlyOutput("std_region_plot", height="340px"))
-          )
+          ))
         )
       ),
 
@@ -861,8 +868,8 @@ function ebsUntranslateCards(containerId) {
           tags$ul(
             tags$li(tags$strong("活動レベル一覧（疾患別）:"), "サイドバーで選択中の都道府県・表示モードについて、全疾患の統合活動レベルをタイル表示"),
             tags$li(tags$strong("活動レベル一覧（都道府県別）:"), "選択中の疾患について、全47都道府県の統合活動レベルをデフォルメ日本地図上にタイル表示"),
-            tags$li(tags$strong("地図:"), "都道府県別コロプレスマップ（直近週）＋都道府県ランキング"),
-            tags$li(tags$strong("流行曲線:"), "週次報告数推移・年別重ね合わせ・都道府県別ヒートマップ・地域別比較（定点把握・全数把握）／月次報告数推移（月報疾患：性感染症・薬剤耐性菌）"),
+            tags$li(tags$strong("地域別比較:"), "都道府県別コロプレスマップ（直近週）＋都道府県ランキング＋都道府県別ヒートマップ＋地域別比較（定点把握。週次/月次報告に対応）"),
+            tags$li(tags$strong("流行曲線:"), "週次報告数推移・年別重ね合わせ（定点把握・全数把握）／月次報告数推移・年別重ね合わせ（月報疾患：性感染症・薬剤耐性菌）"),
             tags$li(tags$strong("複数疾患比較（定点）:"), "複数疾患の定点報告数を重ね合わせ表示"),
             tags$li(tags$strong("実効再生産数 Rt:"), "Cori法によるRt推定"),
             tags$li(tags$strong("EBSニュース（国内・海外）:"), "報道・行政発表等のニュース記事をシグナルレベル別に一覧表示"),
