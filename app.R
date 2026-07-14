@@ -42,7 +42,12 @@ IS_SHINYAPPS <- nchar(Sys.getenv("SHINYAPPS_APPLICATION_ID")) > 0 ||
 # バグの原因になっていた。
 
 cat("IBS データ読み込み中（キャッシュ）...\n")
-SURV_DATA <- load_all_cached()
+SURV_DATA_RAW <- load_all_cached()
+# JIHS週報CSVの「総数」行（全国の定点あたり報告数の公式値）はpref_name=="全国"として
+# 別枠に分離する。SURV_DATA自体は従来通り47都道府県のみを保持し、既存の
+# 都道府県別集計・Rt推定等のロジックに影響を与えないようにする
+SURV_DATA_NATIONAL <- if (!is.null(SURV_DATA_RAW)) SURV_DATA_RAW %>% dplyr::filter(pref_name == "全国") else NULL
+SURV_DATA <- if (!is.null(SURV_DATA_RAW)) SURV_DATA_RAW %>% dplyr::filter(pref_name != "全国") else SURV_DATA_RAW
 IS_REAL_DATA <- !is.null(SURV_DATA) && nrow(SURV_DATA) > 0
 tryCatch(
   record_data_change("ibs", compute_recent_signature(SURV_DATA, "date", 90)),
@@ -1456,6 +1461,32 @@ EBS_DLABEL <- c(
   general="感染症全般", other="その他"
 )
 
+# 定点把握疾患の「全国」系列を取得する。JIHS週報CSVの「総数」行（全国の定点あたり
+# 報告数の公式値）が存在する週はそれを使い、存在しない週（旧キャッシュ等）は
+# 都道府県の単純平均で補完するフォールバック方式
+national_series_for <- function(did, dr = NULL) {
+  avg <- SURV_DATA %>% filter(disease == did, region %in% unique(PREF_MASTER$region))
+  if (!is.null(dr)) avg <- avg %>% filter(date >= dr[1], date <= dr[2])
+  avg <- avg %>%
+    group_by(date, year, week) %>%
+    summarise(avg_val = mean(reports_per_site, na.rm = TRUE), .groups = "drop") %>%
+    arrange(date)
+
+  off <- if (is.null(SURV_DATA_NATIONAL) || nrow(SURV_DATA_NATIONAL) == 0) {
+    tibble(date = as.Date(character()), reports_per_site = numeric())
+  } else {
+    SURV_DATA_NATIONAL %>% filter(disease == did)
+  }
+  if (!is.null(dr)) off <- off %>% filter(date >= dr[1], date <= dr[2])
+  off <- off %>% select(date, official_val = reports_per_site)
+
+  avg %>%
+    left_join(off, by = "date") %>%
+    mutate(reports_per_site = dplyr::coalesce(official_val, avg_val)) %>%
+    select(date, year, week, reports_per_site) %>%
+    arrange(date)
+}
+
 server <- function(input, output, session) {
 
   # ── 初回アクセス時の注意事項ポップアップ ─────────────────
@@ -2117,21 +2148,14 @@ server <- function(input, output, session) {
       summarise(reports = sum(reports, na.rm = TRUE), .groups = "drop")
   })
   national_avg <- reactive({
-    filtered_data() %>%
-      group_by(date,year,week) %>%
-      summarise(reports_per_site=mean(reports_per_site,na.rm=TRUE),.groups="drop") %>%
-      arrange(date)
+    dr <- input$date_range
+    national_series_for(input$disease, dr)
   })
 
   # ±2SD の歴史参照用：date_range に依存しない全期間データ
   # （date_range をずらしても過去5年分が欠落しないようにするため）
   national_avg_hist <- reactive({
-    SURV_DATA %>%
-      filter(disease == input$disease,
-             region %in% unique(PREF_MASTER$region)) %>%
-      group_by(date, year, week) %>%
-      summarise(reports_per_site = mean(reports_per_site, na.rm = TRUE), .groups = "drop") %>%
-      arrange(date)
+    national_series_for(input$disease, NULL)
   })
 
   # 都道府県選択時: date_range内の当該都道府県平均（流行曲線の主系列）
@@ -2203,25 +2227,33 @@ server <- function(input, output, session) {
     }
     if (is_teiten) {
       pref <- if (!is.null(input$pref_filter) && input$pref_filter != "全国") input$pref_filter else NULL
-      d <- latest_week_data()
-      fd <- filtered_data()
       if (!is.null(pref)) {
+        d <- latest_week_data()
+        fd <- filtered_data()
         cur_d  <- d  %>% filter(pref_name == pref)
         prev_d <- fd %>% filter(date == max(fd$date, na.rm=TRUE) - 7, pref_name == pref)
         label  <- paste0(pref, " 定点あたり報告数")
+        val  <- mean(cur_d$reports_per_site, na.rm=TRUE)
+        prev <- mean(prev_d$reports_per_site, na.rm=TRUE)
+        wk_txt <- if (nrow(cur_d) > 0) sprintf("(%d年第%d週)", cur_d$year[1], cur_d$week[1]) else ""
       } else {
-        cur_d  <- d
-        prev_d <- fd %>% filter(date == max(fd$date, na.rm=TRUE) - 7)
-        label  <- "全国平均 定点あたり報告数"
+        # 全国値はJIHS公式の「総数」行（都道府県の単純平均ではない）を用いる
+        nat <- national_avg()
+        label <- "全国 定点あたり報告数"
+        if (nrow(nat) == 0) {
+          val <- NaN; prev <- NA_real_; wk_txt <- ""
+        } else {
+          latest_dt <- max(nat$date, na.rm = TRUE)
+          cur_row   <- nat %>% filter(date == latest_dt)
+          prev_row  <- nat %>% filter(date == latest_dt - 7)
+          val  <- cur_row$reports_per_site[1]
+          prev <- if (nrow(prev_row) > 0) prev_row$reports_per_site[1] else NA_real_
+          wk_txt <- sprintf("(%d年第%d週)", cur_row$year[1], cur_row$week[1])
+        }
       }
-      val  <- mean(cur_d$reports_per_site, na.rm=TRUE)
-      prev <- mean(prev_d$reports_per_site, na.rm=TRUE)
       delta_pct <- if (!is.na(prev) && prev > 0) (val - prev) / prev * 100 else NA
       dc <- if(is.na(delta_pct))"flat" else if(delta_pct>5)"up" else if(delta_pct < -5)"down" else "flat"
       dt <- if(is.na(delta_pct))"―" else sprintf("%+.1f%%", delta_pct)
-      # 期間スライダーで選んだ範囲の末尾週を評価しているため、実際の年・週を明示する
-      # （「直近週」は現在時刻ではなく選択期間の最終週を指す）
-      wk_txt <- if (nrow(cur_d) > 0) sprintf("(%d年第%d週)", cur_d$year[1], cur_d$week[1]) else ""
       tags$div(class="kpi-box",
         tags$div(style="background:#2980b9;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
         tags$div(class="kpi-value", style=paste0("color:",DISEASE_CONFIG[[input$disease]]$color),
@@ -2840,10 +2872,27 @@ server <- function(input, output, session) {
     results <- list()
 
     # ── 定点把握疾患 ────────────────────────────────────
-    if (!is_zensu) all_teiten <- SURV_DATA %>%
-      { if (!is.null(pref)) filter(., pref_name == pref) else . } %>%
-      group_by(disease, date, year, week) %>%
-      summarise(reports_per_site = mean(reports_per_site, na.rm=TRUE), .groups="drop")
+    # 全国（pref未指定）はJIHS公式の「総数」行を優先し、欠測週のみ都道府県平均で補完する
+    if (!is_zensu) {
+      if (is.null(pref)) {
+        avg_all <- SURV_DATA %>%
+          group_by(disease, date, year, week) %>%
+          summarise(avg_val = mean(reports_per_site, na.rm=TRUE), .groups="drop")
+        off_all <- if (is.null(SURV_DATA_NATIONAL) || nrow(SURV_DATA_NATIONAL) == 0) {
+          tibble(disease=character(), date=as.Date(character()), official_val=numeric())
+        } else {
+          SURV_DATA_NATIONAL %>% select(disease, date, official_val = reports_per_site)
+        }
+        all_teiten <- avg_all %>%
+          left_join(off_all, by=c("disease","date")) %>%
+          mutate(reports_per_site = dplyr::coalesce(official_val, avg_val)) %>%
+          select(disease, date, year, week, reports_per_site)
+      } else {
+        all_teiten <- SURV_DATA %>% filter(pref_name == pref) %>%
+          group_by(disease, date, year, week) %>%
+          summarise(reports_per_site = mean(reports_per_site, na.rm=TRUE), .groups="drop")
+      }
+    }
 
     dr <- input$date_range
     if (!is_zensu) for (did in names(DISEASE_CONFIG)) {
@@ -4041,7 +4090,7 @@ server <- function(input, output, session) {
     col    <- DISEASE_CONFIG[[input$disease]]$color
     lbl    <- DISEASE_CONFIG[[input$disease]]$label
     thresh <- DISEASE_CONFIG[[input$disease]]$alert_threshold
-    main_label <- if (is_pref) input$pref_filter else "全国平均"
+    main_label <- if (is_pref) input$pref_filter else "全国"
     # 各時点から過去5年間の同一週番号データで平均±2SD を計算（都道府県選択時はその都道府県のデータで算出）
     # ts_band_series() は date_range に依存しない全期間データ（ts_hist_data）を参照するため、
     # date_range をずらしても帯が短くならない
@@ -4192,11 +4241,22 @@ server <- function(input, output, session) {
   multi_data <- reactive({
     req(length(input$multi_diseases)>0)
     dr <- input$date_range
-    SURV_DATA %>%
+    avg_d <- SURV_DATA %>%
       filter(disease %in% input$multi_diseases,
              date >= dr[1], date <= dr[2]) %>%
       group_by(disease,date,year,week) %>%
-      summarise(reports_per_site=mean(reports_per_site,na.rm=TRUE),.groups="drop") %>%
+      summarise(avg_val=mean(reports_per_site,na.rm=TRUE),.groups="drop")
+    off_d <- if (is.null(SURV_DATA_NATIONAL) || nrow(SURV_DATA_NATIONAL) == 0) {
+      tibble(disease=character(), date=as.Date(character()), official_val=numeric())
+    } else {
+      SURV_DATA_NATIONAL %>%
+        filter(disease %in% input$multi_diseases, date >= dr[1], date <= dr[2]) %>%
+        select(disease, date, official_val = reports_per_site)
+    }
+    avg_d %>%
+      left_join(off_d, by=c("disease","date")) %>%
+      mutate(reports_per_site = dplyr::coalesce(official_val, avg_val)) %>%
+      select(disease, date, year, week, reports_per_site) %>%
       mutate(disease_label=DISEASE_CONFIG[disease] %>%
                sapply(function(x) x$label))
   })
@@ -4251,16 +4311,26 @@ server <- function(input, output, session) {
   })
 
   output$multi_summary_table <- renderDT({
+    off_cur <- if (is.null(SURV_DATA_NATIONAL) || nrow(SURV_DATA_NATIONAL) == 0) {
+      tibble(disease=character(), official_val=numeric())
+    } else {
+      SURV_DATA_NATIONAL %>%
+        filter(disease %in% input$multi_diseases, year==CURRENT_YEAR, week==CURRENT_WEEK) %>%
+        select(disease, official_val = reports_per_site)
+    }
     SURV_DATA %>%
       filter(disease %in% input$multi_diseases) %>%
       filter(year==CURRENT_YEAR, week==CURRENT_WEEK) %>%
       group_by(disease) %>%
       summarise(
-        国平均=round(mean(reports_per_site,na.rm=TRUE),2),
+        国平均=mean(reports_per_site,na.rm=TRUE),
         最大値=round(max(reports_per_site,na.rm=TRUE),2),
         最多都道府県=pref_name[which.max(reports_per_site)],
         .groups="drop"
       ) %>%
+      left_join(off_cur, by="disease") %>%
+      mutate(国平均=round(dplyr::coalesce(official_val, 国平均), 2)) %>%
+      select(-official_val) %>%
       mutate(
         疾患=sapply(disease, function(x) DISEASE_CONFIG[[x]]$label),
         Rt=sapply(disease, function(d) {

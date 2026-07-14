@@ -287,10 +287,24 @@ parse_teiten_csv <- function(text, year, week) {
     if (length(fields) < 3) return(NULL)
 
     pref <- fields[1]
-    if (pref == "" || pref == "総数" || grepl("^合計|^全国", pref)) return(NULL)
+    if (pref == "") return(NULL)
 
-    pref_row <- PREF_MASTER %>% filter(pref_name == pref)
-    if (nrow(pref_row) == 0) return(NULL)
+    # 「総数」行はJIHSが算出した全国の定点あたり報告数（速報値）。都道府県の
+    # 単純平均ではなく、この公式値をそのまま「全国」として保持する
+    # （filtered_data()等はregion %in% PREF_MASTER$regionで絞り込むため、
+    #  region="全国"のこの行は都道府県別集計には混入しない）
+    is_national_total <- pref == "総数" || grepl("^合計|^全国", pref)
+    if (is_national_total) {
+      pref_code_v <- NA_integer_
+      pref_name_v <- "全国"
+      region_v    <- "全国"
+    } else {
+      pref_row <- PREF_MASTER %>% filter(pref_name == pref)
+      if (nrow(pref_row) == 0) return(NULL)
+      pref_code_v <- pref_row$pref_code
+      pref_name_v <- pref
+      region_v    <- pref_row$region
+    }
 
     rows_list <- lapply(names(col_map), function(did) {
       ci  <- col_map[[did]]
@@ -299,9 +313,9 @@ parse_teiten_csv <- function(text, year, week) {
         year             = as.integer(year),
         week             = as.integer(week),
         date             = week_start,
-        pref_code        = pref_row$pref_code,
-        pref_name        = pref,
-        region           = pref_row$region,
+        pref_code        = pref_code_v,
+        pref_name        = pref_name_v,
+        region           = region_v,
         disease          = did,
         disease_label    = DISEASE_CONFIG[[did]]$label,
         reports_per_site = val,
@@ -328,16 +342,26 @@ parse_ari_csv <- function(text, year, week) {
     fields <- strsplit(trimws(row), ",")[[1]]
     if (length(fields) < 3) return(NULL)
     pref <- trimws(gsub('"', "", fields[1]))
-    if (pref == "" || pref == "総数") return(NULL)
+    if (pref == "") return(NULL)
 
-    pref_row <- PREF_MASTER %>% filter(pref_name == pref)
-    if (nrow(pref_row) == 0) return(NULL)
+    is_national_total <- pref == "総数" || grepl("^合計|^全国", pref)
+    if (is_national_total) {
+      pref_code_v <- NA_integer_
+      pref_name_v <- "全国"
+      region_v    <- "全国"
+    } else {
+      pref_row <- PREF_MASTER %>% filter(pref_name == pref)
+      if (nrow(pref_row) == 0) return(NULL)
+      pref_code_v <- pref_row$pref_code
+      pref_name_v <- pref
+      region_v    <- pref_row$region
+    }
 
     val <- suppressWarnings(as.numeric(gsub('"', "", fields[3])))
     tibble(
       year=as.integer(year), week=as.integer(week),
       date=week_start,
-      pref_code=pref_row$pref_code, pref_name=pref, region=pref_row$region,
+      pref_code=pref_code_v, pref_name=pref_name_v, region=region_v,
       disease="ari", disease_label="ARI（急性呼吸器感染症）",
       reports_per_site=val,
       is_provisional=TRUE, data_source="JIHS IDWR速報（暫定値）"
