@@ -554,7 +554,17 @@ function ebsUntranslateCards(containerId) {
             uiOutput("std_ts_title_ui"),
             plotlyOutput("std_ts_plot", height="380px"),
             uiOutput("std_ts_legend")
-          ))
+          )),
+          fluidRow(column(12,
+            tags$h5("年別重ね合わせ（月次報告数）", style="font-weight:700;margin-top:16px"),
+            plotlyOutput("std_yearly_overlay_plot", height="320px")
+          )),
+          fluidRow(
+            column(6, tags$h5("都道府県別ヒートマップ",style="font-weight:700;margin-top:12px"),
+                   plotlyOutput("std_heatmap_plot", height="340px")),
+            column(6, tags$h5("地域別比較",style="font-weight:700;margin-top:12px"),
+                   plotlyOutput("std_region_plot", height="340px"))
+          )
         )
       ),
 
@@ -5400,6 +5410,102 @@ server <- function(input, output, session) {
         tags$a(href="javascript:void(0)", onclick="goToNotes('notes-std')", "詳細")
       )
     )
+  })
+
+  # 年別重ね合わせ（月報疾患）
+  output$std_yearly_overlay_plot <- renderPlotly({
+    did  <- input$disease
+    pref <- if (!is.null(input$pref_filter) && input$pref_filter != "全国") input$pref_filter else NULL
+    d <- STD_DATA
+    if (is.null(d) || nrow(d) == 0)
+      return(plot_ly() %>% add_annotations(text = "データなし", showarrow = FALSE))
+    d <- d %>% filter(disease == did)
+    if (!is.null(pref)) d <- d %>% filter(pref_name == pref)
+    d <- d %>%
+      group_by(year, month) %>%
+      summarise(val = sum(reports, na.rm = TRUE), .groups = "drop")
+    if (nrow(d) == 0)
+      return(plot_ly() %>% add_annotations(text = "データなし", showarrow = FALSE))
+
+    years  <- sort(unique(d$year))
+    pal    <- colorRampPalette(c("#bdc3c7","#2980b9","#e74c3c"))(length(years))
+    dconf  <- STD_DISEASE_CONFIG[[did]]
+    col    <- if (!is.null(dconf)) dconf$color else "#2980b9"
+    cur_yr <- max(years)
+
+    p <- plot_ly()
+    for (i in seq_along(years)) {
+      yr  <- years[i]
+      dy  <- d %>% filter(year == yr) %>% arrange(month)
+      lw  <- if (yr == cur_yr) 2.5 else 1
+      op  <- if (yr == cur_yr) 1 else 0.5
+      clr <- if (yr == cur_yr) col else pal[i]
+      p <- p %>% add_trace(
+        data = dy, x = ~month, y = ~val, type = "scatter", mode = "lines",
+        name = as.character(yr),
+        line = list(color = clr, width = lw),
+        opacity = op,
+        hovertemplate = paste0(yr, " %{x}月: %{y}件<extra></extra>"))
+    }
+    p %>% layout(
+      xaxis = list(title = "月", dtick = 1, range = c(1,12), showgrid = TRUE, gridcolor = "#eee"),
+      yaxis = list(title = "報告数（件/月）", gridcolor = "#eee"),
+      legend= list(orientation = "h", y = -0.2),
+      plot_bgcolor = "#fff", paper_bgcolor = "#fff",
+      margin = list(t = 10, b = 60, l = 60, r = 20)
+    )
+  })
+
+  # 都道府県別ヒートマップ（月報疾患・直近2年）
+  output$std_heatmap_plot <- renderPlotly({
+    did <- input$disease
+    d <- STD_DATA
+    if (is.null(d) || nrow(d) == 0)
+      return(plot_ly() %>% add_annotations(text = "データなし", showarrow = FALSE))
+    cutoff <- Sys.Date() - 730
+    d <- d %>% filter(disease == did, date >= cutoff) %>%
+      left_join(PREF_MASTER %>% select(pref_name, pref_code), by = "pref_name") %>%
+      group_by(pref_code, pref_name, date, year, month) %>%
+      summarise(reports = sum(reports, na.rm = TRUE), .groups = "drop") %>%
+      mutate(month_label = sprintf("%d-%02d", year, month))
+    if (nrow(d) == 0)
+      return(plot_ly() %>% add_annotations(text = "データなし", showarrow = FALSE))
+    pord <- d %>% distinct(pref_code, pref_name) %>% arrange(pref_code) %>% pull(pref_name)
+    mord <- d %>% distinct(month_label, date) %>% arrange(date) %>% pull(month_label)
+    d <- d %>% mutate(pref_name = factor(pref_name, levels = rev(pord)),
+                       month_label = factor(month_label, levels = mord))
+    plot_ly(data = d, x = ~month_label, y = ~pref_name, z = ~reports, type = "heatmap",
+      colorscale = list(c(0,"#ffffcc"), c(0.5,"#fd8d3c"), c(1,"#800026")),
+      hovertemplate = "%{y} %{x}: %{z}件<extra></extra>",
+      colorbar = list(title = "件/月")) %>%
+      layout(xaxis = list(title = "", tickangle = -45),
+             yaxis = list(title = "", tickfont = list(size = 8)), margin = list(l = 85, t = 20, b = 60))
+  })
+
+  # 地域別比較（月報疾患）
+  output$std_region_plot <- renderPlotly({
+    did <- input$disease
+    d <- STD_DATA
+    if (is.null(d) || nrow(d) == 0)
+      return(plot_ly() %>% add_annotations(text = "データなし", showarrow = FALSE))
+    d <- d %>% filter(disease == did) %>%
+      left_join(PREF_MASTER %>% select(pref_name, region), by = "pref_name") %>%
+      group_by(region, date) %>%
+      summarise(reports = sum(reports, na.rm = TRUE), .groups = "drop")
+    if (nrow(d) == 0)
+      return(plot_ly() %>% add_annotations(text = "データなし", showarrow = FALSE))
+    regions <- unique(d$region)
+    cols <- colorRampPalette(brewer.pal(min(8, length(regions)), "Set2"))(length(regions))
+    p <- plot_ly()
+    for (i in seq_along(regions)) {
+      rd <- d %>% filter(region == regions[i])
+      p <- p %>% add_lines(data = rd, x = ~date, y = ~reports,
+        name = regions[i], line = list(color = cols[i], width = 2))
+    }
+    p %>% layout(xaxis = list(title = "", showgrid = FALSE),
+      yaxis = list(title = "地域合計 報告数（件/月）", gridcolor = "#eee"),
+      legend = list(orientation = "h", y = -0.2, font = list(size = 10)),
+      hovermode = "x unified", plot_bgcolor = "#fff", paper_bgcolor = "#fff", margin = list(t = 20))
   })
 
   # ── データ出力 ─────────────────────────────────────────
