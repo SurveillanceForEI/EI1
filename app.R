@@ -482,7 +482,7 @@ function ebsUntranslateCards(containerId) {
           )
         ),
         # 都道府県別ヒートマップ・地域別比較（定点把握疾患。週次/月次報告は
-        # input$diseaseの選択IDで振り分ける。全数把握はこれらのグラフを持たない）
+        # input$diseaseの選択IDで振り分ける）
         conditionalPanel(sprintf("input.ts_mode === 'teiten' && %s.indexOf(input.disease) === -1", std_ids_js),
           fluidRow(
             column(6, tags$h5("都道府県別ヒートマップ",style="font-weight:700;margin-top:16px"),
@@ -497,6 +497,15 @@ function ebsUntranslateCards(containerId) {
                    plotlyOutput("std_heatmap_plot", height="340px")),
             column(6, tags$h5("地域別比較",style="font-weight:700;margin-top:16px"),
                    plotlyOutput("std_region_plot", height="340px"))
+          )
+        ),
+        # 都道府県別ヒートマップ・地域別比較（全数把握疾患）
+        conditionalPanel("input.ts_mode === 'zensu'",
+          fluidRow(
+            column(6, tags$h5("都道府県別ヒートマップ",style="font-weight:700;margin-top:16px"),
+                   plotlyOutput("zensu_heatmap_plot", height="340px")),
+            column(6, tags$h5("地域別比較",style="font-weight:700;margin-top:16px"),
+                   plotlyOutput("zensu_region_plot", height="340px"))
           )
         )
       ),
@@ -5298,6 +5307,55 @@ server <- function(input, output, session) {
       plot_bgcolor="#fff", paper_bgcolor="#fff",
       margin=list(t=10, b=60, l=60, r=20)
     )
+  })
+
+  # 都道府県別ヒートマップ（全数把握・直近1年）
+  output$zensu_heatmap_plot <- renderPlotly({
+    zd <- ZENSU_DATA
+    if (is.null(zd) || nrow(zd) == 0)
+      return(plot_ly() %>% add_annotations(text="データなし", showarrow=FALSE))
+    cutoff1y <- Sys.Date() - 365
+    d <- zd %>% filter(disease == input$zensu_disease_ts, date >= cutoff1y) %>%
+      group_by(pref_code, pref_name, date, week, year) %>%
+      summarise(cases=sum(cases, na.rm=TRUE), .groups="drop") %>%
+      mutate(week_label = paste0(year, "-W", sprintf("%02d", week)))
+    if (nrow(d) == 0)
+      return(plot_ly() %>% add_annotations(text="データなし", showarrow=FALSE))
+    pord <- d %>% distinct(pref_code,pref_name) %>% arrange(pref_code) %>% pull(pref_name)
+    word <- d %>% distinct(week_label, date) %>% arrange(date) %>% pull(week_label)
+    d <- d %>% mutate(pref_name=factor(pref_name,levels=rev(pord)),
+                      week_label=factor(week_label,levels=word))
+    plot_ly(data=d, x=~week_label, y=~pref_name, z=~cases, type="heatmap",
+      colorscale=list(c(0,"#ffffcc"),c(0.5,"#fd8d3c"),c(1,"#800026")),
+      hovertemplate="%{y} %{x}: %{z}件<extra></extra>",
+      colorbar=list(title="件")) %>%
+      layout(xaxis=list(title="", tickangle=-45, dtick=4),
+             yaxis=list(title="",tickfont=list(size=8)),margin=list(l=85,t=20,b=60))
+  })
+
+  # 地域別比較（全数把握）
+  output$zensu_region_plot <- renderPlotly({
+    zd <- ZENSU_DATA
+    if (is.null(zd) || nrow(zd) == 0)
+      return(plot_ly() %>% add_annotations(text="データなし", showarrow=FALSE))
+    d <- zd %>% filter(disease == input$zensu_disease_ts) %>%
+      left_join(PREF_MASTER %>% select(pref_code, region), by = "pref_code") %>%
+      group_by(region,date) %>%
+      summarise(cases=sum(cases, na.rm=TRUE), .groups="drop")
+    if (nrow(d) == 0)
+      return(plot_ly() %>% add_annotations(text="データなし", showarrow=FALSE))
+    regions <- unique(d$region)
+    cols <- colorRampPalette(brewer.pal(min(8,length(regions)),"Set2"))(length(regions))
+    p <- plot_ly()
+    for(i in seq_along(regions)){
+      rd <- d %>% filter(region==regions[i])
+      p <- p %>% add_lines(data=rd,x=~date,y=~cases,
+        name=regions[i],line=list(color=cols[i],width=2))
+    }
+    p %>% layout(xaxis=list(title="",showgrid=FALSE),
+      yaxis=list(title="地域合計 報告数（件）",gridcolor="#eee"),
+      legend=list(orientation="h",y=-0.2,font=list(size=10)),
+      hovermode="x unified",plot_bgcolor="#fff",paper_bgcolor="#fff",margin=list(t=20))
   })
 
   # ── 月報疾患（性感染症・薬剤耐性菌）────────────────────────
