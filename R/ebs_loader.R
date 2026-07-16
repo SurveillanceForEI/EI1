@@ -157,8 +157,8 @@ EBS_SOURCES <- list(
   list(id="jihs",    name="JIHS (国立健康危機管理)", lang="ja", category="研究機関",
        url="https://www.niid.jihs.go.jp/feed/"),
   # ── 国際機関 ───────────────────────────────────────────────
-  list(id="who_don", name="WHO Disease Outbreak News", lang="en", category="国際",
-       url="https://www.who.int/feeds/entity/csr/don/en/rss.xml"),
+  # who_donはRSS(https://www.who.int/feeds/entity/csr/don/en/rss.xml)が廃止(404)されたため、
+  # EBS_SOURCESには含めずJSON API経由のfetch_who_don()で個別取得する（fetch_who_eiosと同様のパターン）
   list(id="promed",  name="ProMED Mail",             lang="en", category="国際",
        url="https://promedmail.org/feed/"),
   list(id="ecdc",    name="ECDC",                    lang="en", category="国際",
@@ -568,6 +568,44 @@ fetch_who_eios <- function(timeout_sec = 30) {
     }
     parse_rss(content(resp, "text", encoding = "UTF-8"), src)
   }, error = function(e) { message("WHO EIOS エラー: ", e$message); NULL })
+}
+
+# ============================================================
+# WHO Disease Outbreak News（JSON API。旧RSSフィードは廃止済みのため
+# who.intのODataベースの公開APIから直接取得する）
+# ============================================================
+WHO_DON_API_URL <- "https://www.who.int/api/emergencies/diseaseoutbreaknews"
+
+fetch_who_don <- function(timeout_sec = 15, n_results = 30) {
+  message("WHO Disease Outbreak News 取得中...")
+  tryCatch({
+    resp <- GET(WHO_DON_API_URL, timeout(timeout_sec),
+                query = list(`$orderby` = "PublicationDate desc", `$top` = n_results),
+                add_headers("User-Agent" = "JapanSurveillanceDashboard/1.0",
+                            "Accept" = "application/json"))
+    if (status_code(resp) != 200) {
+      message("WHO DON: HTTP ", status_code(resp)); return(NULL)
+    }
+    js <- jsonlite::fromJSON(content(resp, "text", encoding = "UTF-8"), simplifyDataFrame = TRUE)
+    items <- js$value
+    if (is.null(items) || nrow(items) == 0) return(NULL)
+
+    summary_txt <- if (!is.null(items$Overview)) items$Overview else items$Summary
+    summary_txt <- gsub("<[^>]+>", " ", summary_txt)
+    summary_txt <- trimws(gsub("\\s+", " ", summary_txt))
+    summary_txt <- substr(summary_txt, 1, 500)
+
+    tibble(
+      source_id   = "who_don",
+      source_name = "WHO Disease Outbreak News",
+      category    = "国際",
+      lang        = "en",
+      title       = items$Title,
+      link        = paste0("https://www.who.int/emergencies/disease-outbreak-news/item/", items$UrlName),
+      pub_date    = as.Date(items$PublicationDate),
+      summary     = summary_txt
+    )
+  }, error = function(e) { message("WHO DON エラー: ", e$message); NULL })
 }
 
 # ============================================================
@@ -2806,6 +2844,14 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
     if (!"retweet_count" %in% names(eios)) eios$retweet_count <- NA_integer_
     if (!"like_count"    %in% names(eios)) eios$like_count    <- NA_integer_
     all_df <- bind_rows(all_df, eios)
+  }
+
+  # WHO Disease Outbreak News（JSON API）
+  don <- tryCatch(fetch_who_don(), error = function(e) NULL)
+  if (!is.null(don) && nrow(don) > 0) {
+    if (!"retweet_count" %in% names(don)) don$retweet_count <- NA_integer_
+    if (!"like_count"    %in% names(don)) don$like_count    <- NA_integer_
+    all_df <- bind_rows(all_df, don)
   }
 
   # Google News
