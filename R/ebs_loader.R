@@ -154,15 +154,15 @@ EBS_SOURCES <- list(
   # ── 日本・行政 ─────────────────────────────────────────────
   list(id="mhlw",    name="厚生労働省",             lang="ja", category="行政",
        url="https://www.mhlw.go.jp/stf/news.rdf"),
-  list(id="jihs",    name="JIHS (国立健康危機管理)", lang="ja", category="研究機関",
-       url="https://www.niid.jihs.go.jp/feed/"),
+  # jihsはRSS(https://www.niid.jihs.go.jp/feed/)が廃止(404)されたため、
+  # EBS_SOURCESには含めずHTMLスクレイピング経由のfetch_jihs_news()で個別取得する
   # ── 国際機関 ───────────────────────────────────────────────
   # who_donはRSS(https://www.who.int/feeds/entity/csr/don/en/rss.xml)が廃止(404)されたため、
   # EBS_SOURCESには含めずJSON API経由のfetch_who_don()で個別取得する（fetch_who_eiosと同様のパターン）
-  list(id="promed",  name="ProMED Mail",             lang="en", category="国際",
-       url="https://promedmail.org/feed/"),
-  list(id="ecdc",    name="ECDC",                    lang="en", category="国際",
-       url="https://www.ecdc.europa.eu/en/rss.xml"),
+  # promedはサイトリニューアル(Next.js化)によりRSS(https://promedmail.org/feed/)・
+  # 静的HTML双方から記事一覧を取得できなくなったため、現状取得手段なし（要継続調査）
+  # ecdcはRSS(https://www.ecdc.europa.eu/en/rss.xml)が廃止(404)されたため、
+  # EBS_SOURCESには含めずHTMLスクレイピング経由のfetch_ecdc_news()で個別取得する
   list(id="cdc",     name="CDC Health Alerts (US)",  lang="en", category="国際",
        url="https://tools.cdc.gov/api/v2/resources/media/316422.rss"),
   list(id="reliefweb", name="ReliefWeb (Japan)",     lang="en", category="国際",
@@ -609,6 +609,89 @@ fetch_who_don <- function(timeout_sec = 15, n_results = 30) {
       summary     = summary_txt
     )
   }, error = function(e) { message("WHO DON エラー: ", e$message); NULL })
+}
+
+# ============================================================
+# ECDC ニュース（HTMLスクレイピング。旧RSS(en/rss.xml)は廃止済みのため、
+# news-eventsページに実際にサーバーサイドレンダリングされているニュースカードを直接解析する）
+# ============================================================
+ECDC_NEWS_URL <- "https://www.ecdc.europa.eu/en/news-events"
+
+fetch_ecdc_news <- function(timeout_sec = 15, n_results = 20) {
+  message("ECDC ニュース取得中...")
+  tryCatch({
+    resp <- GET(ECDC_NEWS_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) {
+      message("ECDC: HTTP ", status_code(resp)); return(NULL)
+    }
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    cards <- xml_find_all(doc,
+      "//div[contains(concat(' ', normalize-space(@class), ' '), ' ecdc-card-list-item')]")
+    if (length(cards) == 0) return(NULL)
+
+    rows <- lapply(cards, function(card) {
+      a <- xml_find_first(card, ".//p[contains(@class,'ecdc-card__title')]/a")
+      title <- trimws(xml_text(a))
+      href  <- xml_attr(a, "href")
+      date_str <- xml_attr(xml_find_first(card, ".//time"), "datetime")
+      desc  <- trimws(xml_text(xml_find_first(card, ".//p[contains(@class,'ecdc-card__description')]")))
+      if (is.na(title) || nchar(title) == 0 || is.na(date_str)) return(NULL)
+      tibble(
+        source_id   = "ecdc",
+        source_name = "ECDC",
+        category    = "国際",
+        lang        = "en",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.ecdc.europa.eu", href),
+        pub_date    = as.Date(date_str),
+        summary     = substr(desc, 1, 500)
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% head(n_results)
+  }, error = function(e) { message("ECDC エラー: ", e$message); NULL })
+}
+
+# ============================================================
+# JIHS（国立健康危機管理研究機構）新着情報（HTMLスクレイピング。
+# JIHS発足に伴いniid.jihs.go.jpの旧RSS(feed/)は廃止されたため、
+# jihs.go.jpの新着情報一覧ページ（<dl><dt>日付</dt><dd><a>タイトル</a></dd>...）を直接解析する）
+# ============================================================
+JIHS_NEWS_URL <- "https://www.jihs.go.jp/content4/newinfo.html"
+
+fetch_jihs_news <- function(timeout_sec = 15, n_results = 20) {
+  message("JIHS 新着情報取得中...")
+  tryCatch({
+    resp <- GET(JIHS_NEWS_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) {
+      message("JIHS: HTTP ", status_code(resp)); return(NULL)
+    }
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    dts <- xml_find_all(doc, "//dl/dt")
+    if (length(dts) == 0) return(NULL)
+
+    rows <- lapply(dts, function(dt) {
+      date_str <- trimws(xml_text(dt))
+      dd <- xml_find_first(dt, "following-sibling::dd[1]")
+      a  <- xml_find_first(dd, ".//a")
+      title <- trimws(xml_text(a))
+      href  <- xml_attr(a, "href")
+      d <- suppressWarnings(as.Date(date_str, format = "%Y/%m/%d"))
+      if (is.na(d) || is.na(title) || nchar(title) == 0) return(NULL)
+      tibble(
+        source_id   = "jihs",
+        source_name = "JIHS (国立健康危機管理)",
+        category    = "研究機関",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.jihs.go.jp/content4/", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% head(n_results)
+  }, error = function(e) { message("JIHS エラー: ", e$message); NULL })
 }
 
 # ============================================================
@@ -2855,6 +2938,22 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
     if (!"retweet_count" %in% names(don)) don$retweet_count <- NA_integer_
     if (!"like_count"    %in% names(don)) don$like_count    <- NA_integer_
     all_df <- bind_rows(all_df, don)
+  }
+
+  # ECDC ニュース（HTMLスクレイピング）
+  ecdc <- tryCatch(fetch_ecdc_news(), error = function(e) NULL)
+  if (!is.null(ecdc) && nrow(ecdc) > 0) {
+    if (!"retweet_count" %in% names(ecdc)) ecdc$retweet_count <- NA_integer_
+    if (!"like_count"    %in% names(ecdc)) ecdc$like_count    <- NA_integer_
+    all_df <- bind_rows(all_df, ecdc)
+  }
+
+  # JIHS 新着情報（HTMLスクレイピング）
+  jihs <- tryCatch(fetch_jihs_news(), error = function(e) NULL)
+  if (!is.null(jihs) && nrow(jihs) > 0) {
+    if (!"retweet_count" %in% names(jihs)) jihs$retweet_count <- NA_integer_
+    if (!"like_count"    %in% names(jihs)) jihs$like_count    <- NA_integer_
+    all_df <- bind_rows(all_df, jihs)
   }
 
   # Google News
