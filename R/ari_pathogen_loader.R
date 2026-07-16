@@ -305,6 +305,11 @@ update_ari_pathogen_data <- function(force = FALSE) {
   new_counts <- parsed$counts %>% mutate(source_report = basename(path))
   new_pos <- if (!is.null(parsed$positivity)) parsed$positivity %>% mutate(source_report = basename(path)) else NULL
 
+  # 週報は毎号、直近約64週分を再掲載する（「集計時点における報告数であるため、
+  # 過去の週報で掲載された値とは必ずしも一致しない」との注記どおり、速報値が
+  # 後日修正される）。そのため、新しく取得したnew_counts/new_posを必ず先に
+  # bind_rowsし、distinct(.keep_all=TRUE)が先頭行（＝最新号の値）を残す
+  # ことで、重複する過去週は常に最新号の値で上書きされるようにしている
   merged_counts <- if (!is.null(old) && !is.null(old$counts)) {
     bind_rows(new_counts, old$counts) %>% distinct(year, week, category, .keep_all = TRUE) %>% arrange(date)
   } else new_counts %>% arrange(date)
