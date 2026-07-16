@@ -188,8 +188,36 @@ EBS_SOURCES <- list(
        url="https://www.pref.aomori.lg.jp/rss/feed.rss"),
   list(id="pref_iwate",    name="岩手県",              lang="ja", category="行政",
        url="https://www.pref.iwate.jp/news.rss"),
-  # 宮城・秋田・山形・栃木・千葉・富山・石川・福井・山梨・長野・茨城・京都・大阪・神奈川・
-  # 福岡ほか未確認の都道府県、および政令指定都市・中核市（保健所設置自治体）は継続調査中
+  list(id="pref_tottori",  name="鳥取県（報道発表）",  lang="ja", category="行政",
+       url="https://www.pref.tottori.lg.jp/xml/pressrelease_RSS/all.xml"),
+  list(id="pref_shimane",  name="島根県",              lang="ja", category="行政",
+       url="https://www.pref.shimane.lg.jp/top_news.rdf"),
+  list(id="pref_okayama",  name="岡山県",              lang="ja", category="行政",
+       url="https://www.pref.okayama.jp/rss/10/list1.xml"),
+  list(id="pref_hiroshima",name="広島県",              lang="ja", category="行政",
+       url="https://www.pref.hiroshima.lg.jp/rss/10/list1.xml"),
+  list(id="pref_yamaguchi",name="山口県",              lang="ja", category="行政",
+       url="https://www.pref.yamaguchi.lg.jp/rss/10/list6.xml"),
+  list(id="pref_ehime",    name="愛媛県",              lang="ja", category="行政",
+       url="https://www.pref.ehime.jp/rss/20/list1.xml"),
+  list(id="pref_kumamoto", name="熊本県",              lang="ja", category="行政",
+       url="https://www.pref.kumamoto.jp/rss/10/list1.xml"),
+  list(id="pref_oita",     name="大分県",              lang="ja", category="行政",
+       url="https://www.pref.oita.jp/rss/10/list1.xml"),
+  list(id="pref_kagoshima",name="鹿児島県",            lang="ja", category="行政",
+       url="https://www.pref.kagoshima.jp/saishin/saishin.xml"),
+  list(id="pref_okinawa",  name="沖縄県",              lang="ja", category="行政",
+       url="https://www.pref.okinawa.lg.jp/news.rss"),
+  list(id="pref_chiba",    name="千葉県",              lang="ja", category="行政",
+       url="https://www.pref.chiba.lg.jp/homepage/shinchaku/shinchaku.xml"),
+  list(id="pref_yamanashi",name="山梨県（報道発表）",  lang="ja", category="行政",
+       url="https://www.pref.yamanashi.jp/release/release.xml"),
+  list(id="pref_nagano",   name="長野県",              lang="ja", category="行政",
+       url="https://www.pref.nagano.lg.jp/chumoku/chumoku.xml"),
+  list(id="pref_miyazaki", name="宮崎県（記者発表）",  lang="ja", category="行政",
+       url="https://www.pref.miyazaki.lg.jp/kisha/hodo.xml"),
+  # 秋田・栃木・富山・石川・福井・茨城・京都・大阪・神奈川・和歌山・佐賀・長崎・香川・高知・
+  # 徳島は未確認、政令指定都市・中核市（保健所設置自治体）は継続調査中
   # ── 国際機関 ───────────────────────────────────────────────
   # who_donはRSS(https://www.who.int/feeds/entity/csr/don/en/rss.xml)が廃止(404)されたため、
   # EBS_SOURCESには含めずJSON API経由のfetch_who_don()で個別取得する（fetch_who_eiosと同様のパターン）
@@ -552,6 +580,7 @@ parse_rss <- function(content_text, source_def) {
           "%Y-%m-%dT%H:%M:%S",   # 2026-06-25T07:00:00
           "%Y-%m-%d %H:%M:%S",   # 2026-06-25 07:00:00
           "%Y-%m-%d-%H-%M-%S",   # 2026-06-25-07-00-00（台湾CDCのguid形式）
+          "%Y/%m/%d %H:%M:%S",   # 2026/07/15 00:00:00（鳥取県RSS形式）
           "%Y-%m-%d"             # 2026-06-25
         )
         for (fmt in fmts) {
