@@ -167,6 +167,11 @@ EBS_SOURCES <- list(
        url="https://tools.cdc.gov/api/v2/resources/media/316422.rss"),
   list(id="reliefweb", name="ReliefWeb (Japan)",     lang="en", category="国際",
        url="https://reliefweb.int/updates/rss.xml?primary_country=JPN"),
+  # ── 東・東南アジア ────────────────────────────────────────
+  list(id="taiwan_cdc", name="台湾 CDC（衛生福利部疾病管制署）", lang="zh", category="国際",
+       url="https://www.cdc.gov.tw/RSS/RssXml/Hh094B49-DRwe2RR4eFfrQ?type=1"),
+  # chinacdc・chp（香港）はRSS未提供のため、EBS_SOURCESには含めず
+  # fetch_china_cdc_news() / fetch_chp_news()（後者はchromoteによるヘッドレスブラウザ取得）で個別取得する
   # ── 専門メディア ────────────────────────────────────────────
   list(id="cidrap",  name="CIDRAP",                  lang="en", category="研究機関",
        url="https://www.cidrap.umn.edu/rss.xml"),
@@ -464,7 +469,9 @@ parse_rss <- function(content_text, source_def) {
   rows <- lapply(items, function(item) {
     title    <- get_text(item, "title")
     link     <- get_text(item, "link/@href", "link")
-    date_str <- get_text(item, "pubDate", "date", "published", "updated")
+    # 台湾CDCのRSSは<pubDate>が無く、<guid>に"YYYY-MM-DD-HH-MM-SS"形式で日時を格納しているため
+    # guidも日付候補として試す（isPermaLink属性の有無に関わらず値自体は日時形式）
+    date_str <- get_text(item, "pubDate", "date", "published", "updated", "guid")
     desc     <- get_text(item, "description", "summary", "content")
 
     pub_date <- tryCatch({
@@ -485,6 +492,7 @@ parse_rss <- function(content_text, source_def) {
           "%d %m %Y %H:%M:%S",   # 25 06 2026 07:00:00
           "%Y-%m-%dT%H:%M:%S",   # 2026-06-25T07:00:00
           "%Y-%m-%d %H:%M:%S",   # 2026-06-25 07:00:00
+          "%Y-%m-%d-%H-%M-%S",   # 2026-06-25-07-00-00（台湾CDCのguid形式）
           "%Y-%m-%d"             # 2026-06-25
         )
         for (fmt in fmts) {
@@ -692,6 +700,109 @@ fetch_jihs_news <- function(timeout_sec = 15, n_results = 20) {
     })
     bind_rows(Filter(Negate(is.null), rows)) %>% head(n_results)
   }, error = function(e) { message("JIHS エラー: ", e$message); NULL })
+}
+
+# ============================================================
+# 中国CDC「全球伝染病事件リスク評価報告」（HTMLスクレイピング。RSS未提供のため
+# 月次で発行される全球伝染病事件リスク評価報告(PDF)の一覧ページを直接解析する）
+# ============================================================
+CHINA_CDC_GLOBAL_URL <- "https://www.chinacdc.cn/jksj/jksj03/"
+
+fetch_china_cdc_news <- function(timeout_sec = 15, n_results = 20) {
+  message("中国CDC 全球伝染病事件リスク評価 取得中...")
+  tryCatch({
+    resp <- GET(CHINA_CDC_GLOBAL_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) {
+      message("中国CDC: HTTP ", status_code(resp)); return(NULL)
+    }
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    links <- xml_find_all(doc, "//a[contains(@href,'.pdf')]")
+    if (length(links) == 0) return(NULL)
+
+    rows <- lapply(links, function(a) {
+      # <a>本文の直下テキストのみ抽出（末尾の<span>更新日付を除外するため、
+      # 例: <a href="...">タイトル<span>2026-07-16</span></a>）
+      title <- trimws(paste(xml_text(xml_find_all(a, "./text()")), collapse = ""))
+      href  <- xml_attr(a, "href")
+      # href例: "./202607/P020260716341152144978.pdf" → 年月"202607"を日付として使う
+      ym <- regmatches(href, regexpr("(?<=/)\\d{6}(?=/)", href, perl = TRUE))
+      if (length(ym) == 0 || nchar(title) == 0) return(NULL)
+      d <- suppressWarnings(as.Date(paste0(ym, "01"), format = "%Y%m%d"))
+      if (is.na(d)) return(NULL)
+      full_url <- if (grepl("^https?://", href)) href
+                  else paste0("https://www.chinacdc.cn/jksj/jksj03/", sub("^\\./", "", href))
+      tibble(
+        source_id   = "china_cdc",
+        source_name = "中国CDC（中国疾病预防控制中心）",
+        category    = "国際",
+        lang        = "zh",
+        title       = title,
+        link        = full_url,
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(title, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("中国CDC エラー: ", e$message); NULL })
+}
+
+# ============================================================
+# 香港CHP（衛生防護中心）プレスリリース（ヘッドレスブラウザ経由のHTMLスクレイピング。
+# ページがJavaScriptで内容を描画するSPA形式のためRSS・静的HTML取得は不可。
+# chromoteパッケージ（要Chrome/Chromiumインストール）でレンダリング後のHTMLを取得する。
+# ローカル専用機能（tesseract/magickと同様、requireNamespaceで存在チェック）
+# ============================================================
+CHP_PRESS_URL <- "https://www.chp.gov.hk/en/media/116/index.html"
+
+.chp_scrape_available <- function() requireNamespace("chromote", quietly = TRUE)
+
+fetch_chp_news <- function(timeout_sec = 20, n_results = 20) {
+  if (!.chp_scrape_available()) {
+    message("香港CHP: chromoteパッケージ未インストールのためスキップ")
+    return(NULL)
+  }
+  message("香港CHP プレスリリース取得中（ヘッドレスブラウザ）...")
+  b <- NULL
+  tryCatch({
+    b <- chromote::ChromoteSession$new()
+    b$Page$navigate(CHP_PRESS_URL, wait_ = TRUE)
+    Sys.sleep(3)
+    html <- b$Runtime$evaluate("document.documentElement.outerHTML")$result$value
+    b$close(); b <- NULL
+    if (is.null(html) || nchar(html) == 0) return(NULL)
+
+    doc <- read_html(html)
+    # プレスリリース本体は info.gov.hk/gia/general/YYYYMM/DD/P... 形式のリンクとして
+    # サーバー側で描画される（日付はURL自体に埋め込まれている）
+    links <- xml_find_all(doc, "//a[contains(@href,'info.gov.hk/gia/general/')]")
+    if (length(links) == 0) return(NULL)
+
+    rows <- lapply(links, function(a) {
+      title <- trimws(xml_text(a))
+      href  <- xml_attr(a, "href")
+      m <- regmatches(href, regexec("/general/(\\d{6})/(\\d{2})/", href))[[1]]
+      if (length(m) < 3 || nchar(title) == 0) return(NULL)
+      d <- suppressWarnings(as.Date(paste0(m[2], m[3]), format = "%Y%m%d"))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "chp",
+        source_name = "Hong Kong CHP",
+        category    = "国際",
+        lang        = "en",
+        title       = title,
+        link        = sub("\\?.*$", "", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) {
+    message("香港CHP エラー: ", e$message)
+    NULL
+  }, finally = {
+    if (!is.null(b)) tryCatch(b$close(), error = function(e) NULL)
+  })
 }
 
 # ============================================================
@@ -2954,6 +3065,22 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
     if (!"retweet_count" %in% names(jihs)) jihs$retweet_count <- NA_integer_
     if (!"like_count"    %in% names(jihs)) jihs$like_count    <- NA_integer_
     all_df <- bind_rows(all_df, jihs)
+  }
+
+  # 中国CDC 全球伝染病事件リスク評価（HTMLスクレイピング）
+  china_cdc <- tryCatch(fetch_china_cdc_news(), error = function(e) NULL)
+  if (!is.null(china_cdc) && nrow(china_cdc) > 0) {
+    if (!"retweet_count" %in% names(china_cdc)) china_cdc$retweet_count <- NA_integer_
+    if (!"like_count"    %in% names(china_cdc)) china_cdc$like_count    <- NA_integer_
+    all_df <- bind_rows(all_df, china_cdc)
+  }
+
+  # 香港CHP プレスリリース（ヘッドレスブラウザ、ローカル専用）
+  chp <- tryCatch(fetch_chp_news(), error = function(e) NULL)
+  if (!is.null(chp) && nrow(chp) > 0) {
+    if (!"retweet_count" %in% names(chp)) chp$retweet_count <- NA_integer_
+    if (!"like_count"    %in% names(chp)) chp$like_count    <- NA_integer_
+    all_df <- bind_rows(all_df, chp)
   }
 
   # Google News
