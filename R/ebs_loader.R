@@ -1086,6 +1086,83 @@ fetch_saga_press_news <- function(timeout_sec = 15, n_results = 20) {
 }
 
 # ============================================================
+# 和歌山県 トップページ「新着情報」タブ（HTMLスクレイピング。RSS未提供のため
+# トップページ内の新着情報タブ(c-list _date)を直接解析する）
+# ============================================================
+WAKAYAMA_TOP_URL <- "https://www.pref.wakayama.lg.jp/"
+
+fetch_wakayama_news <- function(timeout_sec = 15, n_results = 20) {
+  message("和歌山県 新着情報 取得中...")
+  tryCatch({
+    resp <- GET(WAKAYAMA_TOP_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    items <- xml_find_all(doc, "//ul[contains(@class,'c-list') and contains(@class,'_date')]//li")
+    if (length(items) == 0) return(NULL)
+
+    rows <- lapply(items, function(li) {
+      a <- xml_find_first(li, ".//a")
+      href <- xml_attr(a, "href")
+      date_str <- xml_attr(xml_find_first(li, ".//time"), "datetime")
+      title <- trimws(xml_text(xml_find_first(li, ".//p")))
+      if (nchar(title) == 0 || is.na(href) || is.na(date_str)) return(NULL)
+      d <- suppressWarnings(as.Date(date_str, format = "%Y/%m/%d"))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "pref_wakayama",
+        source_name = "和歌山県（新着情報）",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.pref.wakayama.lg.jp", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("和歌山県 エラー: ", e$message); NULL })
+}
+
+# ============================================================
+# 福岡県 新着情報一覧（HTMLスクレイピング。RSS未提供のため記事一覧ページを直接解析する）
+# ============================================================
+FUKUOKA_NEWS_URL <- "https://www.pref.fukuoka.lg.jp/soshiki/list1-1.html"
+
+fetch_fukuoka_news <- function(timeout_sec = 15, n_results = 20) {
+  message("福岡県 新着情報 取得中...")
+  tryCatch({
+    resp <- GET(FUKUOKA_NEWS_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    items <- xml_find_all(doc, "//li[.//span[contains(@class,'article_date')]]")
+    if (length(items) == 0) return(NULL)
+
+    rows <- lapply(items, function(li) {
+      date_str <- trimws(xml_text(xml_find_first(li, ".//span[contains(@class,'article_date')]")))
+      a <- xml_find_first(li, ".//span[contains(@class,'article_title')]//a")
+      title <- trimws(xml_text(a))
+      href  <- xml_attr(a, "href")
+      if (nchar(title) == 0 || is.na(href)) return(NULL)
+      d <- suppressWarnings(as.Date(gsub("更新", "", date_str), format = "%Y年%m月%d日"))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "pref_fukuoka",
+        source_name = "福岡県（新着情報）",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.pref.fukuoka.lg.jp", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("福岡県 エラー: ", e$message); NULL })
+}
+
+# ============================================================
 # PubMed E-utilities — アウトブレイク関連論文取得（APIキー不要）
 # ============================================================
 PUBMED_QUERIES <- c(
@@ -3371,8 +3448,9 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
     all_df <- bind_rows(all_df, spf)
   }
 
-  # 秋田県・奈良県・佐賀県 報道発表（HTMLスクレイピング）
-  for (fn in list(fetch_akita_press_news, fetch_nara_press_news, fetch_saga_press_news)) {
+  # 秋田県・奈良県・佐賀県・和歌山県・福岡県 報道発表（HTMLスクレイピング）
+  for (fn in list(fetch_akita_press_news, fetch_nara_press_news, fetch_saga_press_news,
+                   fetch_wakayama_news, fetch_fukuoka_news)) {
     d <- tryCatch(fn(), error = function(e) NULL)
     if (!is.null(d) && nrow(d) > 0) {
       if (!"retweet_count" %in% names(d)) d$retweet_count <- NA_integer_
