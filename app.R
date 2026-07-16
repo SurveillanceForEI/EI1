@@ -855,6 +855,17 @@ function ebsUntranslateCards(containerId) {
           tags$h5("検体採取週ごとの病原体別陽性率", style="font-weight:700;margin-top:16px"),
           plotlyOutput("ari_positivity_plot", height="340px")
         )),
+        fluidRow(style="margin-top:16px;",
+          column(12,
+            tags$div(style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;",
+              tags$h5("検体採取週ごとの全国および地域別、病原体別報告数", style="font-weight:700;margin:0;"),
+              selectInput("ari_region", NULL,
+                choices = setNames(names(ARI_REGIONS), ARI_REGIONS),
+                selected = "national", width = "220px")
+            ),
+            plotlyOutput("ari_regional_plot", height="380px")
+          )
+        ),
         fluidRow(style="margin-top:8px;",
           column(12,
             div(style="text-align:right; margin-bottom:4px;",
@@ -1443,7 +1454,7 @@ function ebsUntranslateCards(containerId) {
           tags$h5("データソース"),
           tags$p("急性呼吸器感染症（ARI）サーベイランス週報　国立健康危機管理研究機構（JIHS）"),
           tags$ul(
-            tags$li("ARI病原体定点（基幹定点）における検体採取週ごとの病原体別報告数・陽性率"),
+            tags$li("ARI病原体定点（基幹定点）における検体採取週ごとの病原体別報告数・陽性率・全国および地域別報告数（タブ内のプルダウンで地域を切り替え）"),
             tags$li(tags$a(href="https://id-info.jihs.go.jp/surveillance/idss/target-diseases/acute-respiratory-infection/weekly-report/index.html",
                            target="_blank", "JIHS ARIサーベイランス週報（原本PDF）")),
             tags$li("データ更新: 毎日午前3時に最新週報PDFを自動取得・再集計")
@@ -3926,6 +3937,36 @@ server <- function(input, output, session) {
       hovermode = "x unified",
       plot_bgcolor = "#fff", paper_bgcolor = "#fff",
       margin = list(t = 10, b = 40, l = 60, r = 20)
+    )
+  })
+
+  output$ari_regional_plot <- renderPlotly({
+    if (is.null(ARI_PATHOGEN_DATA) || is.null(ARI_PATHOGEN_DATA$regional))
+      return(plot_ly() %>% add_annotations(text = "データなし", showarrow = FALSE))
+    reg_id <- if (is.null(input$ari_region)) "national" else input$ari_region
+    d <- ARI_PATHOGEN_DATA$regional %>% filter(region == reg_id)
+    dr <- input$date_range
+    if (!is.null(dr) && length(dr) == 2) d <- d %>% filter(date >= dr[1], date <= dr[2])
+    if (nrow(d) == 0)
+      return(plot_ly() %>% add_annotations(text = "データなし", showarrow = FALSE))
+    p <- plot_ly()
+    for (cat_id in ARI_FIG8_ORDER) {
+      dd <- d %>% filter(category == cat_id)
+      if (nrow(dd) == 0) next
+      p <- p %>% add_bars(data = dd, x = ~date, y = ~reports,
+        name = ARI_FIG8_LABELS[[cat_id]],
+        marker = list(color = ARI_FIG8_LEGEND[[cat_id]]),
+        hovertemplate = paste0(ARI_FIG8_LABELS[[cat_id]], "　%{x|%Y-%m-%d}: %{y}件<extra></extra>"))
+    }
+    p %>% layout(
+      barmode = "stack",
+      title = list(text = ARI_REGIONS[[reg_id]], x = 0, font = list(size = 13)),
+      xaxis = list(title = "検体採取週", showgrid = FALSE, type = "date"),
+      yaxis = list(title = "報告数（件）", gridcolor = "#eee"),
+      legend = list(orientation = "h", y = -0.25, font = list(size = 9)),
+      hovermode = "x unified",
+      plot_bgcolor = "#fff", paper_bgcolor = "#fff",
+      margin = list(t = 30, b = 40, l = 60, r = 20)
     )
   })
 

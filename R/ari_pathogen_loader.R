@@ -50,6 +50,25 @@ ARI_POS_LABELS <- c(flu_a="インフルエンザウイルスA型", flu_b="イン
                     sars_cov2="SARS-CoV-2", rsv="RSウイルス")
 ARI_POS_YMAX <- 60  # %
 
+# 図8凡例（10カテゴリ・簡略版、全国＋地域別の積み上げ棒グラフ。図6と異なり
+# インフルエンザ／パラインフルエンザ／RSウイルスの亜型は分けず1カテゴリにまとめている）
+ARI_FIG8_LEGEND <- c(
+  flu_a="#08519C", sars_cov2="#E0B84F", pi="#F28E2B", rhino_entero="#BCBDDC", other="#C49A6C",
+  flu_b="#90D091", rsv="#FBB4C4", hmpv="#6A3D9A", adeno="#4D4D4D", negative="#E5E5E5"
+)
+ARI_FIG8_LABELS <- c(
+  flu_a="インフルエンザウイルスA型", flu_b="インフルエンザウイルスB型", sars_cov2="SARS-CoV-2",
+  rsv="RSウイルス", hmpv="ヒトメタニューモウイルス", pi="パラインフルエンザウイルス",
+  rhino_entero="ライノ／エンテロウイルス", adeno="アデノウイルス", other="その他", negative="検出なし"
+)
+ARI_FIG8_ORDER <- names(ARI_FIG8_LEGEND)
+
+# 図8の地域区分（全国＋8地域）
+ARI_REGIONS <- c(
+  national="全国", hokkaido_tohoku="北海道・東北", kanto="関東", hokuriku="北陸", tokai="東海",
+  kinki="近畿", chugoku="中国", shikoku="四国", kyushu_okinawa="九州・沖縄"
+)
+
 # ── PDFレンダリング用ヘルパー ─────────────────────────────
 .ari_bitmap_to_array <- function(bmp) {
   a <- aperm(array(as.integer(unclass(bmp)), dim = dim(bmp)), c(3, 2, 1))  # -> [H,W,4]
@@ -88,13 +107,13 @@ ARI_POS_YMAX <- 60  # %
 # ── 棒（週）のx列中心を検出 ────────────────────────────────
 # 軸に近い行を横断してnon-white runをバーとして検出し、最初の2つ
 # （y軸ラベル文字による欠け・分断アーティファクト＝最古週）は除外する
-.ari_find_bar_centers <- function(arr, probe_row, col_range) {
+.ari_find_bar_centers <- function(arr, probe_row, col_range, gap_thresh = 2) {
   r <- arr[,,1]; g <- arr[,,2]; b <- arr[,,3]
   is_nonwhite <- !(r > 250 & g > 250 & b > 250)
   colvals <- is_nonwhite[probe_row, col_range]
   nzcols <- col_range[which(colvals)]
   if (length(nzcols) == 0) return(list(centers = numeric(0), skipped_first = FALSE))
-  grp <- cumsum(c(1, diff(nzcols) > 2))
+  grp <- cumsum(c(1, diff(nzcols) > gap_thresh))
   runs <- split(nzcols, grp)
   widths <- sapply(runs, function(x) diff(range(x)) + 1)
   med_w <- median(widths)
@@ -118,14 +137,106 @@ ARI_POS_YMAX <- 60  # %
   out
 }
 
+# ── 図8用: OCRでy軸の最大値ラベルを読み取る ─────────────────
+# 図8は全国＋8地域の9パネルで、パネルごとにy軸スケールが自動調整され
+# 大きく異なる（60〜1500超）ため、図6/7のような固定オフセットが使えない。
+# tesseract（ローカルのデータ更新時のみ使用。shinyapps.io本番では
+# load_ari_pathogen_cached()でキャッシュ済みデータを読むだけなので不要）で
+# 軸最上端のラベル文字を読み取る。OCRの誤読対策として、読み取った数字の
+# 先頭から複数桁を試し、よくある「きりの良い」軸最大値と完全一致するものを
+# 優先的に採用する
+.ari_ocr_available <- function() {
+  requireNamespace("tesseract", quietly = TRUE) && requireNamespace("magick", quietly = TRUE)
+}
+
+.ARI_NICE_AXIS_VALUES <- c(10,20,25,30,40,50,60,70,80,90,100,120,150,180,200,250,300,
+                           350,400,500,600,700,800,900,1000,1200,1500,1800,2000,2500,3000)
+
+.ari_ocr_top_axis_value <- function(arr, row_range, col_range) {
+  if (!.ari_ocr_available()) return(NA_real_)
+  crop <- arr[row_range, col_range, ]
+  tmp1 <- tempfile(fileext = ".png"); tmp2 <- tempfile(fileext = ".png")
+  on.exit(unlink(c(tmp1, tmp2)), add = TRUE)
+  png::writePNG(crop / 255, tmp1)
+  img <- magick::image_resize(magick::image_read(tmp1), "300%")
+  magick::image_write(img, tmp2)
+  eng <- tesseract::tesseract("eng", options = list(tessedit_char_whitelist = "0123456789,"))
+  d <- tryCatch(tesseract::ocr_data(tmp2, engine = eng), error = function(e) NULL)
+  if (is.null(d) || nrow(d) == 0) return(NA_real_)
+  bbox <- do.call(rbind, lapply(strsplit(d$bbox, ","), as.numeric))
+  raw <- d$word[which.min(bbox[, 2])]
+  digits <- gsub("[^0-9]", "", raw)
+  if (nchar(digits) == 0) return(NA_real_)
+  for (len in nchar(digits):1) {
+    cand <- suppressWarnings(as.numeric(substr(digits, 1, len)))
+    if (!is.na(cand) && cand %in% .ARI_NICE_AXIS_VALUES) return(cand)
+  }
+  cand <- suppressWarnings(as.numeric(substr(digits, 1, min(3, nchar(digits)))))
+  if (is.na(cand)) return(NA_real_)
+  .ARI_NICE_AXIS_VALUES[which.min(abs(.ARI_NICE_AXIS_VALUES - cand))]
+}
+
+# ── 図8: 1パネル分（全国 or 1地域）を抽出する汎用関数 ──────
+# panel_row_range/panel_col_range: パネル全体のおおよその範囲（ベースライン検出用）
+# bar_col_range: 棒グラフ本体を探索するx範囲（実際のバー開始位置を含む広めの範囲でよい）
+# dpi: y軸ラベルの相対オフセット（実測px値）をスケーリングするために使用
+.ari_extract_fig8_panel <- function(arr, panel_row_range, panel_col_range,
+                                     bar_col_range, leg_rgb, week_dates,
+                                     gap_thresh = 2, dpi = 300) {
+  row0 <- .ari_find_baseline_row(arr, panel_row_range, panel_col_range)
+  if (is.na(row0)) return(NULL)
+
+  bar_info <- .ari_find_bar_centers(arr, row0 - max(3, round((row0 - min(panel_row_range)) * 0.01)),
+                                     bar_col_range, gap_thresh = gap_thresh)
+  centers <- bar_info$centers
+  if (length(centers) == 0) return(NULL)
+
+  # y軸ラベルは実際に検出した最初のバー位置から見た相対オフセットで探す
+  # （実測: 最初のバー中心から見て-220px〜-20px、dpi=300基準）
+  bar_start <- centers[1]
+  yt_off <- round(c(-220, -20) * (dpi / 300))
+  ytick_col_range <- max(1, bar_start + yt_off[1]):max(2, bar_start + yt_off[2])
+  ymax <- .ari_ocr_top_axis_value(arr, min(panel_row_range):row0, ytick_col_range)
+  if (is.na(ymax)) return(NULL)
+  # 直近側（週の並びの末尾）をweek_datesの長さに揃える
+  n <- min(length(centers), length(week_dates))
+  centers <- tail(centers, n)
+  dates_use <- tail(week_dates, n)
+
+  row_top <- min(panel_row_range)
+  px_per_count <- (row0 - row_top) / ymax
+  r <- arr[,,1]; g <- arr[,,2]; b <- arr[,,3]
+
+  classify_col <- function(x_center) {
+    col_r <- r[row_top:row0, x_center]; col_g <- g[row_top:row0, x_center]; col_b <- b[row_top:row0, x_center]
+    d_all <- sapply(seq_len(nrow(leg_rgb)), function(i)
+      (col_r - leg_rgb[i,1])^2 + (col_g - leg_rgb[i,2])^2 + (col_b - leg_rgb[i,3])^2)
+    is_white <- col_r > 250 & col_g > 250 & col_b > 250
+    best <- apply(d_all, 1, which.min)
+    labs <- rownames(leg_rgb)[best]
+    labs[is_white] <- NA_character_
+    labs
+  }
+
+  rows_out <- lapply(seq_along(centers), function(i) {
+    labs <- classify_col(centers[i])
+    tab <- table(labs[!is.na(labs)])
+    if (length(tab) == 0) return(NULL)
+    counts <- round(as.numeric(tab) / px_per_count)
+    tibble(date = dates_use[i], category = names(tab), reports = counts)
+  })
+  bind_rows(rows_out)
+}
+
 # ── PDFページ内で図6/図7のキャプションがあるページ番号を探す ──
 .ari_find_fig_pages <- function(pdf_path) {
   pages <- tryCatch(pdftools::pdf_text(pdf_path), error = function(e) NULL)
   if (is.null(pages)) return(list(fig6 = NA_integer_, fig7 = NA_integer_, date_range = NULL))
-  fig6 <- NA_integer_; fig7 <- NA_integer_
+  fig6 <- NA_integer_; fig7 <- NA_integer_; fig8 <- NA_integer_
   for (i in seq_along(pages)) {
     if (is.na(fig6) && grepl("図\\s*6[:：]?\\s*検体採取週ごとの病原体別報告数", pages[i])) fig6 <- i
     if (is.na(fig7) && grepl("図\\s*7[:：]?\\s*検体採取週ごとの病原体別陽性率", pages[i])) fig7 <- i
+    if (is.na(fig8) && grepl("図\\s*8[:：]?\\s*検体採取週ごとの全国および地域別", pages[i])) fig8 <- i
   }
   # データ範囲テキスト（例: データ範囲: 2025年4月7日～2026年6月28日）を抽出
   date_range <- NULL
@@ -144,7 +255,7 @@ ARI_POS_YMAX <- 60  # %
       break
     }
   }
-  list(fig6 = fig6, fig7 = fig7, date_range = date_range)
+  list(fig6 = fig6, fig7 = fig7, fig8 = fig8, date_range = date_range)
 }
 
 # ── メイン: 1つのARI週報PDFから図6・図7を抽出する ─────────
@@ -257,7 +368,88 @@ parse_ari_pathogen_pdf <- function(pdf_path, dpi = 300) {
   pos_df$year <- as.integer(format(pos_df$date, "%G"))
   pos_df$week <- as.integer(format(pos_df$date, "%V"))
 
-  list(counts = count_df, positivity = pos_df)
+  # ── 図8: 全国＋地域別の積み上げ棒グラフ（9パネル） ─────────
+  # ローカルのデータ更新時のみtesseract/magickが必要（未インストールなら
+  # regional_dfはNULLになり、既存の全国合算データはそのまま利用可能）
+  regional_df <- if (is.na(info$fig8) || !.ari_ocr_available()) {
+    NULL
+  } else {
+    tryCatch(
+      .ari_parse_fig8(pdf_path, info$fig8, week_dates, dpi = dpi),
+      error = function(e) { message("図8解析エラー: ", e$message); NULL }
+    )
+  }
+
+  list(counts = count_df, positivity = pos_df, regional = regional_df)
+}
+
+# ── 図8全体（全国＋8地域）を解析する ────────────────────────
+.ari_parse_fig8 <- function(pdf_path, fig8_page, week_dates, dpi = 300) {
+  leg_rgb_fig8 <- t(grDevices::col2rgb(ARI_FIG8_LEGEND)); rownames(leg_rgb_fig8) <- ARI_FIG8_ORDER
+
+  # 全国パネル（図7と同じページの下部。凡例(2行x5列)の下にある）
+  arr_nat <- .ari_render_page(pdf_path, fig8_page, dpi = dpi)
+  H <- dim(arr_nat)[1]; W <- dim(arr_nat)[2]
+  r <- arr_nat[,,1]; g <- arr_nat[,,2]; b <- arr_nat[,,3]
+  mx <- pmax(r,g,b); mn <- pmin(r,g,b); sat <- mx - mn
+  is_colored <- sat > 25 & mx > 40
+  leg_search <- round(H*0.40):round(H*0.68)
+  row_counts <- rowSums(is_colored[leg_search, ])
+  nzr <- leg_search[which(row_counts > 5)]
+  national_df <- NULL
+  if (length(nzr) > 0) {
+    grpr <- cumsum(c(1, diff(nzr) > 3))
+    row_bands <- split(nzr, grpr)
+    # 凡例の各行は十分な高さ（十数px以上）を持つはずなので、極小のノイズバンド
+    # （チャート本体の先頭ピクセル等）を除外してから最後（最下段）を凡例とみなす
+    row_bands <- Filter(function(x) diff(range(x)) >= 15, row_bands)
+    if (length(row_bands) >= 2) {
+      leg_bottom <- max(row_bands[[length(row_bands)]])
+      national_df <- .ari_extract_fig8_panel(
+        arr_nat,
+        panel_row_range = (leg_bottom + 20):round(H*0.99),
+        panel_col_range = round(W*0.09):round(W*0.98),
+        bar_col_range   = round(W*0.09):round(W*0.99),
+        leg_rgb = leg_rgb_fig8, week_dates = week_dates, gap_thresh = 2, dpi = dpi
+      )
+    }
+  }
+  if (!is.null(national_df)) national_df$region <- "national"
+
+  # 地域パネル（2ページにまたがる2x2グリッド x 2ページ = 8地域）
+  region_page1 <- names(ARI_REGIONS)[2:5]  # hokkaido_tohoku, kanto, hokuriku, tokai
+  region_page2 <- names(ARI_REGIONS)[6:9]  # kinki, chugoku, shikoku, kyushu_okinawa
+  quad_specs <- list(
+    list(row = c(0.025, 0.30), col = c(0.05, 0.49), bar = c(0.09, 0.48)),
+    list(row = c(0.025, 0.30), col = c(0.535, 0.99), bar = c(0.575, 0.965)),
+    list(row = c(0.40, 0.565), col = c(0.05, 0.49), bar = c(0.09, 0.48)),
+    list(row = c(0.40, 0.565), col = c(0.535, 0.99), bar = c(0.575, 0.965))
+  )
+  parse_region_page <- function(page_no, region_ids) {
+    arr <- .ari_render_page(pdf_path, page_no, dpi = dpi)
+    Hp <- dim(arr)[1]; Wp <- dim(arr)[2]
+    out <- list()
+    for (i in seq_along(region_ids)) {
+      qs <- quad_specs[[i]]
+      panel_row_range <- round(Hp*qs$row[1]):round(Hp*qs$row[2])
+      panel_col_range <- round(Wp*qs$col[1]):round(Wp*qs$col[2])
+      bar_col_range   <- round(Wp*qs$bar[1]):round(Wp*qs$bar[2])
+      df <- tryCatch(
+        .ari_extract_fig8_panel(arr, panel_row_range, panel_col_range,
+                                bar_col_range, leg_rgb_fig8, week_dates, gap_thresh = 1, dpi = dpi),
+        error = function(e) NULL)
+      if (!is.null(df) && nrow(df) > 0) {
+        df$region <- region_ids[i]
+        out[[region_ids[i]]] <- df
+      }
+    }
+    bind_rows(out)
+  }
+
+  df1 <- tryCatch(parse_region_page(fig8_page + 1, region_page1), error = function(e) NULL)
+  df2 <- tryCatch(parse_region_page(fig8_page + 2, region_page2), error = function(e) NULL)
+
+  bind_rows(national_df, df1, df2)
 }
 
 # ── 週報アーカイブ一覧から最新PDFのURLを取得 ───────────────
@@ -304,12 +496,17 @@ update_ari_pathogen_data <- function(force = FALSE) {
 
   new_counts <- parsed$counts %>% mutate(source_report = basename(path))
   new_pos <- if (!is.null(parsed$positivity)) parsed$positivity %>% mutate(source_report = basename(path)) else NULL
+  new_regional <- if (!is.null(parsed$regional) && nrow(parsed$regional) > 0) {
+    parsed$regional %>%
+      mutate(year = as.integer(format(date, "%G")), week = as.integer(format(date, "%V")),
+             source_report = basename(path))
+  } else NULL
 
   # 週報は毎号、直近約64週分を再掲載する（「集計時点における報告数であるため、
   # 過去の週報で掲載された値とは必ずしも一致しない」との注記どおり、速報値が
-  # 後日修正される）。そのため、新しく取得したnew_counts/new_posを必ず先に
-  # bind_rowsし、distinct(.keep_all=TRUE)が先頭行（＝最新号の値）を残す
-  # ことで、重複する過去週は常に最新号の値で上書きされるようにしている
+  # 後日修正される）。そのため、新しく取得したnew_counts/new_pos/new_regionalを
+  # 必ず先にbind_rowsし、distinct(.keep_all=TRUE)が先頭行（＝最新号の値）を
+  # 残すことで、重複する過去週は常に最新号の値で上書きされるようにしている
   merged_counts <- if (!is.null(old) && !is.null(old$counts)) {
     bind_rows(new_counts, old$counts) %>% distinct(year, week, category, .keep_all = TRUE) %>% arrange(date)
   } else new_counts %>% arrange(date)
@@ -320,7 +517,16 @@ update_ari_pathogen_data <- function(force = FALSE) {
     } else new_pos %>% arrange(date)
   } else if (!is.null(old)) old$positivity else NULL
 
-  merged <- list(counts = merged_counts, positivity = merged_pos)
+  # 図8（地域別）はtesseract/magick未インストール環境（本番サーバー等）では
+  # NULLになりうるため、その場合は既存キャッシュのregionalをそのまま維持する
+  merged_regional <- if (!is.null(new_regional)) {
+    if (!is.null(old) && !is.null(old$regional)) {
+      bind_rows(new_regional, old$regional) %>%
+        distinct(year, week, category, region, .keep_all = TRUE) %>% arrange(date)
+    } else new_regional %>% arrange(date)
+  } else if (!is.null(old)) old$regional else NULL
+
+  merged <- list(counts = merged_counts, positivity = merged_pos, regional = merged_regional)
   dir.create(dirname(ARI_DATA_CACHE), showWarnings = FALSE, recursive = TRUE)
   saveRDS(merged, ARI_DATA_CACHE)
   merged
