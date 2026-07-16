@@ -1163,6 +1163,44 @@ fetch_fukuoka_news <- function(timeout_sec = 15, n_results = 20) {
 }
 
 # ============================================================
+# 長崎県 コンテンツ情報一覧（HTMLスクレイピング。RSS未提供のため記事一覧ページを直接解析する）
+# ============================================================
+NAGASAKI_NEWS_URL <- "https://www.pref.nagasaki.jp/doc/"
+
+fetch_nagasaki_news <- function(timeout_sec = 15, n_results = 20) {
+  message("長崎県 新着情報 取得中...")
+  tryCatch({
+    resp <- GET(NAGASAKI_NEWS_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    items <- xml_find_all(doc, "//ol[contains(@class,'news-list')]//li")
+    if (length(items) == 0) return(NULL)
+
+    rows <- lapply(items, function(li) {
+      date_str <- xml_attr(xml_find_first(li, ".//time"), "datetime")
+      a <- xml_find_first(li, ".//span//a")
+      title <- trimws(xml_text(a))
+      href  <- xml_attr(a, "href")
+      if (nchar(title) == 0 || is.na(href) || is.na(date_str)) return(NULL)
+      d <- suppressWarnings(as.Date(gsub("年|月", "-", gsub("日", "", date_str)), format = "%Y-%m-%d"))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "pref_nagasaki",
+        source_name = "長崎県",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.pref.nagasaki.jp", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("長崎県 エラー: ", e$message); NULL })
+}
+
+# ============================================================
 # PubMed E-utilities — アウトブレイク関連論文取得（APIキー不要）
 # ============================================================
 PUBMED_QUERIES <- c(
@@ -3448,9 +3486,9 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
     all_df <- bind_rows(all_df, spf)
   }
 
-  # 秋田県・奈良県・佐賀県・和歌山県・福岡県 報道発表（HTMLスクレイピング）
+  # 秋田県・奈良県・佐賀県・和歌山県・福岡県・長崎県 報道発表（HTMLスクレイピング）
   for (fn in list(fetch_akita_press_news, fetch_nara_press_news, fetch_saga_press_news,
-                   fetch_wakayama_news, fetch_fukuoka_news)) {
+                   fetch_wakayama_news, fetch_fukuoka_news, fetch_nagasaki_news)) {
     d <- tryCatch(fn(), error = function(e) NULL)
     if (!is.null(d) && nrow(d) > 0) {
       if (!"retweet_count" %in% names(d)) d$retweet_count <- NA_integer_
