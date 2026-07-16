@@ -468,8 +468,8 @@ function ebsUntranslateCards(containerId) {
         )
       ),
 
-      # ── 患者報告サーベイランス ─────────────────────────────
-      tabPanel("患者報告サーベイランス", icon=icon("chart-line"),
+      # ── 患者サーベイランス ─────────────────────────────────
+      tabPanel("患者サーベイランス", icon=icon("chart-line"),
       tabsetPanel(id="sub_patient", type="tabs",
 
       # ── 地図（地域別比較） ─────────────────────────────────
@@ -678,126 +678,8 @@ function ebsUntranslateCards(containerId) {
       ) # sub_patient
       ),
 
-      # ── EBS ──────────────────────────────────────────────
-      tabPanel("EBS", icon=icon("newspaper"),
-      tabsetPanel(id="sub_ebs", type="tabs",
-
-      tabPanel("国内", icon=icon("newspaper"),
-        tags$div(style="text-align:right;font-size:0.78em;margin:2px 4px 0;",
-          tags$a(href="javascript:void(0)", onclick="goToNotes('notes-ebs')",
-            style="color:#888;text-decoration:none;",
-            icon("circle-info"), " 注意事項・データソース")),
-        fluidRow(
-          column(3,
-            tags$div(class="data-source-bar","EBSニュース（国内）"),
-            tags$div(style="font-size:0.85em;color:#555;margin-bottom:6px;",
-              icon("info-circle"), " 疾患・都道府県はサイドバーで選択"),
-            selectInput("ebs_page_size","表示件数",
-              choices=c("10件"=10,"50件"=50,"100件"=100,"全部"=9999), selected=50),
-            radioButtons("ebs_sort", "並び順",
-              choices = c("シグナル優先"="signal", "日付順（新しい順）"="date"),
-              selected = "signal"),
-            actionButton("ebs_show_all", "すべて表示",
-              icon=icon("list"), class="btn btn-default btn-sm",
-              style="width:100%;margin-top:4px;"),
-            tags$div(style="font-size:0.75em;color:#888;margin-top:4px;line-height:1.4;",
-              "押すと疾患フィルターを解除して全疾患の記事を表示します")
-          ),
-          column(9,
-            uiOutput("ebs_signal_summary"),
-            tags$div(style="text-align:right;margin-bottom:6px;",
-              radioButtons("ebs_translate", NULL,
-                choices = c("そのまま表示" = "off", "🌐 日本語訳で読む" = "on"),
-                selected = "off", inline = TRUE)
-            ),
-            uiOutput("ebs_news_feed")
-          )
-        )
-      ),
-
-      tabPanel("国外", icon=icon("globe"),
-        tags$div(style="text-align:right;font-size:0.78em;margin:2px 4px 0;",
-          tags$a(href="javascript:void(0)", onclick="goToNotes('notes-ebs-overseas')",
-            style="color:#888;text-decoration:none;",
-            icon("circle-info"), " 注意事項・データソース")),
-        fluidRow(
-          column(3,
-            tags$div(class="data-source-bar","EBSニュース（海外）"),
-            tags$div(style="font-size:0.85em;color:#555;margin-bottom:6px;",
-              icon("info-circle"), " 疾患はサイドバーで選択"),
-            selectInput("ebs_ov_page_size","表示件数",
-              choices=c("10件"=10,"50件"=50,"100件"=100,"全部"=9999), selected=50),
-            radioButtons("ebs_ov_sort", "並び順",
-              choices = c("シグナル優先"="signal", "日付順（新しい順）"="date"),
-              selected = "signal"),
-            actionButton("ebs_ov_show_all", "すべて表示",
-              icon=icon("list"), class="btn btn-default btn-sm",
-              style="width:100%;margin-top:4px;"),
-            tags$div(style="font-size:0.75em;color:#888;margin-top:4px;line-height:1.4;",
-              "押すと疾患フィルターを解除して全疾患の記事を表示します"),
-            tags$div(style="font-size:0.8em;color:#888;margin-top:8px;",
-              icon("info-circle"),
-              " 流行トレンド評価には含まれません。都道府県フィルタ対象外。")
-          ),
-          column(9,
-            uiOutput("ebs_ov_signal_summary"),
-            tags$div(style="text-align:right;margin-bottom:6px;",
-              radioButtons("ebs_ov_translate", NULL,
-                choices = c("そのまま表示" = "off", "🌐 日本語訳で読む" = "on"),
-                selected = "off", inline = TRUE)
-            ),
-            uiOutput("ebs_ov_news_feed")
-          )
-        )
-      ),
-
-      tabPanel("EBSトレンド", icon=icon("arrow-trend-up"),
-        tags$div(style="text-align:right;font-size:0.78em;margin:2px 4px 0;",
-          tags$a(href="javascript:void(0)", onclick="goToNotes('notes-ebs-trends')",
-            style="color:#888;text-decoration:none;",
-            icon("circle-info"), " 注意事項・データソース")),
-        uiOutput("filter_bar_trends"),
-        fluidRow(
-          column(12,
-            # ── EBS 日別記事数チャート ──
-            tags$div(class="data-source-bar", "EBSニュース 日別シグナル数（過去60日）"),
-            plotlyOutput("ebs_daily_chart", height="220px"),
-            tags$hr(),
-            # ── Google Trends ──
-            tags$div(class="data-source-bar",
-              "Google Trends | 過去12ヶ月 | 100=最大関心度"),
-            plotlyOutput("gtrends_plot", height="400px")
-          )
-        )
-      )
-
-      ) # sub_ebs
-      ),
-
-      # ── 重症サーベイランス（入院、IDWR週報PDF）────────────────
-      tabPanel("重症サーベイランス（入院）", icon=icon("bed-pulse"),
-        tags$div(style="text-align:right;font-size:0.78em;margin:2px 4px 0;",
-          tags$a(href="javascript:void(0)", onclick="goToNotes('notes-hosp')",
-            style="color:#888;text-decoration:none;",
-            icon("circle-info"), " 注意事項・データソース")),
-        fluidRow(style="margin:8px 0 4px;",
-          column(4,
-            checkboxGroupInput("hosp_disease", "対象疾患",
-              choices = c("インフルエンザ" = "flu", "新型コロナウイルス感染症" = "covid"),
-              selected = c("flu", "covid"))
-          )
-        ),
-        tags$div(class="data-source-bar", "基幹定点 入院サーベイランス — 週次入院患者報告数"),
-        uiOutput("hosp_last_updated"),
-        plotlyOutput("hosp_plot", height="380px"),
-        uiOutput("hosp_legend"),
-        tags$hr(),
-        DTOutput("hosp_table"),
-        downloadButton("hosp_table_dl", "CSVダウンロード", class="btn-sm", style="margin-top:8px;")
-      ),
-
-      # ── 病原体報告サーベイランス ───────────────────────────
-      tabPanel("病原体報告サーベイランス", icon=icon("flask"),
+      # ── 病原体サーベイランス ───────────────────────────────
+      tabPanel("病原体サーベイランス", icon=icon("flask"),
       tabsetPanel(id="sub_pathogen", type="tabs",
 
       tabPanel("病原体検出", icon=icon("flask"),
@@ -901,10 +783,122 @@ function ebsUntranslateCards(containerId) {
       ) # sub_pathogen
       ),
 
-      # ── その他 ────────────────────────────────────────────
-      tabPanel("その他", icon=icon("ellipsis"),
-      tabsetPanel(id="sub_other", type="tabs",
+      # ── 重症サーベイランス（入院、IDWR週報PDF）────────────────
+      tabPanel("重症サーベイランス", icon=icon("bed-pulse"),
+        tags$div(style="text-align:right;font-size:0.78em;margin:2px 4px 0;",
+          tags$a(href="javascript:void(0)", onclick="goToNotes('notes-hosp')",
+            style="color:#888;text-decoration:none;",
+            icon("circle-info"), " 注意事項・データソース")),
+        fluidRow(style="margin:8px 0 4px;",
+          column(4,
+            checkboxGroupInput("hosp_disease", "対象疾患",
+              choices = c("インフルエンザ" = "flu", "新型コロナウイルス感染症" = "covid"),
+              selected = c("flu", "covid"))
+          )
+        ),
+        tags$div(class="data-source-bar", "基幹定点 入院サーベイランス — 週次入院患者報告数"),
+        uiOutput("hosp_last_updated"),
+        plotlyOutput("hosp_plot", height="380px"),
+        uiOutput("hosp_legend"),
+        tags$hr(),
+        DTOutput("hosp_table"),
+        downloadButton("hosp_table_dl", "CSVダウンロード", class="btn-sm", style="margin-top:8px;")
+      ),
 
+      # ── EBS ──────────────────────────────────────────────
+      tabPanel("EBS", icon=icon("newspaper"),
+      tabsetPanel(id="sub_ebs", type="tabs",
+
+      tabPanel("国内", icon=icon("newspaper"),
+        tags$div(style="text-align:right;font-size:0.78em;margin:2px 4px 0;",
+          tags$a(href="javascript:void(0)", onclick="goToNotes('notes-ebs')",
+            style="color:#888;text-decoration:none;",
+            icon("circle-info"), " 注意事項・データソース")),
+        fluidRow(
+          column(3,
+            tags$div(class="data-source-bar","EBSニュース（国内）"),
+            tags$div(style="font-size:0.85em;color:#555;margin-bottom:6px;",
+              icon("info-circle"), " 疾患・都道府県はサイドバーで選択"),
+            selectInput("ebs_page_size","表示件数",
+              choices=c("10件"=10,"50件"=50,"100件"=100,"全部"=9999), selected=50),
+            radioButtons("ebs_sort", "並び順",
+              choices = c("シグナル優先"="signal", "日付順（新しい順）"="date"),
+              selected = "signal"),
+            actionButton("ebs_show_all", "すべて表示",
+              icon=icon("list"), class="btn btn-default btn-sm",
+              style="width:100%;margin-top:4px;"),
+            tags$div(style="font-size:0.75em;color:#888;margin-top:4px;line-height:1.4;",
+              "押すと疾患フィルターを解除して全疾患の記事を表示します")
+          ),
+          column(9,
+            uiOutput("ebs_signal_summary"),
+            tags$div(style="text-align:right;margin-bottom:6px;",
+              radioButtons("ebs_translate", NULL,
+                choices = c("そのまま表示" = "off", "🌐 日本語訳で読む" = "on"),
+                selected = "off", inline = TRUE)
+            ),
+            uiOutput("ebs_news_feed")
+          )
+        )
+      ),
+
+      tabPanel("国外", icon=icon("globe"),
+        tags$div(style="text-align:right;font-size:0.78em;margin:2px 4px 0;",
+          tags$a(href="javascript:void(0)", onclick="goToNotes('notes-ebs-overseas')",
+            style="color:#888;text-decoration:none;",
+            icon("circle-info"), " 注意事項・データソース")),
+        fluidRow(
+          column(3,
+            tags$div(class="data-source-bar","EBSニュース（海外）"),
+            tags$div(style="font-size:0.85em;color:#555;margin-bottom:6px;",
+              icon("info-circle"), " 疾患はサイドバーで選択"),
+            selectInput("ebs_ov_page_size","表示件数",
+              choices=c("10件"=10,"50件"=50,"100件"=100,"全部"=9999), selected=50),
+            radioButtons("ebs_ov_sort", "並び順",
+              choices = c("シグナル優先"="signal", "日付順（新しい順）"="date"),
+              selected = "signal"),
+            actionButton("ebs_ov_show_all", "すべて表示",
+              icon=icon("list"), class="btn btn-default btn-sm",
+              style="width:100%;margin-top:4px;"),
+            tags$div(style="font-size:0.75em;color:#888;margin-top:4px;line-height:1.4;",
+              "押すと疾患フィルターを解除して全疾患の記事を表示します"),
+            tags$div(style="font-size:0.8em;color:#888;margin-top:8px;",
+              icon("info-circle"),
+              " 流行トレンド評価には含まれません。都道府県フィルタ対象外。")
+          ),
+          column(9,
+            uiOutput("ebs_ov_signal_summary"),
+            tags$div(style="text-align:right;margin-bottom:6px;",
+              radioButtons("ebs_ov_translate", NULL,
+                choices = c("そのまま表示" = "off", "🌐 日本語訳で読む" = "on"),
+                selected = "off", inline = TRUE)
+            ),
+            uiOutput("ebs_ov_news_feed")
+          )
+        )
+      ),
+
+      tabPanel("EBSトレンド", icon=icon("arrow-trend-up"),
+        tags$div(style="text-align:right;font-size:0.78em;margin:2px 4px 0;",
+          tags$a(href="javascript:void(0)", onclick="goToNotes('notes-ebs-trends')",
+            style="color:#888;text-decoration:none;",
+            icon("circle-info"), " 注意事項・データソース")),
+        uiOutput("filter_bar_trends"),
+        fluidRow(
+          column(12,
+            # ── EBS 日別記事数チャート ──
+            tags$div(class="data-source-bar", "EBSニュース 日別シグナル数（過去60日）"),
+            plotlyOutput("ebs_daily_chart", height="220px"),
+            tags$hr(),
+            # ── Google Trends ──
+            tags$div(class="data-source-bar",
+              "Google Trends | 過去12ヶ月 | 100=最大関心度"),
+            plotlyOutput("gtrends_plot", height="400px")
+          )
+        )
+      ),
+
+      # ── 文献（PubMed）────────────────────────────────────
       tabPanel("文献", icon=icon("book-open"),
         fluidRow(
           column(3,
@@ -926,7 +920,14 @@ function ebsUntranslateCards(containerId) {
             uiOutput("pubmed_news_feed")
           )
         )
+      )
+
+      ) # sub_ebs
       ),
+
+      # ── その他 ────────────────────────────────────────────
+      tabPanel("その他", icon=icon("ellipsis"),
+      tabsetPanel(id="sub_other", type="tabs",
 
       # ── Notes ────────────────────────────────────────────
       tabPanel("Notes", icon=icon("circle-info"),
@@ -953,27 +954,27 @@ function ebsUntranslateCards(containerId) {
                 tags$li(tags$strong("疾患別:"), "サイドバーで選択中の都道府県・表示モードについて、全疾患の統合活動レベルをタイル表示"),
                 tags$li(tags$strong("都道府県別:"), "選択中の疾患について、全47都道府県の統合活動レベルをデフォルメ日本地図上にタイル表示")
               )),
-            tags$li(tags$strong("患者報告サーベイランス:"),
+            tags$li(tags$strong("患者サーベイランス:"),
               tags$ul(
                 tags$li(tags$strong("地域別比較:"), "都道府県別コロプレスマップ（直近週）＋都道府県ランキング＋都道府県別ヒートマップ＋地域別比較（定点把握。週次/月次報告に対応）"),
                 tags$li(tags$strong("流行曲線:"), "週次報告数推移・年別重ね合わせ（定点把握・全数把握）／月次報告数推移・年別重ね合わせ（月報疾患：性感染症・薬剤耐性菌）。CSVダウンロードもこのタブ内で可能"),
                 tags$li(tags$strong("複数疾患比較（定点）:"), "複数疾患の定点報告数を重ね合わせ表示"),
                 tags$li(tags$strong("実効再生産数 Rt:"), "Cori法によるRt推定")
               )),
-            tags$li(tags$strong("病原体報告サーベイランス:"),
+            tags$li(tags$strong("病原体サーベイランス:"),
               tags$ul(
                 tags$li(tags$strong("病原体検出:"), "IASR（病原微生物検出情報）に基づく病原体検出状況"),
                 tags$li(tags$strong("ARI病原体:"), "ARIサーベイランス週報に基づく病原体別報告数・陽性率（グラフ画像からの近似値）")
               )),
-            tags$li(tags$strong("重症サーベイランス（入院）:"), "IDWR週報PDFに基づく、インフルエンザ・新型コロナウイルス感染症の入院患者数の推移"),
+            tags$li(tags$strong("重症サーベイランス:"), "IDWR週報PDFに基づく、インフルエンザ・新型コロナウイルス感染症の入院患者数の推移"),
             tags$li(tags$strong("EBS:"),
               tags$ul(
                 tags$li(tags$strong("国内・国外:"), "報道・行政発表等のニュース記事をシグナルレベル別に一覧表示"),
-                tags$li(tags$strong("EBSトレンド:"), "EBSニュースとGoogle Trendsを統合した短期トレンド評価")
+                tags$li(tags$strong("EBSトレンド:"), "EBSニュースとGoogle Trendsを統合した短期トレンド評価"),
+                tags$li(tags$strong("文献:"), "PubMed収載論文の一覧")
               )),
             tags$li(tags$strong("その他:"),
               tags$ul(
-                tags$li(tags$strong("文献:"), "PubMed収載論文の一覧"),
                 tags$li(tags$strong("Notes:"), "このページ（データソース・算出方法・注意事項の説明）")
               ))
           ),
@@ -3573,7 +3574,7 @@ server <- function(input, output, session) {
   observeEvent(input$pref_tile_click, {
     req(input$pref_tile_click$pref)
     updateSelectInput(session, "pref_filter", selected = input$pref_tile_click$pref)
-    updateTabsetPanel(session, "main_tabs", selected = "患者報告サーベイランス")
+    updateTabsetPanel(session, "main_tabs", selected = "患者サーベイランス")
     updateTabsetPanel(session, "sub_patient", selected = "流行曲線")
   })
 
@@ -3588,7 +3589,7 @@ server <- function(input, output, session) {
       updateRadioButtons(session, "ts_mode", selected = "teiten")
       updateSelectInput(session, "disease", selected = input$disease_tile_click$id)
     }
-    updateTabsetPanel(session, "main_tabs", selected = "患者報告サーベイランス")
+    updateTabsetPanel(session, "main_tabs", selected = "患者サーベイランス")
     updateTabsetPanel(session, "sub_patient", selected = "流行曲線")
   })
 
