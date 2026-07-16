@@ -156,6 +156,20 @@ EBS_SOURCES <- list(
        url="https://www.mhlw.go.jp/stf/news.rdf"),
   # jihsはRSS(https://www.niid.jihs.go.jp/feed/)が廃止(404)されたため、
   # EBS_SOURCESには含めずHTMLスクレイピング経由のfetch_jihs_news()で個別取得する
+  # ── 都道府県（保健所設置自治体） ───────────────────────────
+  # 東京都・兵庫県は保健医療局/健康カテゴリ専用RSSのため精度が高い。
+  # 埼玉県・北海道・愛知県は全庁共通RSSのため、既存のINFECT_FILTER_KEYWORDSによる
+  # 感染症関連キーワード絞り込みに依存する
+  list(id="pref_tokyo",    name="東京都 保健医療局",  lang="ja", category="行政",
+       url="https://www.hokeniryo.metro.tokyo.lg.jp/index.html/-/asset_publisher/fjpa/rss"),
+  list(id="pref_hyogo",    name="兵庫県（健康）",      lang="ja", category="行政",
+       url="https://web.pref.hyogo.lg.jp/rss/health.xml"),
+  list(id="pref_saitama",  name="埼玉県 県政ニュース", lang="ja", category="行政",
+       url="https://www.pref.saitama.lg.jp/news/news.xml"),
+  list(id="pref_hokkaido", name="北海道 お知らせ",     lang="ja", category="行政",
+       url="https://www.pref.hokkaido.lg.jp/news/oshirase/rss.xml"),
+  list(id="pref_aichi",    name="愛知県",              lang="ja", category="行政",
+       url="https://www.pref.aichi.jp/rss/10/list1.xml"),
   # ── 国際機関 ───────────────────────────────────────────────
   # who_donはRSS(https://www.who.int/feeds/entity/csr/don/en/rss.xml)が廃止(404)されたため、
   # EBS_SOURCESには含めずJSON API経由のfetch_who_don()で個別取得する（fetch_who_eiosと同様のパターン）
@@ -469,8 +483,22 @@ parse_rss <- function(content_text, source_def) {
   }
   if (length(items) == 0) return(NULL)
 
+  # 単純なタグ名（例:"date"）を直接XPathで指定すると、一部のフィード（例: 埼玉県の
+  # RSS1.0/RDF、dc:date由来）でxml_find_firstが原因不明にNAを返すことがあるため、
+  # local-name()ベースのXPathに変換して確実に一致させる（xml_ns_strip後は名前空間が
+  # 除去されているのでlocal-name()マッチで安全に子要素を選択できる）
+  .to_localname_xpath <- function(tag) {
+    if (grepl("/@", tag)) {
+      parts <- strsplit(tag, "/@", fixed = TRUE)[[1]]
+      paste0("*[local-name()='", parts[1], "']/@", parts[2])
+    } else {
+      paste0("*[local-name()='", tag, "']")
+    }
+  }
+
   get_text <- function(item, ...) {
-    for (xpath in c(...)) {
+    for (tag in c(...)) {
+      xpath <- .to_localname_xpath(tag)
       v <- tryCatch(xml_text(xml_find_first(item, xpath)), error = function(e) NA)
       if (!is.na(v) && nchar(trimws(v)) > 0) return(trimws(v))
     }
