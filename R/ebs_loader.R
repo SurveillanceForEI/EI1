@@ -153,7 +153,7 @@ is_overseas_article <- function(title, summary, ebs_pref = NA, source_id = "", s
 EBS_SOURCES <- list(
   # ── 日本・行政 ─────────────────────────────────────────────
   list(id="mhlw",    name="厚生労働省",             lang="ja", category="行政",
-       url="https://www.mhlw.go.jp/stf/rss/index.xml"),
+       url="https://www.mhlw.go.jp/stf/news.rdf"),
   list(id="jihs",    name="JIHS (国立健康危機管理)", lang="ja", category="研究機関",
        url="https://www.niid.jihs.go.jp/feed/"),
   # ── 国際機関 ───────────────────────────────────────────────
@@ -440,11 +440,14 @@ GENERIC_HEALTH_KEYWORDS <- c(
 parse_rss <- function(content_text, source_def) {
   xml_doc <- tryCatch(read_xml(content_text), error = function(e) NULL)
   if (is.null(xml_doc)) return(NULL)
-  ns <- xml_ns(xml_doc)
+  # RSS 1.0/RDF系フィード（asahi, mhlw等）はデフォルト名前空間(xmlns="http://purl.org/rss/1.0/")
+  # を宣言しており、無プレフィックスのXPath（".//item"等）が一致しない問題があったため、
+  # 名前空間を除去してRSS 1.0/2.0/Atom全形式を無プレフィックスXPathで統一的に扱う
+  xml_ns_strip(xml_doc)
   root_name <- xml_name(xml_doc)
 
   items <- if (grepl("feed", root_name, ignore.case = TRUE)) {
-    xml_find_all(xml_doc, ".//d1:entry", ns)
+    xml_find_all(xml_doc, ".//entry")
   } else {
     xml_find_all(xml_doc, ".//item")
   }
@@ -459,10 +462,10 @@ parse_rss <- function(content_text, source_def) {
   }
 
   rows <- lapply(items, function(item) {
-    title    <- get_text(item, "title", "d1:title")
-    link     <- get_text(item, "link", "d1:link/@href", "d1:link")
-    date_str <- get_text(item, "pubDate", "dc:date", "d1:published", "d1:updated")
-    desc     <- get_text(item, "description", "d1:summary", "d1:content")
+    title    <- get_text(item, "title")
+    link     <- get_text(item, "link/@href", "link")
+    date_str <- get_text(item, "pubDate", "date", "published", "updated")
+    desc     <- get_text(item, "description", "summary", "content")
 
     pub_date <- tryCatch({
       d <- as.Date(NA)
