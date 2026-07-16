@@ -361,8 +361,8 @@ function survCollectState() {
     var el = document.getElementById(id);
     if (el) s[id] = el.checked;
   });
-  // アクティブタブ
-  var activeTab = document.querySelector(".nav-tabs .active a");
+  // アクティブタブ（ネストしたタブがあるため、外側main_tabsのnavに限定して取得）
+  var activeTab = document.querySelector("#main_tabs > .nav-tabs > li.active > a");
   if (activeTab) s.main_tabs = activeTab.getAttribute("data-value");
   return s;
 }
@@ -450,21 +450,27 @@ function ebsUntranslateCards(containerId) {
     # ── タブ群 ─────────────────────────────────────────────
     tabBox(width=12, id="main_tabs",
 
-      # ── 活動レベル一覧（疾患別） ───────────────────────────
-      tabPanel("活動レベル一覧（疾患別）", icon=icon("th"),
-        tags$div(style="padding:10px 6px 4px;",
-          uiOutput("all_levels_header"),
-          uiOutput("all_levels_ui")
+      # ── 活動レベル一覧 ─────────────────────────────────────
+      tabPanel("活動レベル一覧", icon=icon("th"),
+        tabsetPanel(id="sub_levels", type="tabs",
+          tabPanel("疾患別",
+            tags$div(style="padding:10px 6px 4px;",
+              uiOutput("all_levels_header"),
+              uiOutput("all_levels_ui")
+            )
+          ),
+          tabPanel("都道府県別",
+            tags$div(style="padding:10px 6px 4px;",
+              uiOutput("pref_levels_header"),
+              uiOutput("pref_levels_ui")
+            )
+          )
         )
       ),
 
-      # ── 活動レベル一覧（都道府県別） ─────────────────────
-      tabPanel("活動レベル一覧（都道府県別）", icon=icon("border-all"),
-        tags$div(style="padding:10px 6px 4px;",
-          uiOutput("pref_levels_header"),
-          uiOutput("pref_levels_ui")
-        )
-      ),
+      # ── 患者報告サーベイランス ─────────────────────────────
+      tabPanel("患者報告サーベイランス", icon=icon("chart-line"),
+      tabsetPanel(id="sub_patient", type="tabs",
 
       # ── 地図（地域別比較） ─────────────────────────────────
       tabPanel("地域別比較", icon=icon("map"),
@@ -543,7 +549,10 @@ function ebsUntranslateCards(containerId) {
           ),
           tags$a(href="javascript:void(0)", onclick="goToNotes('notes-forecast')",
             style="font-size:0.78em;color:#888;text-decoration:none;",
-            icon("circle-info"), " 予測手法について")
+            icon("circle-info"), " 予測手法について"),
+          tags$div(style="margin-left:auto;",
+            downloadButton("download_csv", "CSVダウンロード", class="btn-xs btn-default", icon=icon("download"))
+          )
         ),
         # 定点把握（線グラフ＋年別重ね合わせ）。「定点把握疾患」選択肢には
         # 週次報告の疾患と月次報告（性感染症・薬剤耐性菌）の疾患が混在するため、
@@ -664,10 +673,16 @@ function ebsUntranslateCards(containerId) {
         fluidRow(column(12,
           uiOutput("rt_si_info")
         ))
+      )
+
+      ) # sub_patient
       ),
 
       # ── EBS ──────────────────────────────────────────────
-      tabPanel("EBSニュース（国内）", icon=icon("newspaper"),
+      tabPanel("EBS", icon=icon("newspaper"),
+      tabsetPanel(id="sub_ebs", type="tabs",
+
+      tabPanel("国内", icon=icon("newspaper"),
         tags$div(style="text-align:right;font-size:0.78em;margin:2px 4px 0;",
           tags$a(href="javascript:void(0)", onclick="goToNotes('notes-ebs')",
             style="color:#888;text-decoration:none;",
@@ -700,7 +715,7 @@ function ebsUntranslateCards(containerId) {
         )
       ),
 
-      tabPanel("EBSニュース（海外）", icon=icon("globe"),
+      tabPanel("国外", icon=icon("globe"),
         tags$div(style="text-align:right;font-size:0.78em;margin:2px 4px 0;",
           tags$a(href="javascript:void(0)", onclick="goToNotes('notes-ebs-overseas')",
             style="color:#888;text-decoration:none;",
@@ -736,7 +751,7 @@ function ebsUntranslateCards(containerId) {
         )
       ),
 
-      tabPanel("EBS Trends", icon=icon("arrow-trend-up"),
+      tabPanel("EBSトレンド", icon=icon("arrow-trend-up"),
         tags$div(style="text-align:right;font-size:0.78em;margin:2px 4px 0;",
           tags$a(href="javascript:void(0)", onclick="goToNotes('notes-ebs-trends')",
             style="color:#888;text-decoration:none;",
@@ -754,10 +769,13 @@ function ebsUntranslateCards(containerId) {
             plotlyOutput("gtrends_plot", height="400px")
           )
         )
+      )
+
+      ) # sub_ebs
       ),
 
-      # ── 入院サーベイランス（IDWR週報PDF）────────────────────
-      tabPanel("入院サーベイランス", icon=icon("bed-pulse"),
+      # ── 重症サーベイランス（入院、IDWR週報PDF）────────────────
+      tabPanel("重症サーベイランス（入院）", icon=icon("bed-pulse"),
         tags$div(style="text-align:right;font-size:0.78em;margin:2px 4px 0;",
           tags$a(href="javascript:void(0)", onclick="goToNotes('notes-hosp')",
             style="color:#888;text-decoration:none;",
@@ -778,7 +796,10 @@ function ebsUntranslateCards(containerId) {
         downloadButton("hosp_table_dl", "CSVダウンロード", class="btn-sm", style="margin-top:8px;")
       ),
 
-      # ── 病原体検出（IASR）────────────────────────────────
+      # ── 病原体報告サーベイランス ───────────────────────────
+      tabPanel("病原体報告サーベイランス", icon=icon("flask"),
+      tabsetPanel(id="sub_pathogen", type="tabs",
+
       tabPanel("病原体検出", icon=icon("flask"),
         tags$div(style="text-align:right;font-size:0.78em;margin:2px 4px 0;",
           tags$a(href="javascript:void(0)", onclick="goToNotes('notes-iasr')",
@@ -875,9 +896,15 @@ function ebsUntranslateCards(containerId) {
             DTOutput("ari_table", height="300px")
           )
         )
+      )
+
+      ) # sub_pathogen
       ),
 
-      # ── 文献（PubMed）────────────────────────────────────
+      # ── その他 ────────────────────────────────────────────
+      tabPanel("その他", icon=icon("ellipsis"),
+      tabsetPanel(id="sub_other", type="tabs",
+
       tabPanel("文献", icon=icon("book-open"),
         fluidRow(
           column(3,
@@ -901,14 +928,6 @@ function ebsUntranslateCards(containerId) {
         )
       ),
 
-      # ── データテーブル ────────────────────────────────────
-      tabPanel("データ", icon=icon("table"),
-        tags$div(style="margin-bottom:10px;",
-          downloadButton("download_csv", "CSVダウンロード", class="btn-sm btn-default")
-        ),
-        DTOutput("data_table")
-      ),
-
       # ── Notes ────────────────────────────────────────────
       tabPanel("Notes", icon=icon("circle-info"),
         tags$div(style="padding:20px;max-width:960px;font-size:0.9em;line-height:1.8;",
@@ -926,21 +945,37 @@ function ebsUntranslateCards(containerId) {
 
           # ── タブ構成 ──────────────────────────────────────
           tags$h4("■ タブ構成", style="border-bottom:2px solid #7f8c8d;padding-bottom:4px;color:#2c3e50;"),
+          tags$p(style="font-size:0.85em;color:#888;margin-bottom:6px;",
+            "関連するタブを6つのグループにまとめ、グループ内はサブタブで切り替えます。"),
           tags$ul(
-            tags$li(tags$strong("活動レベル一覧（疾患別）:"), "サイドバーで選択中の都道府県・表示モードについて、全疾患の統合活動レベルをタイル表示"),
-            tags$li(tags$strong("活動レベル一覧（都道府県別）:"), "選択中の疾患について、全47都道府県の統合活動レベルをデフォルメ日本地図上にタイル表示"),
-            tags$li(tags$strong("地域別比較:"), "都道府県別コロプレスマップ（直近週）＋都道府県ランキング＋都道府県別ヒートマップ＋地域別比較（定点把握。週次/月次報告に対応）"),
-            tags$li(tags$strong("流行曲線:"), "週次報告数推移・年別重ね合わせ（定点把握・全数把握）／月次報告数推移・年別重ね合わせ（月報疾患：性感染症・薬剤耐性菌）"),
-            tags$li(tags$strong("複数疾患比較（定点）:"), "複数疾患の定点報告数を重ね合わせ表示"),
-            tags$li(tags$strong("実効再生産数 Rt:"), "Cori法によるRt推定"),
-            tags$li(tags$strong("EBSニュース（国内・海外）:"), "報道・行政発表等のニュース記事をシグナルレベル別に一覧表示"),
-            tags$li(tags$strong("EBS Trends:"), "EBSニュースとGoogle Trendsを統合した短期トレンド評価"),
-            tags$li(tags$strong("入院サーベイランス:"), "IDWR週報PDFに基づく、インフルエンザ・新型コロナウイルス感染症の入院患者数の推移"),
-            tags$li(tags$strong("病原体検出:"), "IASR（病原微生物検出情報）に基づく病原体検出状況"),
-            tags$li(tags$strong("ARI病原体:"), "ARIサーベイランス週報に基づく病原体別報告数・陽性率（グラフ画像からの近似値）"),
-            tags$li(tags$strong("文献:"), "PubMed収載論文の一覧"),
-            tags$li(tags$strong("データ:"), "現在の絞り込み条件に基づく表形式データとCSVダウンロード"),
-            tags$li(tags$strong("Notes:"), "このページ（データソース・算出方法・注意事項の説明）")
+            tags$li(tags$strong("活動レベル一覧:"),
+              tags$ul(
+                tags$li(tags$strong("疾患別:"), "サイドバーで選択中の都道府県・表示モードについて、全疾患の統合活動レベルをタイル表示"),
+                tags$li(tags$strong("都道府県別:"), "選択中の疾患について、全47都道府県の統合活動レベルをデフォルメ日本地図上にタイル表示")
+              )),
+            tags$li(tags$strong("患者報告サーベイランス:"),
+              tags$ul(
+                tags$li(tags$strong("地域別比較:"), "都道府県別コロプレスマップ（直近週）＋都道府県ランキング＋都道府県別ヒートマップ＋地域別比較（定点把握。週次/月次報告に対応）"),
+                tags$li(tags$strong("流行曲線:"), "週次報告数推移・年別重ね合わせ（定点把握・全数把握）／月次報告数推移・年別重ね合わせ（月報疾患：性感染症・薬剤耐性菌）。CSVダウンロードもこのタブ内で可能"),
+                tags$li(tags$strong("複数疾患比較（定点）:"), "複数疾患の定点報告数を重ね合わせ表示"),
+                tags$li(tags$strong("実効再生産数 Rt:"), "Cori法によるRt推定")
+              )),
+            tags$li(tags$strong("病原体報告サーベイランス:"),
+              tags$ul(
+                tags$li(tags$strong("病原体検出:"), "IASR（病原微生物検出情報）に基づく病原体検出状況"),
+                tags$li(tags$strong("ARI病原体:"), "ARIサーベイランス週報に基づく病原体別報告数・陽性率（グラフ画像からの近似値）")
+              )),
+            tags$li(tags$strong("重症サーベイランス（入院）:"), "IDWR週報PDFに基づく、インフルエンザ・新型コロナウイルス感染症の入院患者数の推移"),
+            tags$li(tags$strong("EBS:"),
+              tags$ul(
+                tags$li(tags$strong("国内・国外:"), "報道・行政発表等のニュース記事をシグナルレベル別に一覧表示"),
+                tags$li(tags$strong("EBSトレンド:"), "EBSニュースとGoogle Trendsを統合した短期トレンド評価")
+              )),
+            tags$li(tags$strong("その他:"),
+              tags$ul(
+                tags$li(tags$strong("文献:"), "PubMed収載論文の一覧"),
+                tags$li(tags$strong("Notes:"), "このページ（データソース・算出方法・注意事項の説明）")
+              ))
           ),
           tags$br(),
 
@@ -1499,6 +1534,9 @@ function ebsUntranslateCards(containerId) {
             )
           )
         )
+      )
+
+      ) # sub_other
       )
     ),
 
@@ -3535,7 +3573,8 @@ server <- function(input, output, session) {
   observeEvent(input$pref_tile_click, {
     req(input$pref_tile_click$pref)
     updateSelectInput(session, "pref_filter", selected = input$pref_tile_click$pref)
-    updateTabsetPanel(session, "main_tabs", selected = "流行曲線")
+    updateTabsetPanel(session, "main_tabs", selected = "患者報告サーベイランス")
+    updateTabsetPanel(session, "sub_patient", selected = "流行曲線")
   })
 
   # 疾患別タイルクリック → 表示モード・疾患を切り替えて流行曲線タブへ移動
@@ -3549,7 +3588,8 @@ server <- function(input, output, session) {
       updateRadioButtons(session, "ts_mode", selected = "teiten")
       updateSelectInput(session, "disease", selected = input$disease_tile_click$id)
     }
-    updateTabsetPanel(session, "main_tabs", selected = "流行曲線")
+    updateTabsetPanel(session, "main_tabs", selected = "患者報告サーベイランス")
+    updateTabsetPanel(session, "sub_patient", selected = "流行曲線")
   })
 
   # ── 入院サーベイランス（IDWR週報PDF）──────────────────────
@@ -5804,20 +5844,6 @@ server <- function(input, output, session) {
                疾患名, `定点あたり報告数`, 警戒レベル) %>%
         arrange(desc(年), desc(週), desc(`定点あたり報告数`))
     }
-  })
-
-  output$data_table <- renderDT({
-    is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
-    d <- data_tab_df()
-    dt <- datatable(d, filter="top", rownames=FALSE,
-      options=list(pageLength=20, scrollX=TRUE,
-        language=list(url="//cdn.datatables.net/plug-ins/1.13.6/i18n/ja.json")))
-    if (!is_zensu && "警戒レベル" %in% names(d)) {
-      dt <- dt %>% formatStyle("警戒レベル", backgroundColor=styleEqual(
-        c("警戒（レベル3）","注意（レベル2）","流行期（レベル1）","基準以下"),
-        c("#fadbd8","#fdebd0","#fef9e7","#d5f5e3")))
-    }
-    dt
   })
 
   output$download_csv <- downloadHandler(
