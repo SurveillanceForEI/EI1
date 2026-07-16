@@ -170,6 +170,26 @@ EBS_SOURCES <- list(
        url="https://www.pref.hokkaido.lg.jp/news/oshirase/rss.xml"),
   list(id="pref_aichi",    name="愛知県",              lang="ja", category="行政",
        url="https://www.pref.aichi.jp/rss/10/list1.xml"),
+  list(id="pref_mie",      name="三重県（報道発表）",  lang="ja", category="行政",
+       url="https://www.pref.mie.lg.jp/app/rss/hodo_rss"),
+  list(id="pref_shizuoka", name="静岡県",              lang="ja", category="行政",
+       url="https://www.pref.shizuoka.jp/news.rss"),
+  list(id="pref_fukushima",name="福島県",              lang="ja", category="行政",
+       url="https://www.pref.fukushima.lg.jp/rss/10/list1.xml"),
+  list(id="pref_gunma",    name="群馬県",              lang="ja", category="行政",
+       url="https://www.pref.gunma.jp/rss/10/list1.xml"),
+  list(id="pref_niigata",  name="新潟県",              lang="ja", category="行政",
+       url="https://www.pref.niigata.lg.jp/rss/10/list1.xml"),
+  list(id="pref_gifu",     name="岐阜県",              lang="ja", category="行政",
+       url="https://www.pref.gifu.lg.jp/rss/10/list1.xml"),
+  list(id="pref_shiga",    name="滋賀県",              lang="ja", category="行政",
+       url="https://www.pref.shiga.lg.jp/file/rss/kensei_koho_e-shinbun_oshirase_index.rss"),
+  list(id="pref_aomori",   name="青森県",              lang="ja", category="行政",
+       url="https://www.pref.aomori.lg.jp/rss/feed.rss"),
+  list(id="pref_iwate",    name="岩手県",              lang="ja", category="行政",
+       url="https://www.pref.iwate.jp/news.rss"),
+  # 宮城・秋田・山形・栃木・千葉・富山・石川・福井・山梨・長野・茨城・京都・大阪・神奈川・
+  # 福岡ほか未確認の都道府県、および政令指定都市・中核市（保健所設置自治体）は継続調査中
   # ── 国際機関 ───────────────────────────────────────────────
   # who_donはRSS(https://www.who.int/feeds/entity/csr/don/en/rss.xml)が廃止(404)されたため、
   # EBS_SOURCESには含めずJSON API経由のfetch_who_don()で個別取得する（fetch_who_eiosと同様のパターン）
