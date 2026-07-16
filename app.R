@@ -357,7 +357,8 @@ function survCollectState() {
     if (el) s[id] = el.value;
   });
   // チェックボックス
-  ["ebs_recent_only","ebs_show_pubmed","ebs_ov_recent_only"].forEach(function(id) {
+  ["ebs_recent_only","ebs_show_pubmed","ebs_ov_recent_only",
+   "ebs_official_only","ebs_ov_official_only"].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) s[id] = el.checked;
   });
@@ -832,7 +833,12 @@ function ebsUntranslateCards(containerId) {
               icon=icon("list"), class="btn btn-default btn-sm",
               style="width:100%;margin-top:4px;"),
             tags$div(style="font-size:0.75em;color:#888;margin-top:4px;line-height:1.4;",
-              "押すと疾患フィルターを解除して全疾患の記事を表示します")
+              "押すと疾患フィルターを解除して全疾患の記事を表示します"),
+            checkboxInput("ebs_official_only",
+              tags$span(icon("landmark"), " 公式情報のみ表示"),
+              value = FALSE),
+            tags$div(style="font-size:0.75em;color:#888;margin-top:-8px;line-height:1.4;",
+              "厚労省・都道府県等の自治体公式サイトからの情報のみに絞り込みます")
           ),
           column(9,
             uiOutput("ebs_signal_summary"),
@@ -866,6 +872,11 @@ function ebsUntranslateCards(containerId) {
               style="width:100%;margin-top:4px;"),
             tags$div(style="font-size:0.75em;color:#888;margin-top:4px;line-height:1.4;",
               "押すと疾患フィルターを解除して全疾患の記事を表示します"),
+            checkboxInput("ebs_ov_official_only",
+              tags$span(icon("landmark"), " 公式情報のみ表示"),
+              value = FALSE),
+            tags$div(style="font-size:0.75em;color:#888;margin-top:-8px;line-height:1.4;",
+              "WHO・海外保健当局等の公式サイトからの情報のみに絞り込みます"),
             tags$div(style="font-size:0.8em;color:#888;margin-top:8px;",
               icon("info-circle"),
               " 流行トレンド評価には含まれません。都道府県フィルタ対象外。")
@@ -891,7 +902,7 @@ function ebsUntranslateCards(containerId) {
         fluidRow(
           column(12,
             # ── EBS 日別記事数チャート ──
-            tags$div(class="data-source-bar", "EBSニュース 日別シグナル数（過去60日）"),
+            tags$div(class="data-source-bar", "国内EBSニュース 日別シグナル数（過去60日）"),
             plotlyOutput("ebs_daily_chart", height="220px"),
             tags$hr(),
             # ── Google Trends ──
@@ -1331,6 +1342,16 @@ function ebsUntranslateCards(containerId) {
                       tags$td("―"))
             )
           ),
+          tags$h5("公式情報のみ表示フィルタ"),
+          tags$ul(
+            tags$li("国内・海外タブそれぞれのサイドバーにある「公式情報のみ表示」チェックボックスで、",
+                    "行政機関・国際機関の公式サイト/公式RSSから取得した記事のみに絞り込めます"),
+            tags$li("対象: 厚生労働省・JIHS・全47都道府県の公式サイト、WHO・ECDC・UKHSA・ロベルトコッホ研究所・",
+                    "台湾/中国CDC・香港CHP等の海外公的機関"),
+            tags$li("対象外（公式情報として扱わない）: NHK・新聞社等の報道機関、Google Newsによる",
+                    "ニュース集約、PubMed（学術論文）、SNS"),
+            tags$li("公式情報源からの記事にはカード上に", tags$strong("「公式」"), "バッジが表示されます")
+          ),
           tags$h5("都道府県判定（EBSニュース（国内））"),
           tags$ul(
             tags$li("メディア名・URL → 都道府県マッピング（例: 神奈川新聞→神奈川県）"),
@@ -1682,6 +1703,8 @@ server <- function(input, output, session) {
       updateCheckboxInput(session, "ebs_recent_only", value = isTRUE(s$ebs_recent_only))
     if (!is.null(s$ebs_show_pubmed))
       updateCheckboxInput(session, "ebs_show_pubmed", value = isTRUE(s$ebs_show_pubmed))
+    if (!is.null(s$ebs_official_only))
+      updateCheckboxInput(session, "ebs_official_only", value = isTRUE(s$ebs_official_only))
     if (!is.null(s$ebs_page_size))
       updateSelectInput(session, "ebs_page_size", selected = s$ebs_page_size)
     # EBSニュース（海外）
@@ -1691,6 +1714,8 @@ server <- function(input, output, session) {
       updateSelectInput(session, "ebs_ov_disease", selected = s$ebs_ov_disease)
     if (!is.null(s$ebs_ov_recent_only))
       updateCheckboxInput(session, "ebs_ov_recent_only", value = isTRUE(s$ebs_ov_recent_only))
+    if (!is.null(s$ebs_ov_official_only))
+      updateCheckboxInput(session, "ebs_ov_official_only", value = isTRUE(s$ebs_ov_official_only))
     if (!is.null(s$ebs_ov_page_size))
       updateSelectInput(session, "ebs_ov_page_size", selected = s$ebs_ov_page_size)
     # 複数疾患比較
@@ -4753,6 +4778,9 @@ server <- function(input, output, session) {
                               if ("source_id" %in% names(.)) source_id else "",
                               if ("source_name" %in% names(.)) source_name else ""))
     d <- d %>% filter(is.na(source_id) | source_id != "pubmed")
+    if (isTRUE(input$ebs_official_only)) {
+      d <- d %>% filter(is_official_ebs_source(source_id))
+    }
     if (!ebs_show_all_flag()) {
       did <- sidebar_disease_id()
       if (!is.null(did) && did != "すべて")
@@ -4996,7 +5024,12 @@ server <- function(input, output, session) {
         tags$div(style="font-size:0.80em;color:#888;margin:4px 0;",
           tags$span(style="font-weight:600;",
             if (!is.na(row$source_id) && row$source_id == "who_eios") "Other Source" else row$source_name
-          )," • ",
+          ),
+          if (!is.na(row$source_id) && is_official_ebs_source(row$source_id))
+            tags$span(style=paste0("display:inline-block;background:#2980b9;color:#fff;",
+              "border-radius:3px;padding:0 5px;font-size:0.7em;font-weight:700;margin-left:5px;"),
+              icon("landmark"), " 公式"),
+          " • ",
           tags$span(if (is.na(row$pub_date)) tags$span(style="color:#e67e22;","日付不明") else format(row$pub_date,"%Y-%m-%d")),
           sns_info),
         if(!is.na(row$summary)&&nchar(row$summary)>0)
@@ -5029,6 +5062,9 @@ server <- function(input, output, session) {
              if ("source_name" %in% names(.)) source_name else "")
     )
     d <- d %>% filter(is.na(source_id) | source_id != "pubmed")
+    if (isTRUE(input$ebs_ov_official_only)) {
+      d <- d %>% filter(is_official_ebs_source(source_id))
+    }
     if (!ebs_ov_show_all_flag()) {
       did <- sidebar_disease_id()
       if (!is.null(did) && did != "すべて")
@@ -5143,7 +5179,12 @@ server <- function(input, output, session) {
         tags$div(style="font-size:0.80em;color:#888;margin:4px 0;",
           tags$span(style="font-weight:600;",
             if (!is.na(row$source_id) && row$source_id == "who_eios") "Other Source" else row$source_name
-          ), " • ",
+          ),
+          if (!is.na(row$source_id) && is_official_ebs_source(row$source_id))
+            tags$span(style=paste0("display:inline-block;background:#2980b9;color:#fff;",
+              "border-radius:3px;padding:0 5px;font-size:0.7em;font-weight:700;margin-left:5px;"),
+              icon("landmark"), " 公式"),
+          " • ",
           tags$span(if (is.na(row$pub_date)) tags$span(style="color:#e67e22;","日付不明") else format(row$pub_date, "%Y-%m-%d"))
         ),
         if (!is.na(row$summary) && nchar(row$summary) > 0)

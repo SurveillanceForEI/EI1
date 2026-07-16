@@ -149,6 +149,22 @@ is_overseas_article <- function(title, summary, ebs_pref = NA, source_id = "", s
   !has_japan && (has_overseas || media_has_overseas || media_non_japanese_script)
 }
 
+# ── 公式情報源判定 ────────────────────────────────────────
+# 都道府県(pref_*)は全て自治体公式サイトからの直接取得のため一律公式扱いとする。
+# それ以外は行政機関・国際機関・国際保健機関の公式サイト/公式RSSのみを列挙する
+# （報道機関・ニュース集約(Google News)・学術論文(PubMed)・SNSは公式情報源に含めない）。
+# who_eiosはWHOのツールだが、世界中の一般メディア記事を自動収集するアグリゲーターであり
+# WHO自身が発信した公式情報ではないため、あえて公式情報源には含めない
+OFFICIAL_EBS_SOURCE_IDS <- c(
+  "mhlw", "jihs", "cdc", "reliefweb", "rki", "ukhsa", "nicd",
+  "taiwan_cdc", "china_cdc", "chp", "spf", "who_don"
+)
+
+is_official_ebs_source <- function(source_id) {
+  sid <- tolower(trimws(as.character(source_id)))
+  !is.na(sid) & (grepl("^pref_", sid) | sid %in% OFFICIAL_EBS_SOURCE_IDS)
+}
+
 # ── 固定RSSフィード ────────────────────────────────────────
 EBS_SOURCES <- list(
   # ── 日本・行政 ─────────────────────────────────────────────
