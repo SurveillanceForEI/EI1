@@ -172,6 +172,12 @@ EBS_SOURCES <- list(
        url="https://www.gov.uk/government/organisations/uk-health-security-agency.atom"),
   list(id="rki",     name="Robert Koch-Institut（独）", lang="de", category="国際",
        url="https://www.rki.de/SiteGlobals/Functions/RSS/RSS-neue-Dokumente.xml?nn=16777276"),
+  list(id="nicd",    name="NICD（南アフリカ）",         lang="en", category="国際",
+       url="https://www.nicd.ac.za/feed/"),
+  # santepubliquefrance（仏）はRSS未提供のため、EBS_SOURCESには含めず
+  # fetch_france_spf_news()で個別取得する
+  # iss（伊）はWAFにより取得不可（Request Rejected）、brazil/saudi/turkeyも
+  # WAFブロック・SharePoint SPA・告知内容が調達/人事中心で信号として不適切等の理由で見送り
   # ── 東・東南アジア ────────────────────────────────────────
   list(id="taiwan_cdc", name="台湾 CDC（衛生福利部疾病管制署）", lang="zh", category="国際",
        url="https://www.cdc.gov.tw/RSS/RssXml/Hh094B49-DRwe2RR4eFfrQ?type=1"),
@@ -808,6 +814,48 @@ fetch_chp_news <- function(timeout_sec = 20, n_results = 20) {
   }, finally = {
     if (!is.null(b)) tryCatch(b$close(), error = function(e) NULL)
   })
+}
+
+# ============================================================
+# フランス Santé publique France「Les actualités」（HTMLスクレイピング。RSS(index.php/rss)
+# はHTMLページへのリダイレクトになっており機能していないため、記事一覧ページを直接解析する）
+# ============================================================
+SPF_NEWS_URL <- "https://www.santepubliquefrance.fr/les-actualites"
+
+fetch_france_spf_news <- function(timeout_sec = 15, n_results = 20) {
+  message("Santé publique France 取得中...")
+  tryCatch({
+    resp <- GET(SPF_NEWS_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) {
+      message("SPF: HTTP ", status_code(resp)); return(NULL)
+    }
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    cards <- xml_find_all(doc,
+      "//div[contains(concat(' ', normalize-space(@class), ' '), ' node--type-article ')]")
+    if (length(cards) == 0) return(NULL)
+
+    rows <- lapply(cards, function(card) {
+      title <- trimws(xml_text(xml_find_first(card, ".//h3[contains(@class,'record__body__title')]")))
+      date_str <- xml_attr(xml_find_first(card, ".//time"), "datetime")
+      a <- xml_find_first(card, ".//a[contains(@class,'record__footer__link')]")
+      href <- xml_attr(a, "href")
+      if (nchar(title) == 0 || is.na(date_str) || is.na(href)) return(NULL)
+      d <- suppressWarnings(as.Date(substr(date_str, 1, 10)))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "spf",
+        source_name = "Santé publique France",
+        category    = "国際",
+        lang        = "fr",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.santepubliquefrance.fr", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("SPF エラー: ", e$message); NULL })
 }
 
 # ============================================================
@@ -3086,6 +3134,14 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
     if (!"retweet_count" %in% names(chp)) chp$retweet_count <- NA_integer_
     if (!"like_count"    %in% names(chp)) chp$like_count    <- NA_integer_
     all_df <- bind_rows(all_df, chp)
+  }
+
+  # Santé publique France（HTMLスクレイピング）
+  spf <- tryCatch(fetch_france_spf_news(), error = function(e) NULL)
+  if (!is.null(spf) && nrow(spf) > 0) {
+    if (!"retweet_count" %in% names(spf)) spf$retweet_count <- NA_integer_
+    if (!"like_count"    %in% names(spf)) spf$like_count    <- NA_integer_
+    all_df <- bind_rows(all_df, spf)
   }
 
   # Google News
