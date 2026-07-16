@@ -216,8 +216,30 @@ EBS_SOURCES <- list(
        url="https://www.pref.nagano.lg.jp/chumoku/chumoku.xml"),
   list(id="pref_miyazaki", name="宮崎県（記者発表）",  lang="ja", category="行政",
        url="https://www.pref.miyazaki.lg.jp/kisha/hodo.xml"),
-  # 秋田・栃木・富山・石川・福井・茨城・京都・大阪・神奈川・和歌山・佐賀・長崎・香川・高知・
-  # 徳島は未確認、政令指定都市・中核市（保健所設置自治体）は継続調査中
+  list(id="pref_miyagi",   name="宮城県（報道発表）",  lang="ja", category="行政",
+       url="https://www.pref.miyagi.jp/release/release.xml"),
+  list(id="pref_yamagata", name="山形県",              lang="ja", category="行政",
+       url="https://www.pref.yamagata.jp/shinchaku/shinchaku.xml"),
+  list(id="pref_toyama",   name="富山県",              lang="ja", category="行政",
+       url="https://www.pref.toyama.jp/shinchaku/shinchaku.xml"),
+  list(id="pref_ishikawa", name="石川県",              lang="ja", category="行政",
+       url="https://www.pref.ishikawa.lg.jp/shinchaku/shinchaku.xml"),
+  list(id="pref_kyoto",    name="京都府（報道発表）",  lang="ja", category="行政",
+       url="https://www.pref.kyoto.jp/press/press.xml"),
+  list(id="pref_osaka",    name="大阪府",              lang="ja", category="行政",
+       url="https://www.pref.osaka.lg.jp/shinchaku/shinchaku.xml"),
+  list(id="pref_kanagawa", name="神奈川県",            lang="ja", category="行政",
+       url="https://www.pref.kanagawa.jp/news/news.xml"),
+  list(id="pref_tokushima",name="徳島県（健康・感染症）",lang="ja", category="行政",
+       url="https://www.pref.tokushima.lg.jp/file/rss/ippannokata_kenko_kansensho_index.rss"),
+  list(id="pref_tochigi",  name="栃木県（報道発表）",  lang="ja", category="行政",
+       url="https://www.pref.tochigi.lg.jp/kensei/kouhou/houdou/houdou.xml"),
+  list(id="pref_ibaraki",  name="茨城県",              lang="ja", category="行政",
+       url="https://www.pref.ibaraki.jp/news.xml"),
+  list(id="pref_kagawa",   name="香川県",              lang="ja", category="行政",
+       url="https://www.pref.kagawa.lg.jp/shinchaku.xml"),
+  # 秋田・福井・奈良・和歌山・高知・福岡・佐賀・長崎は未確認、
+  # 政令指定都市・中核市（保健所設置自治体）は継続調査中
   # ── 国際機関 ───────────────────────────────────────────────
   # who_donはRSS(https://www.who.int/feeds/entity/csr/don/en/rss.xml)が廃止(404)されたため、
   # EBS_SOURCESには含めずJSON API経由のfetch_who_don()で個別取得する（fetch_who_eiosと同様のパターン）
