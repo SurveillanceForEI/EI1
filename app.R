@@ -785,24 +785,28 @@ function ebsUntranslateCards(containerId) {
 
       # ── 重症サーベイランス（入院、IDWR週報PDF）────────────────
       tabPanel("重症サーベイランス", icon=icon("bed-pulse"),
-        tags$div(style="text-align:right;font-size:0.78em;margin:2px 4px 0;",
-          tags$a(href="javascript:void(0)", onclick="goToNotes('notes-hosp')",
-            style="color:#888;text-decoration:none;",
-            icon("circle-info"), " 注意事項・データソース")),
-        fluidRow(style="margin:8px 0 4px;",
-          column(4,
-            checkboxGroupInput("hosp_disease", "対象疾患",
-              choices = c("インフルエンザ" = "flu", "新型コロナウイルス感染症" = "covid"),
-              selected = c("flu", "covid"))
-          )
-        ),
-        tags$div(class="data-source-bar", "基幹定点 入院サーベイランス — 週次入院患者報告数"),
-        uiOutput("hosp_last_updated"),
-        plotlyOutput("hosp_plot", height="380px"),
-        uiOutput("hosp_legend"),
-        tags$hr(),
-        DTOutput("hosp_table"),
-        downloadButton("hosp_table_dl", "CSVダウンロード", class="btn-sm", style="margin-top:8px;")
+      tabsetPanel(id="sub_severe", type="tabs",
+        tabPanel("入院サーベイランス",
+          tags$div(style="text-align:right;font-size:0.78em;margin:2px 4px 0;",
+            tags$a(href="javascript:void(0)", onclick="goToNotes('notes-hosp')",
+              style="color:#888;text-decoration:none;",
+              icon("circle-info"), " 注意事項・データソース")),
+          fluidRow(style="margin:8px 0 4px;",
+            column(4,
+              checkboxGroupInput("hosp_disease", "対象疾患",
+                choices = c("インフルエンザ" = "flu", "新型コロナウイルス感染症" = "covid"),
+                selected = c("flu", "covid"))
+            )
+          ),
+          tags$div(class="data-source-bar", "基幹定点 入院サーベイランス — 週次入院患者報告数"),
+          uiOutput("hosp_last_updated"),
+          plotlyOutput("hosp_plot", height="380px"),
+          uiOutput("hosp_legend"),
+          tags$hr(),
+          DTOutput("hosp_table"),
+          downloadButton("hosp_table_dl", "CSVダウンロード", class="btn-sm", style="margin-top:8px;")
+        )
+      ) # sub_severe
       ),
 
       # ── EBS ──────────────────────────────────────────────
@@ -966,7 +970,10 @@ function ebsUntranslateCards(containerId) {
                 tags$li(tags$strong("病原体検出:"), "IASR（病原微生物検出情報）に基づく病原体検出状況"),
                 tags$li(tags$strong("ARI病原体:"), "ARIサーベイランス週報に基づく病原体別報告数・陽性率（グラフ画像からの近似値）")
               )),
-            tags$li(tags$strong("重症サーベイランス:"), "IDWR週報PDFに基づく、インフルエンザ・新型コロナウイルス感染症の入院患者数の推移"),
+            tags$li(tags$strong("重症サーベイランス:"),
+              tags$ul(
+                tags$li(tags$strong("入院サーベイランス:"), "IDWR週報PDFに基づく、インフルエンザ・新型コロナウイルス感染症の入院患者数の推移")
+              )),
             tags$li(tags$strong("EBS:"),
               tags$ul(
                 tags$li(tags$strong("国内・国外:"), "報道・行政発表等のニュース記事をシグナルレベル別に一覧表示"),
