@@ -167,6 +167,11 @@ EBS_SOURCES <- list(
        url="https://tools.cdc.gov/api/v2/resources/media/316422.rss"),
   list(id="reliefweb", name="ReliefWeb (Japan)",     lang="en", category="国際",
        url="https://reliefweb.int/updates/rss.xml?primary_country=JPN"),
+  # ── G20（欧州） ────────────────────────────────────────────
+  list(id="ukhsa",   name="UK Health Security Agency", lang="en", category="国際",
+       url="https://www.gov.uk/government/organisations/uk-health-security-agency.atom"),
+  list(id="rki",     name="Robert Koch-Institut（独）", lang="de", category="国際",
+       url="https://www.rki.de/SiteGlobals/Functions/RSS/RSS-neue-Dokumente.xml?nn=16777276"),
   # ── 東・東南アジア ────────────────────────────────────────
   list(id="taiwan_cdc", name="台湾 CDC（衛生福利部疾病管制署）", lang="zh", category="国際",
        url="https://www.cdc.gov.tw/RSS/RssXml/Hh094B49-DRwe2RR4eFfrQ?type=1"),
