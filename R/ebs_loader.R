@@ -958,6 +958,134 @@ fetch_france_spf_news <- function(timeout_sec = 15, n_results = 20) {
 }
 
 # ============================================================
+# 秋田県 報道発表資料（HTMLスクレイピング。RSS未提供のため年度別ページを直接解析する。
+# 年度が変わると新しいgenre IDのページが作られるため、親ページ(genre/11699)から
+# 「報道発表」を含むリンクのうち末尾の数字が最大のもの＝最新年度を動的に特定する）
+# ============================================================
+AKITA_PRESS_INDEX_URL <- "https://www.pref.akita.lg.jp/pages/genre/11699"
+
+fetch_akita_press_news <- function(timeout_sec = 15, n_results = 20) {
+  message("秋田県 報道発表資料 取得中...")
+  tryCatch({
+    idx_resp <- GET(AKITA_PRESS_INDEX_URL, timeout(timeout_sec),
+                     add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(idx_resp) != 200) return(NULL)
+    idx_doc <- read_html(content(idx_resp, "text", encoding = "UTF-8"))
+    links <- xml_find_all(idx_doc, "//a[contains(text(),'報道発表')]")
+    if (length(links) == 0) return(NULL)
+    hrefs <- xml_attr(links, "href")
+    ids <- suppressWarnings(as.integer(regmatches(hrefs, regexpr("\\d+$", hrefs))))
+    latest_url <- hrefs[which.max(ids)]
+    if (is.na(latest_url)) return(NULL)
+
+    resp <- GET(latest_url, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    items <- xml_find_all(doc, "//li[contains(@class,'c-list__item')]")
+    if (length(items) == 0) return(NULL)
+
+    rows <- lapply(items, function(li) {
+      a <- xml_find_first(li, ".//a")
+      title <- trimws(xml_text(a))
+      href  <- xml_attr(a, "href")
+      date_str <- xml_attr(xml_find_first(li, ".//time"), "datetime")
+      if (nchar(title) == 0 || is.na(date_str)) return(NULL)
+      d <- suppressWarnings(as.Date(date_str))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "pref_akita",
+        source_name = "秋田県（報道発表）",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.pref.akita.lg.jp", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>%
+      arrange(desc(pub_date)) %>% head(n_results)
+  }, error = function(e) { message("秋田県 エラー: ", e$message); NULL })
+}
+
+# ============================================================
+# 奈良県 報道発表（HTMLスクレイピング。RSS未提供のため記事一覧ページを直接解析する）
+# ============================================================
+NARA_PRESS_URL <- "https://www.pref.nara.lg.jp/press/index.html"
+
+fetch_nara_press_news <- function(timeout_sec = 15, n_results = 20) {
+  message("奈良県 報道発表 取得中...")
+  tryCatch({
+    resp <- GET(NARA_PRESS_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    items <- xml_find_all(doc, "//li[.//a and .//span]")
+    if (length(items) == 0) return(NULL)
+
+    rows <- lapply(items, function(li) {
+      date_str <- trimws(xml_text(xml_find_first(li, ".//span")))
+      a <- xml_find_first(li, ".//a")
+      title <- trimws(xml_text(a))
+      href  <- xml_attr(a, "href")
+      if (nchar(title) == 0 || is.na(href)) return(NULL)
+      d <- suppressWarnings(as.Date(gsub("年|月", "-", gsub("日", "", date_str)), format = "%Y-%m-%d"))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "pref_nara",
+        source_name = "奈良県（報道発表）",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.pref.nara.lg.jp", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("奈良県 エラー: ", e$message); NULL })
+}
+
+# ============================================================
+# 佐賀県 報道発表・広報（HTMLスクレイピング。RSS未提供のため記事一覧ページを直接解析する）
+# ============================================================
+SAGA_PRESS_URL <- "https://www.pref.saga.lg.jp/list00693.html"
+
+fetch_saga_press_news <- function(timeout_sec = 15, n_results = 20) {
+  message("佐賀県 報道発表・広報 取得中...")
+  tryCatch({
+    resp <- GET(SAGA_PRESS_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    blocks <- xml_find_all(doc, "//div[contains(@class,'mainblock')]")
+    if (length(blocks) == 0) return(NULL)
+
+    rows <- lapply(blocks, function(b) {
+      date_str <- trimws(xml_text(xml_find_first(b, ".//span[contains(@class,'upddate')]")))
+      a <- xml_find_first(b, ".//div[contains(@class,'title')]//a")
+      title <- trimws(xml_text(a))
+      href  <- xml_attr(a, "href")
+      if (nchar(title) == 0 || is.na(href)) return(NULL)
+      d <- suppressWarnings(as.Date(gsub("更新", "", date_str), format = "%Y年%m月%d日"))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "pref_saga",
+        source_name = "佐賀県（報道発表・広報）",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.pref.saga.lg.jp/", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("佐賀県 エラー: ", e$message); NULL })
+}
+
+# ============================================================
 # PubMed E-utilities — アウトブレイク関連論文取得（APIキー不要）
 # ============================================================
 PUBMED_QUERIES <- c(
@@ -3241,6 +3369,16 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
     if (!"retweet_count" %in% names(spf)) spf$retweet_count <- NA_integer_
     if (!"like_count"    %in% names(spf)) spf$like_count    <- NA_integer_
     all_df <- bind_rows(all_df, spf)
+  }
+
+  # 秋田県・奈良県・佐賀県 報道発表（HTMLスクレイピング）
+  for (fn in list(fetch_akita_press_news, fetch_nara_press_news, fetch_saga_press_news)) {
+    d <- tryCatch(fn(), error = function(e) NULL)
+    if (!is.null(d) && nrow(d) > 0) {
+      if (!"retweet_count" %in% names(d)) d$retweet_count <- NA_integer_
+      if (!"like_count"    %in% names(d)) d$like_count    <- NA_integer_
+      all_df <- bind_rows(all_df, d)
+    }
   }
 
   # Google News
