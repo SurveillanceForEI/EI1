@@ -23,6 +23,7 @@ source("R/ebs_rule_screening.R")   # ebs_loader より先にロード（screen_e
 source("R/ebs_loader.R")
 source("R/zensu_loader.R")
 source("R/iasr_loader.R")
+source("R/ari_pathogen_loader.R")
 source("R/hosp_loader.R")
 source("R/std_loader.R")
 source("R/change_tracker.R")
@@ -170,6 +171,12 @@ cat("IASR データ取得中...\n")
 IASR_DATA <- tryCatch(load_all_iasr(), error=function(e) { message("IASR ERROR:", e$message); NULL })
 tryCatch(
   record_data_change("iasr", compute_recent_signature(IASR_DATA, "date", 180)),
+  error = function(e) NULL
+)
+cat("ARI病原体 データ読み込み中（キャッシュ）...\n")
+ARI_PATHOGEN_DATA <- tryCatch(load_ari_pathogen_cached(), error=function(e) { message("ARI病原体 ERROR:", e$message); NULL })
+tryCatch(
+  record_data_change("ari_pathogen", compute_recent_signature(ARI_PATHOGEN_DATA$counts, "date", 180)),
   error = function(e) NULL
 )
 cat("入院サーベイランス データ読み込み中（キャッシュ）...\n")
@@ -825,6 +832,40 @@ function ebsUntranslateCards(containerId) {
         )
       ),
 
+      # ── ARI病原体（急性呼吸器感染症サーベイランス週報）──────────
+      tabPanel("ARI病原体", icon=icon("virus"),
+        tags$div(style="text-align:right;font-size:0.78em;margin:2px 4px 0;",
+          tags$a(href="javascript:void(0)", onclick="goToNotes('notes-ari-pathogen')",
+            style="color:#888;text-decoration:none;",
+            icon("circle-info"), " 注意事項・データソース")),
+        tags$div(style="font-size:0.75em;color:#a15c00;background:#fff8e6;border:1px solid #f0d38a;border-radius:4px;padding:6px 10px;margin:4px;",
+          icon("triangle-exclamation"), " このタブのグラフはJIHS ARIサーベイランス週報PDFに掲載された",
+          "グラフ画像を色解析により数値化した近似値です。元データの数値表は公表されていないため、",
+          "特に色調の近い亜型間では誤差が生じる場合があります。正確な値は",
+          tags$a(href="https://id-info.jihs.go.jp/surveillance/idss/target-diseases/acute-respiratory-infection/weekly-report/index.html",
+                 target="_blank", "JIHS公式週報PDF"), "をご確認ください。"),
+        fluidRow(style="margin:8px 4px 4px;",
+          column(12, uiOutput("ari_last_updated"))
+        ),
+        fluidRow(column(12,
+          tags$h5("検体採取週ごとの病原体別報告数", style="font-weight:700;margin-bottom:2px"),
+          plotlyOutput("ari_count_plot", height="420px")
+        )),
+        fluidRow(column(12,
+          tags$h5("検体採取週ごとの病原体別陽性率", style="font-weight:700;margin-top:16px"),
+          plotlyOutput("ari_positivity_plot", height="340px")
+        )),
+        fluidRow(style="margin-top:8px;",
+          column(12,
+            div(style="text-align:right; margin-bottom:4px;",
+              downloadButton("ari_table_dl", "CSVダウンロード",
+                             class="btn-xs btn-default", icon=icon("download"))
+            ),
+            DTOutput("ari_table", height="300px")
+          )
+        )
+      ),
+
       # ── 文献（PubMed）────────────────────────────────────
       tabPanel("文献", icon=icon("book-open"),
         fluidRow(
@@ -885,6 +926,7 @@ function ebsUntranslateCards(containerId) {
             tags$li(tags$strong("EBS Trends:"), "EBSニュースとGoogle Trendsを統合した短期トレンド評価"),
             tags$li(tags$strong("入院サーベイランス:"), "IDWR週報PDFに基づく、インフルエンザ・新型コロナウイルス感染症の入院患者数の推移"),
             tags$li(tags$strong("病原体検出:"), "IASR（病原微生物検出情報）に基づく病原体検出状況"),
+            tags$li(tags$strong("ARI病原体:"), "ARIサーベイランス週報に基づく病原体別報告数・陽性率（グラフ画像からの近似値）"),
             tags$li(tags$strong("文献:"), "PubMed収載論文の一覧"),
             tags$li(tags$strong("データ:"), "現在の絞り込み条件に基づく表形式データとCSVダウンロード"),
             tags$li(tags$strong("Notes:"), "このページ（データソース・算出方法・注意事項の説明）")
@@ -1396,6 +1438,28 @@ function ebsUntranslateCards(containerId) {
           ),
           tags$br(),
 
+          # ── ARI病原体 ────────────────────────────────────────
+          tags$h4(id="notes-ari-pathogen", "■ ARI病原体タブ", style="border-bottom:2px solid #16a085;padding-bottom:4px;color:#2c3e50;"),
+          tags$h5("データソース"),
+          tags$p("急性呼吸器感染症（ARI）サーベイランス週報　国立健康危機管理研究機構（JIHS）"),
+          tags$ul(
+            tags$li("ARI病原体定点（基幹定点）における検体採取週ごとの病原体別報告数・陽性率"),
+            tags$li(tags$a(href="https://id-info.jihs.go.jp/surveillance/idss/target-diseases/acute-respiratory-infection/weekly-report/index.html",
+                           target="_blank", "JIHS ARIサーベイランス週報（原本PDF）")),
+            tags$li("データ更新: 毎日午前3時に最新週報PDFを自動取得・再集計")
+          ),
+          tags$h5("注意事項（重要）"),
+          tags$ul(
+            tags$li(tags$strong("このタブの数値は近似値です。"), "週報PDFには図（グラフ画像）のみが掲載され、",
+                    "元データの数値表は公表されていません。グラフをレンダリングした画像を、凡例の色と照合して",
+                    "数値化（ピクセル解析）しているため、元の値と完全には一致しない場合があります"),
+            tags$li("特に色調の近い亜型間（パラインフルエンザウイルス1〜4型、RSウイルスA/B/型不明、",
+                    "インフルエンザ各亜型など）では、誤差が生じやすい点にご留意ください"),
+            tags$li("報告週ではなく検体採取週で集計。集計時点における報告数のため、過去の週報と値が変わる場合があります"),
+            tags$li("正確な数値が必要な場合は、必ず出典元のJIHS公式週報PDFをご確認ください")
+          ),
+          tags$br(),
+
           # ── データ更新スケジュール ─────────────────────────
           tags$h4("■ データ更新スケジュール", style="border-bottom:2px solid #1abc9c;padding-bottom:4px;color:#2c3e50;"),
           tags$table(class="table table-bordered table-sm", style="font-size:0.85em;",
@@ -1406,7 +1470,8 @@ function ebsUntranslateCards(containerId) {
               tags$tr(tags$td("EBSニュース"), tags$td("毎日 03:00 自動（1年キャッシュ）"), tags$td("各RSS・Google News")),
               tags$tr(tags$td("Google Trends"), tags$td("毎日 03:00 自動"), tags$td("gtrendsR API")),
               tags$tr(tags$td("病原体検出（IASR）"), tags$td("毎日 03:00 自動（24時間キャッシュ）"), tags$td("JIHS IASR")),
-              tags$tr(tags$td("入院サーベイランス"), tags$td("毎日 03:00 自動（直近3号分を再取得）"), tags$td("JIHS IDWR週報PDF"))
+              tags$tr(tags$td("入院サーベイランス"), tags$td("毎日 03:00 自動（直近3号分を再取得）"), tags$td("JIHS IDWR週報PDF")),
+              tags$tr(tags$td("ARI病原体"), tags$td("毎日 03:00 自動（最新週報を再取得）"), tags$td("JIHS ARIサーベイランス週報PDF"))
             )
           ),
           tags$br(),
@@ -3792,6 +3857,97 @@ server <- function(input, output, session) {
         pivot_wider(names_from = label, values_from = count, values_fill = 0L) %>%
         arrange(virus)
       write.csv(d_wide, file, row.names=FALSE, fileEncoding="UTF-8-BOM")
+    }
+  )
+
+  # ── ARI病原体（急性呼吸器感染症サーベイランス週報）────────
+  output$ari_last_updated <- renderUI({
+    if (file.exists(ARI_DATA_CACHE))
+      tags$span(style="font-size:0.78em;color:#888;",
+        paste0("更新: ", format(file.mtime(ARI_DATA_CACHE), "%m/%d %H:%M")))
+    else tags$span(style="font-size:0.78em;color:#888;", "未取得")
+  })
+
+  ari_count_filtered <- reactive({
+    if (is.null(ARI_PATHOGEN_DATA) || is.null(ARI_PATHOGEN_DATA$counts)) return(NULL)
+    d <- ARI_PATHOGEN_DATA$counts
+    dr <- input$date_range
+    if (!is.null(dr) && length(dr) == 2) d <- d %>% filter(date >= dr[1], date <= dr[2])
+    d
+  })
+
+  output$ari_count_plot <- renderPlotly({
+    d <- ari_count_filtered()
+    if (is.null(d) || nrow(d) == 0)
+      return(plot_ly() %>% add_annotations(text = "データなし", showarrow = FALSE))
+    d <- d %>% mutate(category = factor(category, levels = rev(ARI_COUNT_ORDER)))
+    p <- plot_ly()
+    for (cat_id in ARI_COUNT_ORDER) {
+      dd <- d %>% filter(category == cat_id)
+      if (nrow(dd) == 0) next
+      p <- p %>% add_bars(data = dd, x = ~date, y = ~reports,
+        name = ARI_COUNT_LABELS[[cat_id]],
+        marker = list(color = ARI_COUNT_LEGEND[[cat_id]]),
+        hovertemplate = paste0(ARI_COUNT_LABELS[[cat_id]], "　%{x|%Y-%m-%d}: %{y}件<extra></extra>"))
+    }
+    p %>% layout(
+      barmode = "stack",
+      xaxis = list(title = "検体採取週", showgrid = FALSE, type = "date"),
+      yaxis = list(title = "報告数（件）", gridcolor = "#eee"),
+      legend = list(orientation = "h", y = -0.25, font = list(size = 9)),
+      hovermode = "x unified",
+      plot_bgcolor = "#fff", paper_bgcolor = "#fff",
+      margin = list(t = 10, b = 40, l = 60, r = 20)
+    )
+  })
+
+  output$ari_positivity_plot <- renderPlotly({
+    if (is.null(ARI_PATHOGEN_DATA) || is.null(ARI_PATHOGEN_DATA$positivity))
+      return(plot_ly() %>% add_annotations(text = "データなし", showarrow = FALSE))
+    d <- ARI_PATHOGEN_DATA$positivity
+    dr <- input$date_range
+    if (!is.null(dr) && length(dr) == 2) d <- d %>% filter(date >= dr[1], date <= dr[2])
+    if (nrow(d) == 0)
+      return(plot_ly() %>% add_annotations(text = "データなし", showarrow = FALSE))
+    p <- plot_ly()
+    for (cat_id in names(ARI_POS_LEGEND)) {
+      dd <- d %>% filter(category == cat_id) %>% arrange(date)
+      if (nrow(dd) == 0) next
+      p <- p %>% add_trace(data = dd, x = ~date, y = ~positivity, type = "scatter", mode = "lines+markers",
+        name = ARI_POS_LABELS[[cat_id]],
+        line = list(color = ARI_POS_LEGEND[[cat_id]], width = 2),
+        marker = list(color = ARI_POS_LEGEND[[cat_id]], size = 5),
+        hovertemplate = paste0(ARI_POS_LABELS[[cat_id]], "　%{x|%Y-%m-%d}: %{y:.1f}%<extra></extra>"))
+    }
+    p %>% layout(
+      xaxis = list(title = "検体採取週", showgrid = FALSE, type = "date"),
+      yaxis = list(title = "陽性率（%）", gridcolor = "#eee", rangemode = "nonnegative"),
+      legend = list(orientation = "h", y = -0.25),
+      hovermode = "x unified",
+      plot_bgcolor = "#fff", paper_bgcolor = "#fff",
+      margin = list(t = 10, b = 40, l = 60, r = 20)
+    )
+  })
+
+  output$ari_table <- renderDT({
+    d <- ari_count_filtered()
+    if (is.null(d) || nrow(d) == 0) return(datatable(data.frame()))
+    d %>%
+      mutate(疾患名 = ARI_COUNT_LABELS[category]) %>%
+      select(年 = year, 週 = week, 検体採取週 = date, 病原体 = 疾患名, 報告数 = reports) %>%
+      arrange(desc(検体採取週), desc(報告数)) %>%
+      datatable(options = list(pageLength = 20, dom = "tip"), rownames = FALSE)
+  })
+
+  output$ari_table_dl <- downloadHandler(
+    filename = function() paste0("ARI病原体_", Sys.Date(), ".csv"),
+    content = function(file) {
+      d <- ari_count_filtered()
+      if (is.null(d) || nrow(d) == 0) { write.csv(data.frame(), file, row.names = FALSE); return() }
+      out <- d %>%
+        mutate(疾患名 = ARI_COUNT_LABELS[category]) %>%
+        select(年 = year, 週 = week, 検体採取週 = date, 病原体 = 疾患名, 報告数 = reports)
+      write.csv(out, file, row.names = FALSE, fileEncoding = "UTF-8-BOM")
     }
   )
 

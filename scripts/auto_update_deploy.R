@@ -101,6 +101,10 @@ tryCatch({
     "data/cache_hosp/std_data.rds"
   else character(0)
 
+  ari_data_file <- if (file.exists("data/cache_ari/ari_pathogen_data.rds"))
+    "data/cache_ari/ari_pathogen_data.rds"
+  else character(0)
+
   app_files <- c(
     "app.R",
     "R/ebs_loader.R",
@@ -112,6 +116,7 @@ tryCatch({
     "R/iasr_loader.R",
     "R/hosp_loader.R",
     "R/std_loader.R",
+    "R/ari_pathogen_loader.R",
     "R/correlation.R",
     "R/change_tracker.R",
     "R/forecast_ts.R",
@@ -125,7 +130,8 @@ tryCatch({
     cache_zensu_files,
     cache_iasr_files,
     hosp_data_file,
-    std_data_file
+    std_data_file,
+    ari_data_file
   )
 
   rsconnect::deployApp(

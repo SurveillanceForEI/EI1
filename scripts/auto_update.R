@@ -30,6 +30,7 @@ source("R/zensu_loader.R", local = FALSE)
 source("R/ebs_loader.R",   local = FALSE)
 source("R/hosp_loader.R",  local = FALSE)
 source("R/std_loader.R",   local = FALSE)
+source("R/ari_pathogen_loader.R", local = FALSE)
 
 dir.create("data",       showWarnings = FALSE)
 dir.create("data/cache", showWarnings = FALSE)
@@ -98,6 +99,16 @@ tryCatch({
   else
     log("月報疾患データ: データなし")
 }, error = function(e) log("月報疾患データ エラー: ", e$message))
+
+# ⑥ ARI病原体（急性呼吸器感染症サーベイランス週報PDF）
+log("ARI病原体データ取得中...")
+tryCatch({
+  d <- update_ari_pathogen_data()
+  if (!is.null(d) && !is.null(d$counts) && nrow(d$counts) > 0)
+    log("ARI病原体データ完了: ", nrow(d$counts), " 行")
+  else
+    log("ARI病原体データ: データなし")
+}, error = function(e) log("ARI病原体データ エラー: ", e$message))
 
 log("===== 自動更新完了 =====")
 
