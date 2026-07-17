@@ -291,6 +291,10 @@ EBS_SOURCES <- list(
   # fetch_kawaguchi_news()（index.update.json、100件）に切り替えて個別取得する
   list(id="city_hachioji",   name="八王子市",   lang="ja", category="行政",
        url="https://www.city.hachioji.tokyo.jp/topnewsrss.xml"),
+  list(id="city_iwaki",      name="いわき市",   lang="ja", category="行政",
+       url="https://www.city.iwaki.lg.jp/www/rss/news.rdf"),
+  list(id="city_kofu",       name="甲府市",     lang="ja", category="行政",
+       url="https://www.city.kofu.yamanashi.jp/shinchaku.xml"),
   list(id="city_aomori",     name="青森市",     lang="ja", category="行政",
        url="https://www.city.aomori.aomori.jp/news.rss"),
   list(id="city_morioka",    name="盛岡市",     lang="ja", category="行政",
@@ -2404,6 +2408,45 @@ fetch_kawaguchi_news <- function(timeout_sec = 15, n_results = 20) {
   message("川口市 新着情報 取得中...")
   .fetch_index_update_json_news("https://www.city.kawaguchi.lg.jp", "city_kawaguchi", "川口市",
                                  timeout_sec, n_results)
+}
+
+# ============================================================
+# 船橋市 新着情報一覧（HTMLスクレイピング。RSS未提供のため記事一覧ページを直接解析する。
+# 日付がタイトル末尾に"(令和X(YYYY)年M月D日)"形式で埋め込まれている）
+# ============================================================
+FUNABASHI_NEWS_URL <- "https://www.city.funabashi.lg.jp/information/news.html"
+
+fetch_funabashi_news <- function(timeout_sec = 15, n_results = 20) {
+  message("船橋市 新着情報 取得中...")
+  tryCatch({
+    resp <- GET(FUNABASHI_NEWS_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    items <- xml_find_all(doc, "//li[a]")
+    if (length(items) == 0) return(NULL)
+
+    rows <- lapply(items, function(li) {
+      a <- xml_find_first(li, ".//a")
+      title <- trimws(xml_text(a))
+      href  <- xml_attr(a, "href")
+      m <- regmatches(title, regexec("令和\\d+\\((\\d{4})\\)年(\\d{1,2})月(\\d{1,2})日\\)$", title, perl = TRUE))[[1]]
+      if (length(m) < 4 || nchar(title) == 0 || is.na(href)) return(NULL)
+      d <- suppressWarnings(as.Date(sprintf("%s-%02d-%02d", m[2], as.integer(m[3]), as.integer(m[4]))))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "city_funabashi",
+        source_name = "船橋市",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.city.funabashi.lg.jp", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("船橋市 エラー: ", e$message); NULL })
 }
 
 # ============================================================
@@ -4702,7 +4745,8 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
                    fetch_maebashi_news, fetch_koshigaya_news, fetch_kashiwa_news,
                    fetch_fukui_city_news, fetch_nagano_city_news, fetch_takamatsu_news,
                    fetch_tsukuba_news, fetch_kanazawa_news, fetch_otsu_news, fetch_matsue_news,
-                   fetch_neyagawa_news, fetch_hachinohe_news, fetch_saga_news, fetch_kawaguchi_news)) {
+                   fetch_neyagawa_news, fetch_hachinohe_news, fetch_saga_news, fetch_kawaguchi_news,
+                   fetch_funabashi_news)) {
     d <- tryCatch(fn(), error = function(e) NULL)
     if (!is.null(d) && nrow(d) > 0) {
       if (!"retweet_count" %in% names(d)) d$retweet_count <- NA_integer_
