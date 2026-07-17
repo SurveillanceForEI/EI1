@@ -1981,6 +1981,106 @@ fetch_utsunomiya_news <- function(timeout_sec = 15, n_results = 20) {
 }
 
 # ============================================================
+# 旭川市 記者発表（HTMLスクレイピング。RSS未提供のため、年度別インデックスページから
+# 最新の「令和X年度の記者発表一覧」を動的に特定してから記事一覧を解析する。
+# 各記事タイトル末尾に"（令和X年M月D日）"が埋め込まれている）
+# ============================================================
+ASAHIKAWA_PRESS_INDEX_URL <- "https://www.city.asahikawa.hokkaido.jp/700/723/735/index.html"
+
+fetch_asahikawa_news <- function(timeout_sec = 15, n_results = 20) {
+  message("旭川市 記者発表 取得中...")
+  tryCatch({
+    idx_resp <- GET(ASAHIKAWA_PRESS_INDEX_URL, timeout(timeout_sec),
+                     add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(idx_resp) != 200) return(NULL)
+    idx_doc <- read_html(content(idx_resp, "text", encoding = "UTF-8"))
+    links <- xml_find_all(idx_doc, "//a[contains(text(),'年度の記者発表一覧')]")
+    if (length(links) == 0) return(NULL)
+    hrefs <- xml_attr(links, "href")
+    ids <- suppressWarnings(as.integer(regmatches(hrefs, regexpr("(?<=/d)\\d+(?=\\.html$)", hrefs, perl = TRUE))))
+    latest_url <- hrefs[which.max(ids)]
+    if (is.na(latest_url)) return(NULL)
+    if (!grepl("^https?://", latest_url)) latest_url <- paste0("https://www.city.asahikawa.hokkaido.jp", latest_url)
+
+    resp <- GET(latest_url, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    items <- xml_find_all(doc, "//div[contains(@class,'article')]//li[a]")
+    if (length(items) == 0) return(NULL)
+
+    rows <- lapply(items, function(li) {
+      a <- xml_find_first(li, ".//a")
+      title <- trimws(xml_text(a))
+      href  <- xml_attr(a, "href")
+      m <- regmatches(title, regexec("令和(\\d+)年(\\d{1,2})月(\\d{1,2})日", title))[[1]]
+      if (length(m) < 4 || nchar(title) == 0 || is.na(href)) return(NULL)
+      gyear <- as.integer(m[2]) + 2018
+      d <- suppressWarnings(as.Date(sprintf("%d-%02d-%02d", gyear, as.integer(m[3]), as.integer(m[4]))))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "city_asahikawa",
+        source_name = "旭川市（記者発表）",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.city.asahikawa.hokkaido.jp", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("旭川市 エラー: ", e$message); NULL })
+}
+
+# ============================================================
+# 函館市 新着情報（HTMLスクレイピング。RSS未提供のため記事一覧ページを直接解析する。
+# <h2 class="date">YYYY年M月D日</h2>の直後の<ul>に記事一覧が続く構造のため、
+# .scan_date_grouped_articles()で処理する）
+# ============================================================
+HAKODATE_NEWS_URL <- "https://www.city.hakodate.hokkaido.jp/docs/"
+
+fetch_hakodate_news <- function(timeout_sec = 15, n_results = 20) {
+  message("函館市 新着情報 取得中...")
+  tryCatch({
+    resp <- GET(HAKODATE_NEWS_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+
+    parse_date <- function(txt) {
+      m <- regmatches(txt, regexec("(\\d{4})年(\\d{1,2})月(\\d{1,2})日", txt))[[1]]
+      if (length(m) < 4) return(as.Date(NA))
+      suppressWarnings(as.Date(sprintf("%s-%02d-%02d", m[2], as.integer(m[3]), as.integer(m[4]))))
+    }
+    grouped <- .scan_date_grouped_articles(
+      doc,
+      "//div[contains(@class,'docs')]/h2[contains(@class,'date')]",
+      "//div[contains(@class,'docs')]/ul/li//a",
+      parse_date
+    )
+    if (length(grouped) == 0) return(NULL)
+
+    rows <- lapply(grouped, function(g) {
+      title <- trimws(xml_text(g$node))
+      href  <- xml_attr(g$node, "href")
+      if (nchar(title) == 0 || is.na(href)) return(NULL)
+      tibble(
+        source_id   = "city_hakodate",
+        source_name = "函館市",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.city.hakodate.hokkaido.jp", href),
+        pub_date    = g$date,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("函館市 エラー: ", e$message); NULL })
+}
+
+# ============================================================
 # PubMed E-utilities — アウトブレイク関連論文取得（APIキー不要）
 # ============================================================
 PUBMED_QUERIES <- c(
@@ -4272,7 +4372,7 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
                    fetch_sakai_news, fetch_kawasaki_news, fetch_kitakyushu_news,
                    fetch_yokohama_news, fetch_kobe_news, fetch_fukuoka_kansen_news,
                    fetch_saitama_news, fetch_osaka_city_news, fetch_niigata_news, fetch_kumamoto_news,
-                   fetch_koriyama_news, fetch_utsunomiya_news)) {
+                   fetch_koriyama_news, fetch_utsunomiya_news, fetch_asahikawa_news, fetch_hakodate_news)) {
     d <- tryCatch(fn(), error = function(e) NULL)
     if (!is.null(d) && nrow(d) > 0) {
       if (!"retweet_count" %in% names(d)) d$retweet_count <- NA_integer_
