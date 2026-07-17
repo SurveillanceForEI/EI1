@@ -150,9 +150,10 @@ is_overseas_article <- function(title, summary, ebs_pref = NA, source_id = "", s
 }
 
 # ── 公式情報源判定 ────────────────────────────────────────
-# 都道府県(pref_*)は全て自治体公式サイトからの直接取得のため一律公式扱いとする。
-# それ以外は行政機関・国際機関・国際保健機関の公式サイト/公式RSSのみを列挙する
-# （報道機関・ニュース集約(Google News)・学術論文(PubMed)・SNSは公式情報源に含めない）。
+# 都道府県(pref_*)・政令指定都市/中核市等の自治体(city_*)は全て自治体公式サイトからの
+# 直接取得のため一律公式扱いとする。それ以外は行政機関・国際機関・国際保健機関の
+# 公式サイト/公式RSSのみを列挙する（報道機関・ニュース集約(Google News)・
+# 学術論文(PubMed)・SNSは公式情報源に含めない）。
 # who_eiosはWHOのツールだが、世界中の一般メディア記事を自動収集するアグリゲーターであり
 # WHO自身が発信した公式情報ではないため、あえて公式情報源には含めない
 OFFICIAL_EBS_SOURCE_IDS <- c(
@@ -162,7 +163,7 @@ OFFICIAL_EBS_SOURCE_IDS <- c(
 
 is_official_ebs_source <- function(source_id) {
   sid <- tolower(trimws(as.character(source_id)))
-  !is.na(sid) & (grepl("^pref_", sid) | sid %in% OFFICIAL_EBS_SOURCE_IDS)
+  !is.na(sid) & (grepl("^pref_", sid) | grepl("^city_", sid) | sid %in% OFFICIAL_EBS_SOURCE_IDS)
 }
 
 # ── 固定RSSフィード ────────────────────────────────────────
@@ -257,7 +258,28 @@ EBS_SOURCES <- list(
   list(id="pref_kochi",    name="高知県（新着情報）",  lang="ja", category="行政",
        url="https://www.pref.kochi.lg.jp/category/kubun/news/index.atom"),
   # 福井はRSS未提供のためHTMLスクレイピング経由のfetch_fukui_news()で個別取得する
-  # 政令指定都市・中核市（保健所設置自治体）は継続調査中
+  # ── 政令指定都市（保健所設置自治体） ─────────────────────
+  list(id="city_sapporo",    name="札幌市（報道発表資料）", lang="ja", category="行政",
+       url="https://www.city.sapporo.jp/somu/koho/hodo/houdou.xml"),
+  list(id="city_sendai",     name="仙台市",                 lang="ja", category="行政",
+       url="https://www.city.sendai.jp/shinchaku.xml"),
+  list(id="city_chiba",      name="千葉市",                 lang="ja", category="行政",
+       url="https://www.city.chiba.jp/shinchaku.xml"),
+  list(id="city_sagamihara", name="相模原市",               lang="ja", category="行政",
+       url="https://www.city.sagamihara.kanagawa.jp/rss.rss"),
+  list(id="city_hamamatsu",  name="浜松市",                 lang="ja", category="行政",
+       url="https://www.city.hamamatsu.shizuoka.jp/oshirase/oshirase.xml"),
+  list(id="city_nagoya",     name="名古屋市",               lang="ja", category="行政",
+       url="https://www.city.nagoya.jp/news.rss"),
+  list(id="city_kyoto",      name="京都市",                 lang="ja", category="行政",
+       url="https://www.city.kyoto.lg.jp/main/rss/rss_new.xml"),
+  list(id="city_okayama",    name="岡山市",                 lang="ja", category="行政",
+       url="https://www.city.okayama.jp/rss/rss.xml"),
+  list(id="city_hiroshima",  name="広島市",                 lang="ja", category="行政",
+       url="https://www.city.hiroshima.lg.jp/news.rss"),
+  # 堺市はRSS未提供のためHTMLスクレイピング経由のfetch_sakai_news()で個別取得する
+  # さいたま市・横浜市・川崎市・新潟市・静岡市・大阪市・神戸市・北九州市・福岡市・熊本市は
+  # 未確認、中核市（保健所設置自治体）は継続調査中
   # ── 国際機関 ───────────────────────────────────────────────
   # who_donはRSS(https://www.who.int/feeds/entity/csr/don/en/rss.xml)が廃止(404)されたため、
   # EBS_SOURCESには含めずJSON API経由のfetch_who_don()で個別取得する（fetch_who_eiosと同様のパターン）
@@ -1256,6 +1278,46 @@ fetch_fukui_news <- function(timeout_sec = 15, n_results = 20) {
     })
     bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
   }, error = function(e) { message("福井県 エラー: ", e$message); NULL })
+}
+
+# ============================================================
+# 堺市 新着情報一覧（HTMLスクレイピング。RSS未提供のため記事一覧ページを直接解析する。
+# 日付は要素属性ではなく<li>テキスト先頭に"YYYY年M月D日"形式で埋め込まれている）
+# ============================================================
+SAKAI_NEWS_URL <- "https://www.city.sakai.lg.jp/newlist/index.html"
+
+fetch_sakai_news <- function(timeout_sec = 15, n_results = 20) {
+  message("堺市 新着情報 取得中...")
+  tryCatch({
+    resp <- GET(SAKAI_NEWS_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    items <- xml_find_all(doc, "//div[contains(@class,'wysiwyg_wp')]//li[a]")
+    if (length(items) == 0) return(NULL)
+
+    rows <- lapply(items, function(li) {
+      a <- xml_find_first(li, ".//a")
+      title <- trimws(xml_text(a))
+      href  <- xml_attr(a, "href")
+      li_text <- xml_text(li)
+      m <- regmatches(li_text, regexpr("\\d{4}年\\d{1,2}月\\d{1,2}日", li_text))
+      if (nchar(title) == 0 || is.na(href) || length(m) == 0) return(NULL)
+      d <- suppressWarnings(as.Date(gsub("年|月", "-", gsub("日", "", m)), format = "%Y-%m-%d"))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "city_sakai",
+        source_name = "堺市",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.city.sakai.lg.jp", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("堺市 エラー: ", e$message); NULL })
 }
 
 # ============================================================
@@ -3546,7 +3608,8 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
 
   # 秋田県・奈良県・佐賀県・和歌山県・福岡県・長崎県・福井県 報道発表（HTMLスクレイピング）
   for (fn in list(fetch_akita_press_news, fetch_nara_press_news, fetch_saga_press_news,
-                   fetch_wakayama_news, fetch_fukuoka_news, fetch_nagasaki_news, fetch_fukui_news)) {
+                   fetch_wakayama_news, fetch_fukuoka_news, fetch_nagasaki_news, fetch_fukui_news,
+                   fetch_sakai_news)) {
     d <- tryCatch(fn(), error = function(e) NULL)
     if (!is.null(d) && nrow(d) > 0) {
       if (!"retweet_count" %in% names(d)) d$retweet_count <- NA_integer_
