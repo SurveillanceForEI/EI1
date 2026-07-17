@@ -2331,22 +2331,22 @@ fetch_takamatsu_news <- function(timeout_sec = 15, n_results = 20) {
 # ============================================================
 # つくば市 新着情報（JSON API。新着情報一覧ページ(news_list.html)はJavaScriptで
 # index.update.jsonを取得して動的に描画する構造のため、静的HTML/RSSでは記事一覧を
-# 取得できない。ブラウザの通信を確認しこのJSON APIを発見し直接取得する）
+# 取得できない。ブラウザの通信を確認しこのJSON APIを発見。同一のCMSベンダーを利用する
+# 複数の自治体（金沢市・大津市・松江市・寝屋川市・八戸市等）で共通のため汎用関数化する）
 # ============================================================
-TSUKUBA_UPDATE_JSON_URL <- "https://www.city.tsukuba.lg.jp/index.update.json"
-
-fetch_tsukuba_news <- function(timeout_sec = 15, n_results = 20) {
-  message("つくば市 新着情報 取得中...")
+.fetch_index_update_json_news <- function(base_url, source_id, source_name,
+                                           timeout_sec = 15, n_results = 20) {
   tryCatch({
-    resp <- GET(TSUKUBA_UPDATE_JSON_URL, timeout(timeout_sec),
+    url <- paste0(sub("/$", "", base_url), "/index.update.json")
+    resp <- GET(url, timeout(timeout_sec),
                 add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
     if (status_code(resp) != 200) return(NULL)
     items <- jsonlite::fromJSON(content(resp, "text", encoding = "UTF-8"), simplifyDataFrame = TRUE)
     if (is.null(items) || nrow(items) == 0) return(NULL)
 
     tibble(
-      source_id   = "city_tsukuba",
-      source_name = "つくば市",
+      source_id   = source_id,
+      source_name = source_name,
       category    = "行政",
       lang        = "ja",
       title       = items$page_name,
@@ -2355,7 +2355,43 @@ fetch_tsukuba_news <- function(timeout_sec = 15, n_results = 20) {
       summary     = NA_character_
     ) %>% filter(!is.na(title), nchar(title) > 0, !is.na(link)) %>%
       distinct(link, .keep_all = TRUE) %>% head(n_results)
-  }, error = function(e) { message("つくば市 エラー: ", e$message); NULL })
+  }, error = function(e) { message(source_name, " エラー: ", e$message); NULL })
+}
+
+fetch_tsukuba_news <- function(timeout_sec = 15, n_results = 20) {
+  message("つくば市 新着情報 取得中...")
+  .fetch_index_update_json_news("https://www.city.tsukuba.lg.jp", "city_tsukuba", "つくば市",
+                                 timeout_sec, n_results)
+}
+
+fetch_kanazawa_news <- function(timeout_sec = 15, n_results = 20) {
+  message("金沢市 新着情報 取得中...")
+  .fetch_index_update_json_news("https://www4.city.kanazawa.lg.jp", "city_kanazawa", "金沢市",
+                                 timeout_sec, n_results)
+}
+
+fetch_otsu_news <- function(timeout_sec = 15, n_results = 20) {
+  message("大津市 新着情報 取得中...")
+  .fetch_index_update_json_news("https://www.city.otsu.lg.jp", "city_otsu", "大津市",
+                                 timeout_sec, n_results)
+}
+
+fetch_matsue_news <- function(timeout_sec = 15, n_results = 20) {
+  message("松江市 新着情報 取得中...")
+  .fetch_index_update_json_news("https://www.city.matsue.lg.jp", "city_matsue", "松江市",
+                                 timeout_sec, n_results)
+}
+
+fetch_neyagawa_news <- function(timeout_sec = 15, n_results = 20) {
+  message("寝屋川市 新着情報 取得中...")
+  .fetch_index_update_json_news("https://www.city.neyagawa.osaka.jp", "city_neyagawa", "寝屋川市",
+                                 timeout_sec, n_results)
+}
+
+fetch_hachinohe_news <- function(timeout_sec = 15, n_results = 20) {
+  message("八戸市 新着情報 取得中...")
+  .fetch_index_update_json_news("https://www.city.hachinohe.aomori.jp", "city_hachinohe", "八戸市",
+                                 timeout_sec, n_results)
 }
 
 # ============================================================
@@ -4653,7 +4689,8 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
                    fetch_koriyama_news, fetch_utsunomiya_news, fetch_asahikawa_news, fetch_hakodate_news,
                    fetch_maebashi_news, fetch_koshigaya_news, fetch_kashiwa_news,
                    fetch_fukui_city_news, fetch_nagano_city_news, fetch_takamatsu_news,
-                   fetch_tsukuba_news)) {
+                   fetch_tsukuba_news, fetch_kanazawa_news, fetch_otsu_news, fetch_matsue_news,
+                   fetch_neyagawa_news, fetch_hachinohe_news)) {
     d <- tryCatch(fn(), error = function(e) NULL)
     if (!is.null(d) && nrow(d) > 0) {
       if (!"retweet_count" %in% names(d)) d$retweet_count <- NA_integer_
