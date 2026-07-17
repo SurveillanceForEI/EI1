@@ -297,8 +297,18 @@ EBS_SOURCES <- list(
        url="https://www.city.morioka.iwate.jp/news.rss"),
   list(id="city_yokosuka",   name="横須賀市",   lang="ja", category="行政",
        url="https://www.city.yokosuka.kanagawa.jp/shinchaku.xml"),
-  # 旭川・函館・前橋・越谷・柏ほか大多数の中核市は未確認（継続調査中）。
-  # 郡山市は接続不能、宇都宮市はSSL証明書期限切れのためこのPC環境から取得不可
+  list(id="city_matsumoto",  name="松本市",     lang="ja", category="行政",
+       url="https://www.city.matsumoto.nagano.jp/rss/10/list1.xml"),
+  list(id="city_toyohashi",  name="豊橋市",     lang="ja", category="行政",
+       url="https://www.city.toyohashi.lg.jp/services/rdf/rss10/11280.xml"),
+  list(id="city_toyota",     name="豊田市",     lang="ja", category="行政",
+       url="https://www.city.toyota.aichi.jp/news.rss"),
+  list(id="city_gifu",       name="岐阜市",     lang="ja", category="行政",
+       url="https://www.city.gifu.lg.jp/news.rss"),
+  # 旭川・函館・前橋・越谷・柏・金沢・大津・富山・岡崎ほか大多数の中核市は未確認（継続調査中）。
+  # 郡山市は接続不能だったがユーザー提供URLで解決済み（fetch_koriyama_news参照）、
+  # 宇都宮市はSSL証明書期限切れと思われたが実際はブラウザ確認で静的HTML取得可能と判明
+  # （fetch_utsunomiya_news参照）
   # ── 国際機関 ───────────────────────────────────────────────
   # who_donはRSS(https://www.who.int/feeds/entity/csr/don/en/rss.xml)が廃止(404)されたため、
   # EBS_SOURCESには含めずJSON API経由のfetch_who_don()で個別取得する（fetch_who_eiosと同様のパターン）
