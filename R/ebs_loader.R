@@ -2214,6 +2214,121 @@ fetch_kashiwa_news <- function(timeout_sec = 15, n_results = 20) {
 }
 
 # ============================================================
+# 福井市 新着一覧（HTMLスクレイピング。RSS未提供のため記事一覧ページを直接解析する）
+# ============================================================
+FUKUI_CITY_NEWS_URL <- "https://www.city.fukui.lg.jp/news.html"
+
+fetch_fukui_city_news <- function(timeout_sec = 15, n_results = 20) {
+  message("福井市 新着一覧 取得中...")
+  tryCatch({
+    resp <- GET(FUKUI_CITY_NEWS_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    items <- xml_find_all(doc, "//li[.//span[contains(@class,'date')]]")
+    if (length(items) == 0) return(NULL)
+
+    rows <- lapply(items, function(li) {
+      date_str <- trimws(xml_text(xml_find_first(li, ".//span[contains(@class,'date')]")))
+      a <- xml_find_first(li, ".//span[contains(@class,'title')]//a")
+      title <- trimws(xml_text(a))
+      href  <- xml_attr(a, "href")
+      if (nchar(title) == 0 || is.na(href) || nchar(date_str) == 0) return(NULL)
+      d <- suppressWarnings(as.Date(gsub("年|月", "-", gsub("日", "", date_str)), format = "%Y-%m-%d"))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "city_fukui2",
+        source_name = "福井市",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.city.fukui.lg.jp", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("福井市 エラー: ", e$message); NULL })
+}
+
+# ============================================================
+# 長野市 新着情報一覧（HTMLスクレイピング。RSS未提供のため記事一覧ページを直接解析する。
+# テーブル形式(<tr><td class="date">日付</td><td><a>タイトル</a></td></tr>)）
+# ============================================================
+NAGANO_CITY_NEWS_URL <- "https://www.city.nagano.nagano.jp/menu/2/shinchaku/index.html"
+
+fetch_nagano_city_news <- function(timeout_sec = 15, n_results = 20) {
+  message("長野市 新着情報 取得中...")
+  tryCatch({
+    resp <- GET(NAGANO_CITY_NEWS_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    rows_tr <- xml_find_all(doc, "//table[contains(@class,'list_table')]//tr[td[contains(@class,'date')]]")
+    if (length(rows_tr) == 0) return(NULL)
+
+    rows <- lapply(rows_tr, function(tr) {
+      date_str <- trimws(xml_text(xml_find_first(tr, ".//td[contains(@class,'date')]")))
+      a <- xml_find_first(tr, ".//td[not(contains(@class,'date'))]//a")
+      title <- trimws(xml_text(a))
+      href  <- xml_attr(a, "href")
+      if (nchar(title) == 0 || is.na(href) || nchar(date_str) == 0) return(NULL)
+      d <- suppressWarnings(as.Date(gsub("年|月", "-", gsub("日", "", date_str)), format = "%Y-%m-%d"))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "city_nagano2",
+        source_name = "長野市",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.city.nagano.nagano.jp", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("長野市 エラー: ", e$message); NULL })
+}
+
+# ============================================================
+# 高松市 新着情報一覧（HTMLスクレイピング。RSS未提供のため記事一覧ページを直接解析する）
+# ============================================================
+TAKAMATSU_NEWS_URL <- "https://www.city.takamatsu.kagawa.jp/kurashi/allNewsList.html"
+
+fetch_takamatsu_news <- function(timeout_sec = 15, n_results = 20) {
+  message("高松市 新着情報 取得中...")
+  tryCatch({
+    resp <- GET(TAKAMATSU_NEWS_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    items <- xml_find_all(doc, "//li[.//span[contains(@class,'date')]]")
+    if (length(items) == 0) return(NULL)
+
+    rows <- lapply(items, function(li) {
+      date_str <- trimws(xml_text(xml_find_first(li, ".//span[contains(@class,'date')]")))
+      a <- xml_find_first(li, ".//span[contains(@class,'infotxt')]//a")
+      title <- trimws(xml_text(a))
+      href  <- xml_attr(a, "href")
+      if (nchar(title) == 0 || is.na(href) || nchar(date_str) == 0) return(NULL)
+      d <- suppressWarnings(as.Date(gsub("年|月", "-", gsub("日", "", date_str)), format = "%Y-%m-%d"))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "city_takamatsu",
+        source_name = "高松市",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.city.takamatsu.kagawa.jp", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("高松市 エラー: ", e$message); NULL })
+}
+
+# ============================================================
 # PubMed E-utilities — アウトブレイク関連論文取得（APIキー不要）
 # ============================================================
 PUBMED_QUERIES <- c(
@@ -4506,7 +4621,8 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
                    fetch_yokohama_news, fetch_kobe_news, fetch_fukuoka_kansen_news,
                    fetch_saitama_news, fetch_osaka_city_news, fetch_niigata_news, fetch_kumamoto_news,
                    fetch_koriyama_news, fetch_utsunomiya_news, fetch_asahikawa_news, fetch_hakodate_news,
-                   fetch_maebashi_news, fetch_koshigaya_news, fetch_kashiwa_news)) {
+                   fetch_maebashi_news, fetch_koshigaya_news, fetch_kashiwa_news,
+                   fetch_fukui_city_news, fetch_nagano_city_news, fetch_takamatsu_news)) {
     d <- tryCatch(fn(), error = function(e) NULL)
     if (!is.null(d) && nrow(d) > 0) {
       if (!"retweet_count" %in% names(d)) d$retweet_count <- NA_integer_
