@@ -361,8 +361,14 @@ EBS_SOURCES <- list(
        url="https://www.city.akashi.lg.jp/oshirase.xml"),
   list(id="city_sasebo",     name="佐世保市",   lang="ja", category="行政",
        url="https://www.city.sasebo.lg.jp/oshirase.xml"),
-  # 旭川・函館・前橋・越谷・柏・金沢・大津・福井・長野・松江・寝屋川・高松ほかその他多数の
-  # 中核市は未確認（継続調査中）。
+  list(id="city_kasugai",    name="春日井市",   lang="ja", category="行政",
+       url="https://www.city.kasugai.lg.jp/rss.rss"),
+  list(id="city_ichinomiya", name="一宮市",     lang="ja", category="行政",
+       url="https://www.city.ichinomiya.aichi.jp/news.rss"),
+  list(id="city_suzuka",     name="鈴鹿市",     lang="ja", category="行政",
+       url="https://www.city.suzuka.lg.jp/news.rss"),
+  # 旭川・函館・前橋・越谷・柏・金沢・大津・福井・長野・松江・寝屋川・高松・つくば・八戸ほか
+  # その他多数の保健所設置市は未確認（継続調査中）。
   # 郡山市は接続不能だったがユーザー提供URLで解決済み（fetch_koriyama_news参照）、
   # 宇都宮市はSSL証明書期限切れと思われたが実際はブラウザ確認で静的HTML取得可能と判明
   # （fetch_utsunomiya_news参照）
