@@ -2081,6 +2081,139 @@ fetch_hakodate_news <- function(timeout_sec = 15, n_results = 20) {
 }
 
 # ============================================================
+# 前橋市 報道資料（HTMLスクレイピング。RSS未提供のため記事一覧ページを直接解析する。
+# <h2>令和X年M月D日</h2>の直後に<p class="file-link-item">記事(PDF)が複数続く構造のため
+# .scan_date_grouped_articles()で処理する）
+# ============================================================
+MAEBASHI_NEWS_URL <- "https://www.city.maebashi.gunma.jp/soshiki/seisaku/kohobrand/gyomu/17/50207.html"
+
+fetch_maebashi_news <- function(timeout_sec = 15, n_results = 20) {
+  message("前橋市 報道資料 取得中...")
+  tryCatch({
+    resp <- GET(MAEBASHI_NEWS_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+
+    parse_date <- function(txt) {
+      m <- regmatches(txt, regexec("令和(\\d+)年(\\d{1,2})月(\\d{1,2})日", txt))[[1]]
+      if (length(m) < 4) return(as.Date(NA))
+      gyear <- as.integer(m[2]) + 2018
+      suppressWarnings(as.Date(sprintf("%d-%02d-%02d", gyear, as.integer(m[3]), as.integer(m[4]))))
+    }
+    grouped <- .scan_date_grouped_articles(
+      doc,
+      "//h2[contains(.,'令和') and contains(.,'月') and contains(.,'日')]",
+      "//p[contains(@class,'file-link-item')]/a",
+      parse_date
+    )
+    if (length(grouped) == 0) return(NULL)
+
+    rows <- lapply(grouped, function(g) {
+      title <- trimws(xml_text(g$node))
+      href  <- xml_attr(g$node, "href")
+      if (nchar(title) == 0 || is.na(href)) return(NULL)
+      tibble(
+        source_id   = "city_maebashi",
+        source_name = "前橋市（報道資料）",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href
+                       else paste0("https:", href),
+        pub_date    = g$date,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("前橋市 エラー: ", e$message); NULL })
+}
+
+# ============================================================
+# 越谷市 新着情報（HTMLスクレイピング。RSS未提供のため記事一覧ページを直接解析する）
+# ============================================================
+KOSHIGAYA_NEWS_URL <- "https://www.city.koshigaya.saitama.jp/allNewsList.html"
+
+fetch_koshigaya_news <- function(timeout_sec = 15, n_results = 20) {
+  message("越谷市 新着情報 取得中...")
+  tryCatch({
+    resp <- GET(KOSHIGAYA_NEWS_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    items <- xml_find_all(doc, "//li[.//span[contains(@class,'date')]]")
+    if (length(items) == 0) return(NULL)
+
+    rows <- lapply(items, function(li) {
+      date_str <- trimws(xml_text(xml_find_first(li, ".//span[contains(@class,'date')]")))
+      a <- xml_find_first(li, ".//span[contains(@class,'link')]//a")
+      title <- trimws(xml_text(a))
+      href  <- xml_attr(a, "href")
+      if (nchar(title) == 0 || is.na(href) || nchar(date_str) == 0) return(NULL)
+      d <- suppressWarnings(as.Date(gsub("年|月", "-", gsub("日", "", date_str)), format = "%Y-%m-%d"))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "city_koshigaya",
+        source_name = "越谷市",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.city.koshigaya.saitama.jp", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("越谷市 エラー: ", e$message); NULL })
+}
+
+# ============================================================
+# 柏市 新着情報一覧（HTMLスクレイピング。RSS未提供のため記事一覧ページを直接解析する。
+# 日付が要素属性ではなく<li>テキスト末尾に"（M月D日）"形式で埋め込まれており、
+# 年の記載が無いため現在の年を基準に、月が現在月より大幅に先の場合は前年とみなす）
+# ============================================================
+KASHIWA_NEWS_URL <- "https://www.city.kashiwa.lg.jp/shinchaku/index.html"
+
+fetch_kashiwa_news <- function(timeout_sec = 15, n_results = 20) {
+  message("柏市 新着情報 取得中...")
+  tryCatch({
+    resp <- GET(KASHIWA_NEWS_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    items <- xml_find_all(doc, "//li[a]")
+    if (length(items) == 0) return(NULL)
+    this_year <- as.integer(format(Sys.Date(), "%Y"))
+    this_month <- as.integer(format(Sys.Date(), "%m"))
+
+    rows <- lapply(items, function(li) {
+      a <- xml_find_first(li, ".//a")
+      title <- trimws(xml_text(a))
+      href  <- xml_attr(a, "href")
+      m <- regmatches(title, regexpr("\\d{1,2}月\\d{1,2}日", title))
+      if (length(m) == 0 || nchar(m) == 0 || nchar(title) == 0 || is.na(href)) return(NULL)
+      dm <- regmatches(m, regexec("(\\d{1,2})月(\\d{1,2})日", m))[[1]]
+      if (length(dm) < 3) return(NULL)
+      mon <- as.integer(dm[2]); day <- as.integer(dm[3])
+      yr <- if (mon > this_month + 1) this_year - 1 else this_year
+      d <- suppressWarnings(as.Date(sprintf("%d-%02d-%02d", yr, mon, day)))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "city_kashiwa",
+        source_name = "柏市",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.city.kashiwa.lg.jp", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("柏市 エラー: ", e$message); NULL })
+}
+
+# ============================================================
 # PubMed E-utilities — アウトブレイク関連論文取得（APIキー不要）
 # ============================================================
 PUBMED_QUERIES <- c(
@@ -4372,7 +4505,8 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
                    fetch_sakai_news, fetch_kawasaki_news, fetch_kitakyushu_news,
                    fetch_yokohama_news, fetch_kobe_news, fetch_fukuoka_kansen_news,
                    fetch_saitama_news, fetch_osaka_city_news, fetch_niigata_news, fetch_kumamoto_news,
-                   fetch_koriyama_news, fetch_utsunomiya_news, fetch_asahikawa_news, fetch_hakodate_news)) {
+                   fetch_koriyama_news, fetch_utsunomiya_news, fetch_asahikawa_news, fetch_hakodate_news,
+                   fetch_maebashi_news, fetch_koshigaya_news, fetch_kashiwa_news)) {
     d <- tryCatch(fn(), error = function(e) NULL)
     if (!is.null(d) && nrow(d) > 0) {
       if (!"retweet_count" %in% names(d)) d$retweet_count <- NA_integer_
