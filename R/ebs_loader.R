@@ -279,10 +279,26 @@ EBS_SOURCES <- list(
        url="https://www.city.hiroshima.lg.jp/news.rss"),
   list(id="city_shizuoka",   name="静岡市（お知らせ）", lang="ja", category="行政",
        url="https://www.city.shizuoka.lg.jp/oshirase.xml"),
-  # 堺市・川崎市・北九州市・横浜市・神戸市・福岡市はRSS未提供のためHTMLスクレイピング経由の
-  # fetch_sakai_news()/fetch_kawasaki_news()/fetch_kitakyushu_news()/
-  # fetch_yokohama_news()/fetch_kobe_news()/fetch_fukuoka_kansen_news()で個別取得する
-  # さいたま市・新潟市・大阪市・熊本市は未確認、中核市（保健所設置自治体）は継続調査中
+  # 堺市・川崎市・北九州市・横浜市・神戸市・福岡市・さいたま市・大阪市・新潟市・熊本市は
+  # RSS未提供のためHTMLスクレイピング経由の各fetch_*_news()で個別取得する
+  # （政令指定都市20/20市 完了）
+  # ── 中核市（保健所設置自治体） ─────────────────────────
+  list(id="city_takasaki",   name="高崎市",     lang="ja", category="行政",
+       url="https://www.city.takasaki.gunma.jp/rss/10/list1.xml"),
+  list(id="city_kawagoe",    name="川越市",     lang="ja", category="行政",
+       url="https://www.city.kawagoe.saitama.jp/news.rss"),
+  list(id="city_kawaguchi",  name="川口市",     lang="ja", category="行政",
+       url="https://www.city.kawaguchi.lg.jp/cgi-bin/feed.php?type=rss_2.0&dirId=4850&includeShortcut=1&ignore=1"),
+  list(id="city_hachioji",   name="八王子市",   lang="ja", category="行政",
+       url="https://www.city.hachioji.tokyo.jp/topnewsrss.xml"),
+  list(id="city_aomori",     name="青森市",     lang="ja", category="行政",
+       url="https://www.city.aomori.aomori.jp/news.rss"),
+  list(id="city_morioka",    name="盛岡市",     lang="ja", category="行政",
+       url="https://www.city.morioka.iwate.jp/news.rss"),
+  list(id="city_yokosuka",   name="横須賀市",   lang="ja", category="行政",
+       url="https://www.city.yokosuka.kanagawa.jp/shinchaku.xml"),
+  # 旭川・函館・前橋・越谷・柏ほか大多数の中核市は未確認（継続調査中）。
+  # 郡山市は接続不能、宇都宮市はSSL証明書期限切れのためこのPC環境から取得不可
   # ── 国際機関 ───────────────────────────────────────────────
   # who_donはRSS(https://www.who.int/feeds/entity/csr/don/en/rss.xml)が廃止(404)されたため、
   # EBS_SOURCESには含めずJSON API経由のfetch_who_don()で個別取得する（fetch_who_eiosと同様のパターン）
