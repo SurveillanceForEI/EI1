@@ -329,8 +329,32 @@ EBS_SOURCES <- list(
        url="https://www.city.kurume.fukuoka.jp/rss/feed.rss"),
   list(id="city_naha",       name="那覇市",     lang="ja", category="行政",
        url="https://www.city.naha.okinawa.jp/news.rss"),
-  # 旭川・函館・前橋・越谷・柏・金沢・大津・富山・岡崎・福井・長野・奈良・松江・下関・
-  # 高松・佐世保・大分・鹿児島ほかその他多数の中核市は未確認（継続調査中）。
+  list(id="city_hirakata",   name="枚方市",     lang="ja", category="行政",
+       url="https://www.city.hirakata.osaka.jp/rss/rss_new.xml"),
+  list(id="city_yao",        name="八尾市",     lang="ja", category="行政",
+       url="https://www.city.yao.osaka.jp/1016213/news.rss"),
+  list(id="city_higashiosaka",name="東大阪市",  lang="ja", category="行政",
+       url="https://www.city.higashiosaka.lg.jp/rss/rss.xml"),
+  list(id="city_himeji",     name="姫路市",     lang="ja", category="行政",
+       url="https://www.city.himeji.lg.jp/rss/rss.xml"),
+  list(id="city_nishinomiya",name="西宮市",     lang="ja", category="行政",
+       url="https://www.nishi.or.jp/rss_news.xml"),
+  list(id="city_amagasaki",  name="尼崎市",     lang="ja", category="行政",
+       url="https://www.city.amagasaki.hyogo.jp/news.rss"),
+  list(id="city_toyonaka",   name="豊中市",     lang="ja", category="行政",
+       url="https://www.city.toyonaka.osaka.jp/rss_news.xml"),
+  list(id="city_takatsuki",  name="高槻市",     lang="ja", category="行政",
+       url="https://www.city.takatsuki.osaka.jp/rss/10/list1.xml"),
+  list(id="city_nara_c",     name="奈良市",     lang="ja", category="行政",
+       url="https://www.city.nara.lg.jp/rss/10/list1.xml"),
+  list(id="city_shimonoseki",name="下関市",     lang="ja", category="行政",
+       url="https://www.city.shimonoseki.lg.jp/rss/10/list1.xml"),
+  list(id="city_oita",       name="大分市",     lang="ja", category="行政",
+       url="https://www.city.oita.oita.jp/shinchaku.xml"),
+  list(id="city_kagoshima_c",name="鹿児島市",   lang="ja", category="行政",
+       url="https://www.city.kagoshima.lg.jp/shinchaku.xml"),
+  # 旭川・函館・前橋・越谷・柏・金沢・大津・富山・岡崎・福井・長野・松江・寝屋川・明石・
+  # 高松・佐世保ほかその他多数の中核市は未確認（継続調査中）。
   # 郡山市は接続不能だったがユーザー提供URLで解決済み（fetch_koriyama_news参照）、
   # 宇都宮市はSSL証明書期限切れと思われたが実際はブラウザ確認で静的HTML取得可能と判明
   # （fetch_utsunomiya_news参照）
