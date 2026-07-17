@@ -277,9 +277,12 @@ EBS_SOURCES <- list(
        url="https://www.city.okayama.jp/rss/rss.xml"),
   list(id="city_hiroshima",  name="広島市",                 lang="ja", category="行政",
        url="https://www.city.hiroshima.lg.jp/news.rss"),
-  # 堺市はRSS未提供のためHTMLスクレイピング経由のfetch_sakai_news()で個別取得する
-  # さいたま市・横浜市・川崎市・新潟市・静岡市・大阪市・神戸市・北九州市・福岡市・熊本市は
-  # 未確認、中核市（保健所設置自治体）は継続調査中
+  list(id="city_shizuoka",   name="静岡市（お知らせ）", lang="ja", category="行政",
+       url="https://www.city.shizuoka.lg.jp/oshirase.xml"),
+  # 堺市・川崎市・北九州市はRSS未提供のためHTMLスクレイピング経由のfetch_sakai_news()/
+  # fetch_kawasaki_news()/fetch_kitakyushu_news()で個別取得する
+  # さいたま市・横浜市・新潟市・大阪市・神戸市・福岡市・熊本市は未確認、
+  # 中核市（保健所設置自治体）は継続調査中
   # ── 国際機関 ───────────────────────────────────────────────
   # who_donはRSS(https://www.who.int/feeds/entity/csr/don/en/rss.xml)が廃止(404)されたため、
   # EBS_SOURCESには含めずJSON API経由のfetch_who_don()で個別取得する（fetch_who_eiosと同様のパターン）
@@ -1318,6 +1321,96 @@ fetch_sakai_news <- function(timeout_sec = 15, n_results = 20) {
     })
     bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
   }, error = function(e) { message("堺市 エラー: ", e$message); NULL })
+}
+
+# ============================================================
+# 川崎市 報道発表資料（HTMLスクレイピング。RSS未提供のため月別ページを直接解析する。
+# 日付ごとに<h3>M月D日の報道発表資料</h3>で見出しが分かれ、直後の<ul>に記事一覧が
+# 続く構造のため、h3の日付をfollowing-sibling::ul[1]内の全記事に適用する）
+# ============================================================
+KAWASAKI_NEWS_URL <- "https://www.city.kawasaki.jp/templates/prs/0-Curr.html"
+
+fetch_kawasaki_news <- function(timeout_sec = 15, n_results = 20) {
+  message("川崎市 報道発表資料 取得中...")
+  tryCatch({
+    resp <- GET(KAWASAKI_NEWS_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    headers <- xml_find_all(doc, "//h3[contains(text(),'の報道発表資料')]")
+    if (length(headers) == 0) return(NULL)
+    year <- format(Sys.Date(), "%Y")
+
+    rows <- lapply(headers, function(h3) {
+      htxt <- xml_text(h3)
+      m <- regmatches(htxt, regexec("(\\d{1,2})月(\\d{1,2})日", htxt))[[1]]
+      if (length(m) < 3) return(NULL)
+      d <- suppressWarnings(as.Date(paste(year, m[2], m[3], sep = "-"), format = "%Y-%m-%d"))
+      if (is.na(d)) return(NULL)
+      # 年またぎ対応: 現在月より未来の月なら前年の記事とみなす
+      if (as.integer(m[2]) > as.integer(format(Sys.Date(), "%m")) + 1)
+        d <- d - 365
+      ul <- xml_find_first(h3, "following-sibling::ul[1]")
+      if (is.na(ul)) return(NULL)
+      links <- xml_find_all(ul, ".//a")
+      sub_rows <- lapply(links, function(a) {
+        # <a>直下のテキストノードのみ抽出（末尾の<span class="ku/shi">部署名</span>を除外）
+        title <- trimws(paste(xml_text(xml_find_all(a, "./text()")), collapse = ""))
+        href  <- xml_attr(a, "href")
+        if (nchar(title) == 0 || is.na(href)) return(NULL)
+        tibble(
+          source_id   = "city_kawasaki",
+          source_name = "川崎市（報道発表資料）",
+          category    = "行政",
+          lang        = "ja",
+          title       = title,
+          link        = if (grepl("^https?://", href)) href else paste0("https://www.city.kawasaki.jp", href),
+          pub_date    = d,
+          summary     = NA_character_
+        )
+      })
+      bind_rows(Filter(Negate(is.null), sub_rows))
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("川崎市 エラー: ", e$message); NULL })
+}
+
+# ============================================================
+# 北九州市 新着情報一覧（HTMLスクレイピング。RSS未提供のため記事一覧ページを直接解析する）
+# ============================================================
+KITAKYUSHU_NEWS_URL <- "https://www.city.kitakyushu.lg.jp/newslist.html"
+
+fetch_kitakyushu_news <- function(timeout_sec = 15, n_results = 20) {
+  message("北九州市 新着情報 取得中...")
+  tryCatch({
+    resp <- GET(KITAKYUSHU_NEWS_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    items <- xml_find_all(doc, "//li[contains(@class,'news__item')]")
+    if (length(items) == 0) return(NULL)
+
+    rows <- lapply(items, function(li) {
+      date_str <- trimws(xml_text(xml_find_first(li, ".//p[contains(@class,'news__date')]")))
+      a <- xml_find_first(li, ".//a")
+      href  <- xml_attr(a, "href")
+      title <- trimws(xml_text(xml_find_first(li, ".//p[contains(@class,'news__text')]")))
+      if (nchar(title) == 0 || is.na(href) || nchar(date_str) == 0) return(NULL)
+      d <- suppressWarnings(as.Date(gsub("年|月", "-", gsub("日", "", date_str)), format = "%Y-%m-%d"))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "city_kitakyushu",
+        source_name = "北九州市",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.city.kitakyushu.lg.jp", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("北九州市 エラー: ", e$message); NULL })
 }
 
 # ============================================================
@@ -3609,7 +3702,7 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
   # 秋田県・奈良県・佐賀県・和歌山県・福岡県・長崎県・福井県 報道発表（HTMLスクレイピング）
   for (fn in list(fetch_akita_press_news, fetch_nara_press_news, fetch_saga_press_news,
                    fetch_wakayama_news, fetch_fukuoka_news, fetch_nagasaki_news, fetch_fukui_news,
-                   fetch_sakai_news)) {
+                   fetch_sakai_news, fetch_kawasaki_news, fetch_kitakyushu_news)) {
     d <- tryCatch(fn(), error = function(e) NULL)
     if (!is.null(d) && nrow(d) > 0) {
       if (!"retweet_count" %in% names(d)) d$retweet_count <- NA_integer_
