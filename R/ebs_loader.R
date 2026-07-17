@@ -1548,6 +1548,71 @@ fetch_fukuoka_kansen_news <- function(timeout_sec = 15, n_results = 30) {
 }
 
 # ============================================================
+# さいたま市 記者への提供資料（HTMLスクレイピング。RSS未提供のため、年度別ページから
+# 最新の「令和X年度」を動的に特定し、さらにその中の最新の「令和X年M月」ページを
+# 動的に特定してから記事一覧を解析する。各記事タイトル先頭に発表日
+# "（令和X年M月D日発表）"が埋め込まれている）
+# ============================================================
+SAITAMA_PRESS_INDEX_URL <- "https://www.city.saitama.lg.jp/006/014/008/003/index.html"
+
+fetch_saitama_news <- function(timeout_sec = 15, n_results = 20) {
+  message("さいたま市 記者への提供資料 取得中...")
+  tryCatch({
+    idx_resp <- GET(SAITAMA_PRESS_INDEX_URL, timeout(timeout_sec),
+                     add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(idx_resp) != 200) return(NULL)
+    idx_doc <- read_html(content(idx_resp, "text", encoding = "UTF-8"))
+    fy_links <- xml_find_all(idx_doc, "//a[contains(text(),'年度')]")
+    if (length(fy_links) == 0) return(NULL)
+    fy_hrefs <- xml_attr(fy_links, "href")
+    fy_ids <- suppressWarnings(as.integer(regmatches(fy_hrefs, regexpr("(?<=/)\\d+(?=/index\\.html$)", fy_hrefs, perl = TRUE))))
+    fy_url <- fy_hrefs[which.max(fy_ids)]
+    if (is.na(fy_url)) return(NULL)
+    if (!grepl("^https?://", fy_url)) fy_url <- paste0("https://www.city.saitama.lg.jp", fy_url)
+
+    fy_resp <- GET(fy_url, timeout(timeout_sec),
+                    add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(fy_resp) != 200) return(NULL)
+    fy_doc <- read_html(content(fy_resp, "text", encoding = "UTF-8"))
+    month_links <- xml_find_all(fy_doc, "//a[contains(text(),'年') and contains(text(),'月')]")
+    if (length(month_links) == 0) return(NULL)
+    month_hrefs <- xml_attr(month_links, "href")
+    month_ids <- suppressWarnings(as.integer(regmatches(month_hrefs, regexpr("(?<=/)\\d+(?=/index\\.html$)", month_hrefs, perl = TRUE))))
+    month_url <- month_hrefs[which.max(month_ids)]
+    if (is.na(month_url)) return(NULL)
+    if (!grepl("^https?://", month_url)) month_url <- paste0("https://www.city.saitama.lg.jp", month_url)
+
+    resp <- GET(month_url, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    links <- xml_find_all(doc, "//a[contains(text(),'発表)') or contains(text(),'発表）')]")
+    if (length(links) == 0) return(NULL)
+
+    rows <- lapply(links, function(a) {
+      title <- trimws(xml_text(a))
+      href  <- xml_attr(a, "href")
+      m <- regmatches(title, regexec("令和(\\d+)年(\\d{1,2})月(\\d{1,2})日発表", title))[[1]]
+      if (length(m) < 4 || nchar(title) == 0 || is.na(href)) return(NULL)
+      gyear <- as.integer(m[2]) + 2018
+      d <- suppressWarnings(as.Date(sprintf("%d-%02d-%02d", gyear, as.integer(m[3]), as.integer(m[4]))))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "city_saitama",
+        source_name = "さいたま市（記者への提供資料）",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.city.saitama.lg.jp", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("さいたま市 エラー: ", e$message); NULL })
+}
+
+# ============================================================
 # PubMed E-utilities — アウトブレイク関連論文取得（APIキー不要）
 # ============================================================
 PUBMED_QUERIES <- c(
@@ -3837,7 +3902,8 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
   for (fn in list(fetch_akita_press_news, fetch_nara_press_news, fetch_saga_press_news,
                    fetch_wakayama_news, fetch_fukuoka_news, fetch_nagasaki_news, fetch_fukui_news,
                    fetch_sakai_news, fetch_kawasaki_news, fetch_kitakyushu_news,
-                   fetch_yokohama_news, fetch_kobe_news, fetch_fukuoka_kansen_news)) {
+                   fetch_yokohama_news, fetch_kobe_news, fetch_fukuoka_kansen_news,
+                   fetch_saitama_news)) {
     d <- tryCatch(fn(), error = function(e) NULL)
     if (!is.null(d) && nrow(d) > 0) {
       if (!"retweet_count" %in% names(d)) d$retweet_count <- NA_integer_
