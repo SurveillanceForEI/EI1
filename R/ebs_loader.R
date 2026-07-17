@@ -287,8 +287,8 @@ EBS_SOURCES <- list(
        url="https://www.city.takasaki.gunma.jp/rss/10/list1.xml"),
   list(id="city_kawagoe",    name="川越市",     lang="ja", category="行政",
        url="https://www.city.kawagoe.saitama.jp/news.rss"),
-  list(id="city_kawaguchi",  name="川口市",     lang="ja", category="行政",
-       url="https://www.city.kawaguchi.lg.jp/cgi-bin/feed.php?type=rss_2.0&dirId=4850&includeShortcut=1&ignore=1"),
+  # 川口市はRSS(dirId=4850)が特定カテゴリのみ(21件)で限定的だったため、後述の
+  # fetch_kawaguchi_news()（index.update.json、100件）に切り替えて個別取得する
   list(id="city_hachioji",   name="八王子市",   lang="ja", category="行政",
        url="https://www.city.hachioji.tokyo.jp/topnewsrss.xml"),
   list(id="city_aomori",     name="青森市",     lang="ja", category="行政",
@@ -2391,6 +2391,18 @@ fetch_neyagawa_news <- function(timeout_sec = 15, n_results = 20) {
 fetch_hachinohe_news <- function(timeout_sec = 15, n_results = 20) {
   message("八戸市 新着情報 取得中...")
   .fetch_index_update_json_news("https://www.city.hachinohe.aomori.jp", "city_hachinohe", "八戸市",
+                                 timeout_sec, n_results)
+}
+
+fetch_saga_news <- function(timeout_sec = 15, n_results = 20) {
+  message("佐賀市 新着情報 取得中...")
+  .fetch_index_update_json_news("https://www.city.saga.lg.jp", "city_saga", "佐賀市",
+                                 timeout_sec, n_results)
+}
+
+fetch_kawaguchi_news <- function(timeout_sec = 15, n_results = 20) {
+  message("川口市 新着情報 取得中...")
+  .fetch_index_update_json_news("https://www.city.kawaguchi.lg.jp", "city_kawaguchi", "川口市",
                                  timeout_sec, n_results)
 }
 
@@ -4690,7 +4702,7 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
                    fetch_maebashi_news, fetch_koshigaya_news, fetch_kashiwa_news,
                    fetch_fukui_city_news, fetch_nagano_city_news, fetch_takamatsu_news,
                    fetch_tsukuba_news, fetch_kanazawa_news, fetch_otsu_news, fetch_matsue_news,
-                   fetch_neyagawa_news, fetch_hachinohe_news)) {
+                   fetch_neyagawa_news, fetch_hachinohe_news, fetch_saga_news, fetch_kawaguchi_news)) {
     d <- tryCatch(fn(), error = function(e) NULL)
     if (!is.null(d) && nrow(d) > 0) {
       if (!"retweet_count" %in% names(d)) d$retweet_count <- NA_integer_
