@@ -1665,6 +1665,134 @@ fetch_osaka_city_news <- function(timeout_sec = 15, n_results = 20) {
 }
 
 # ============================================================
+# 汎用: 「日付見出し + 直後に記事一覧が続く」構造のページを、日付見出しノードと
+# 記事ノードの和集合をXPathで取得（文書順序を保持）し、順に走査して直近の見出しの
+# 日付を各記事に割り当てる。新潟市・熊本市のようにul等の兄弟構造でグループ化されて
+# いないページ（日付見出しと記事が単純に交互に並ぶだけ）に対応するための共通ロジック
+# ============================================================
+.scan_date_grouped_articles <- function(doc, header_xpath, item_xpath, parse_date) {
+  combined_xpath <- paste0(header_xpath, " | ", item_xpath)
+  nodes <- xml_find_all(doc, combined_xpath)
+  if (length(nodes) == 0) return(list())
+  header_nodes <- xml_find_all(doc, header_xpath)
+  header_set <- as.character(header_nodes)
+
+  current_date <- as.Date(NA)
+  rows <- list()
+  for (node in nodes) {
+    if (as.character(node) %in% header_set) {
+      current_date <- parse_date(xml_text(node))
+    } else if (!is.na(current_date)) {
+      rows[[length(rows) + 1]] <- list(node = node, date = current_date)
+    }
+  }
+  rows
+}
+
+# ============================================================
+# 新潟市 報道発表資料（HTMLスクレイピング。RSS未提供のため月別ページを直接解析する。
+# <h2>令和X年M月D日（曜）</h2>の直後に複数の<p class="filelink"><a class="pdf">が
+# ul等の入れ子なしに単純に続く構造のため、.scan_date_grouped_articles()で処理する）
+# ============================================================
+NIIGATA_NEWS_MONTH_URL <- "https://www.city.niigata.lg.jp/shisei/koho/houdou/%s.html"
+
+fetch_niigata_news <- function(timeout_sec = 15, n_results = 20) {
+  message("新潟市 報道発表資料 取得中...")
+  tryCatch({
+    ym <- format(Sys.Date(), "%Y%m")
+    url <- sprintf(NIIGATA_NEWS_MONTH_URL, ym)
+    resp <- GET(url, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+
+    parse_date <- function(txt) {
+      m <- regmatches(txt, regexec("令和(\\d+)年(\\d{1,2})月(\\d{1,2})日", txt))[[1]]
+      if (length(m) < 4) return(as.Date(NA))
+      gyear <- as.integer(m[2]) + 2018
+      suppressWarnings(as.Date(sprintf("%d-%02d-%02d", gyear, as.integer(m[3]), as.integer(m[4]))))
+    }
+    grouped <- .scan_date_grouped_articles(
+      doc,
+      "//h2[contains(text(),'月') and contains(text(),'日') and contains(text(),'曜')]",
+      "//p[contains(@class,'filelink')]/a[contains(@class,'pdf')]",
+      parse_date
+    )
+    if (length(grouped) == 0) return(NULL)
+
+    rows <- lapply(grouped, function(g) {
+      title <- trimws(xml_text(g$node))
+      href  <- xml_attr(g$node, "href")
+      if (nchar(title) == 0 || is.na(href)) return(NULL)
+      tibble(
+        source_id   = "city_niigata",
+        source_name = "新潟市（報道発表資料）",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href
+                       else paste0("https://www.city.niigata.lg.jp/shisei/koho/houdou/", href),
+        pub_date    = g$date,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("新潟市 エラー: ", e$message); NULL })
+}
+
+# ============================================================
+# 熊本市 報道発表（HTMLスクレイピング。RSS未提供のため月別ページを直接解析する。
+# <h4>報道発表　令和X年M月</h4>で年月を示し、<h3>M月D日（曜日）発表</h3>の直後に
+# 記事(PDFリンク)が単純に続く構造のため、.scan_date_grouped_articles()で処理する）
+# ============================================================
+KUMAMOTO_NEWS_URL <- "https://www.city.kumamoto.jp/kiji00371656/index.html"
+
+fetch_kumamoto_news <- function(timeout_sec = 15, n_results = 20) {
+  message("熊本市 報道発表 取得中...")
+  tryCatch({
+    resp <- GET(KUMAMOTO_NEWS_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+
+    ym_node <- xml_find_first(doc, "//h4[contains(text(),'報道発表')]")
+    ym_txt  <- if (!is.na(ym_node)) xml_text(ym_node) else format(Sys.Date(), "令和8年%m月")
+    ym_m <- regmatches(ym_txt, regexec("令和(\\d+)年(\\d{1,2})月", ym_txt))[[1]]
+    gyear <- if (length(ym_m) >= 3) as.integer(ym_m[2]) + 2018 else as.integer(format(Sys.Date(), "%Y"))
+
+    parse_date <- function(txt) {
+      m <- regmatches(txt, regexec("(\\d{1,2})月(\\d{1,2})日", txt))[[1]]
+      if (length(m) < 3) return(as.Date(NA))
+      suppressWarnings(as.Date(sprintf("%d-%02d-%02d", gyear, as.integer(m[2]), as.integer(m[3]))))
+    }
+    grouped <- .scan_date_grouped_articles(
+      doc,
+      "//h3[contains(@class,'title') and contains(text(),'発表')]",
+      "//div[contains(@class,'wys_template') and contains(@class,'wys_list')]//a",
+      parse_date
+    )
+    if (length(grouped) == 0) return(NULL)
+
+    rows <- lapply(grouped, function(g) {
+      title <- trimws(xml_text(g$node))
+      href  <- xml_attr(g$node, "href")
+      if (nchar(title) == 0 || is.na(href)) return(NULL)
+      tibble(
+        source_id   = "city_kumamoto",
+        source_name = "熊本市（報道発表）",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.city.kumamoto.jp", href),
+        pub_date    = g$date,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("熊本市 エラー: ", e$message); NULL })
+}
+
+# ============================================================
 # PubMed E-utilities — アウトブレイク関連論文取得（APIキー不要）
 # ============================================================
 PUBMED_QUERIES <- c(
@@ -3955,7 +4083,7 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
                    fetch_wakayama_news, fetch_fukuoka_news, fetch_nagasaki_news, fetch_fukui_news,
                    fetch_sakai_news, fetch_kawasaki_news, fetch_kitakyushu_news,
                    fetch_yokohama_news, fetch_kobe_news, fetch_fukuoka_kansen_news,
-                   fetch_saitama_news, fetch_osaka_city_news)) {
+                   fetch_saitama_news, fetch_osaka_city_news, fetch_niigata_news, fetch_kumamoto_news)) {
     d <- tryCatch(fn(), error = function(e) NULL)
     if (!is.null(d) && nrow(d) > 0) {
       if (!"retweet_count" %in% names(d)) d$retweet_count <- NA_integer_
