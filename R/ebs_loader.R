@@ -2329,6 +2329,36 @@ fetch_takamatsu_news <- function(timeout_sec = 15, n_results = 20) {
 }
 
 # ============================================================
+# つくば市 新着情報（JSON API。新着情報一覧ページ(news_list.html)はJavaScriptで
+# index.update.jsonを取得して動的に描画する構造のため、静的HTML/RSSでは記事一覧を
+# 取得できない。ブラウザの通信を確認しこのJSON APIを発見し直接取得する）
+# ============================================================
+TSUKUBA_UPDATE_JSON_URL <- "https://www.city.tsukuba.lg.jp/index.update.json"
+
+fetch_tsukuba_news <- function(timeout_sec = 15, n_results = 20) {
+  message("つくば市 新着情報 取得中...")
+  tryCatch({
+    resp <- GET(TSUKUBA_UPDATE_JSON_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    items <- jsonlite::fromJSON(content(resp, "text", encoding = "UTF-8"), simplifyDataFrame = TRUE)
+    if (is.null(items) || nrow(items) == 0) return(NULL)
+
+    tibble(
+      source_id   = "city_tsukuba",
+      source_name = "つくば市",
+      category    = "行政",
+      lang        = "ja",
+      title       = items$page_name,
+      link        = items$url,
+      pub_date    = as.Date(substr(items$publish_datetime, 1, 10)),
+      summary     = NA_character_
+    ) %>% filter(!is.na(title), nchar(title) > 0, !is.na(link)) %>%
+      distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("つくば市 エラー: ", e$message); NULL })
+}
+
+# ============================================================
 # PubMed E-utilities — アウトブレイク関連論文取得（APIキー不要）
 # ============================================================
 PUBMED_QUERIES <- c(
@@ -4622,7 +4652,8 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
                    fetch_saitama_news, fetch_osaka_city_news, fetch_niigata_news, fetch_kumamoto_news,
                    fetch_koriyama_news, fetch_utsunomiya_news, fetch_asahikawa_news, fetch_hakodate_news,
                    fetch_maebashi_news, fetch_koshigaya_news, fetch_kashiwa_news,
-                   fetch_fukui_city_news, fetch_nagano_city_news, fetch_takamatsu_news)) {
+                   fetch_fukui_city_news, fetch_nagano_city_news, fetch_takamatsu_news,
+                   fetch_tsukuba_news)) {
     d <- tryCatch(fn(), error = function(e) NULL)
     if (!is.null(d) && nrow(d) > 0) {
       if (!"retweet_count" %in% names(d)) d$retweet_count <- NA_integer_
