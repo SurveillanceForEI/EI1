@@ -13,3 +13,6 @@
 ## 補足
 - 全市ともRSS/JSON APIの検証はWebFetchによる内容取得で行ったが、実際のRSSリーダーでの購読確認は未実施。
 - 四日市市・藤沢市の感染症情報については、専用の「感染症情報センター」に相当する明確な名称のページが見当たらず、実態としては保健所の一部門ページに留まる可能性が高い。
+
+## 追加検証（curlによる実データ取得確認・EBS_SOURCES登録済み）
+小樽市・町田市・茅ヶ崎市・四日市市の4市はcurlで200・XML形式・実記事タイトルまで確認し、`R/ebs_loader.R`のEBS_SOURCESに追加済み（id: city_otaru, city_machida, city_chigasaki, city_yokkaichi）。藤沢市は一般新着情報のRSS/JSON配信が見つからず、今回は未収録（継続調査中）。

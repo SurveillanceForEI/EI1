@@ -396,6 +396,58 @@ EBS_SOURCES <- list(
   # 郡山市は接続不能だったがユーザー提供URLで解決済み（fetch_koriyama_news参照）、
   # 宇都宮市はSSL証明書期限切れと思われたが実際はブラウザ確認で静的HTML取得可能と判明
   # （fetch_utsunomiya_news参照）
+  # ── その他政令市（地域保健法施行令第1条第3号による保健所設置市、5市）─────
+  # 藤沢市は一般新着情報のRSS/JSON配信が見つからず未収録（継続調査中）
+  list(id="city_otaru",      name="小樽市",     lang="ja", category="行政",
+       url="https://www.city.otaru.lg.jp/docs/index.rss"),
+  list(id="city_machida",    name="町田市",     lang="ja", category="行政",
+       url="https://www.city.machida.tokyo.jp/rss_news.xml"),
+  list(id="city_chigasaki",  name="茅ヶ崎市",   lang="ja", category="行政",
+       url="https://www.city.chigasaki.kanagawa.jp/news.rss"),
+  list(id="city_yokkaichi",  name="四日市市",   lang="ja", category="行政",
+       url="https://www.city.yokkaichi.lg.jp/www/rss/news.rdf"),
+  # ── 特別区（東京23区、保健所設置自治体）──────────────────────
+  # 品川区・渋谷区・荒川区は一般新着情報のRSS/JSON配信が見つからず未収録（継続調査中）
+  list(id="city_chiyoda",    name="千代田区",   lang="ja", category="行政",
+       url="https://www.city.chiyoda.lg.jp/shinchaku/shinchaku.xml"),
+  list(id="city_chuo",       name="中央区",     lang="ja", category="行政",
+       url="https://www.city.chuo.lg.jp/shinchaku/shinchaku.xml"),
+  list(id="city_minato",     name="港区",       lang="ja", category="行政",
+       url="https://www.city.minato.tokyo.jp/shinchaku/shinchaku.xml"),
+  list(id="city_shinjuku",   name="新宿区",     lang="ja", category="行政",
+       url="https://www.city.shinjuku.lg.jp/top_rss.rdf"),
+  list(id="city_bunkyo",     name="文京区",     lang="ja", category="行政",
+       url="https://www.city.bunkyo.lg.jp/shinchaku/shinchaku.xml"),
+  list(id="city_taito",      name="台東区",     lang="ja", category="行政",
+       url="https://www.city.taito.lg.jp/rss_news.xml"),
+  list(id="city_sumida",     name="墨田区",     lang="ja", category="行政",
+       url="https://www.city.sumida.lg.jp/rss_news.xml"),
+  list(id="city_koto",       name="江東区",     lang="ja", category="行政",
+       url="https://www.city.koto.lg.jp/shinchaku/shinchaku.xml"),
+  list(id="city_meguro",     name="目黒区",     lang="ja", category="行政",
+       url="https://www.city.meguro.tokyo.jp/oshirase/rss_news.xml"),
+  list(id="city_ota_c",      name="大田区",     lang="ja", category="行政",
+       url="https://www.city.ota.tokyo.jp/oshirase/rss_news.xml"),
+  list(id="city_setagaya",   name="世田谷区",   lang="ja", category="行政",
+       url="https://www.city.setagaya.lg.jp/shinchaku/shinchaku.xml"),
+  list(id="city_nakano",     name="中野区",     lang="ja", category="行政",
+       url="https://www.city.tokyo-nakano.lg.jp/rss_news.xml"),
+  list(id="city_suginami",   name="杉並区",     lang="ja", category="行政",
+       url="https://www.city.suginami.tokyo.jp/kenkou/shinchaku/shinchaku.xml"),
+  list(id="city_toshima",    name="豊島区",     lang="ja", category="行政",
+       url="https://www.city.toshima.lg.jp/oshirase/oshirase.xml"),
+  list(id="city_kita",       name="北区",       lang="ja", category="行政",
+       url="https://www.city.kita.lg.jp/news.rss"),
+  list(id="city_itabashi",   name="板橋区",     lang="ja", category="行政",
+       url="https://www.city.itabashi.tokyo.jp/rss/news_release.rss"),
+  list(id="city_nerima",     name="練馬区",     lang="ja", category="行政",
+       url="https://www.city.nerima.tokyo.jp/rss/oshirase/rss_news.xml"),
+  list(id="city_adachi",     name="足立区",     lang="ja", category="行政",
+       url="https://www.city.adachi.tokyo.jp/ku/koho/news/news.xml"),
+  list(id="city_katsushika", name="葛飾区",     lang="ja", category="行政",
+       url="https://www.city.katsushika.lg.jp/news.rss"),
+  list(id="city_edogawa",    name="江戸川区",   lang="ja", category="行政",
+       url="https://www.city.edogawa.tokyo.jp/news/shinchaku.xml"),
   # ── 国際機関 ───────────────────────────────────────────────
   # who_donはRSS(https://www.who.int/feeds/entity/csr/don/en/rss.xml)が廃止(404)されたため、
   # EBS_SOURCESには含めずJSON API経由のfetch_who_don()で個別取得する（fetch_who_eiosと同様のパターン）
