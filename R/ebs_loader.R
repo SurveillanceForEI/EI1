@@ -1613,6 +1613,58 @@ fetch_saitama_news <- function(timeout_sec = 15, n_results = 20) {
 }
 
 # ============================================================
+# 大阪市 報道発表資料（HTMLスクレイピング。RSS未提供のため記事一覧ページを直接解析する。
+# <h2 class="hdo_month_h2" id="hdo_YYYY_M">YYYY年M月</h2>で年月見出しが区切られ、
+# その後に日付ごとの<h2>M月D日公開の報道発表資料</h2>と記事<ul>が複数続く構造）
+# ============================================================
+OSAKA_CITY_NEWS_URL <- "https://www.city.osaka.lg.jp/hodoshiryo/93-Curr.html"
+
+fetch_osaka_city_news <- function(timeout_sec = 15, n_results = 20) {
+  message("大阪市 報道発表資料 取得中...")
+  tryCatch({
+    resp <- GET(OSAKA_CITY_NEWS_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    day_headers <- xml_find_all(doc, "//h2[contains(text(),'公開の報道発表資料')]")
+    if (length(day_headers) == 0) return(NULL)
+
+    rows <- lapply(day_headers, function(h2) {
+      ym_node <- xml_find_first(h2, "preceding::h2[contains(@class,'hdo_month_h2')][1]")
+      ym_txt  <- if (!is.na(ym_node)) xml_text(ym_node) else format(Sys.Date(), "%Y年%m月")
+      ym_m <- regmatches(ym_txt, regexec("(\\d{4})年(\\d{1,2})月", ym_txt))[[1]]
+      day_txt <- xml_text(h2)
+      d_m <- regmatches(day_txt, regexec("(\\d{1,2})月(\\d{1,2})日", day_txt))[[1]]
+      if (length(ym_m) < 3 || length(d_m) < 3) return(NULL)
+      d <- suppressWarnings(as.Date(sprintf("%s-%02d-%02d", ym_m[2], as.integer(d_m[2]), as.integer(d_m[3]))))
+      if (is.na(d)) return(NULL)
+      # h2は<div class="h2_box">の子。記事一覧は親divの直後の<div class="hdo_sub_lower">内
+      box <- xml_find_first(h2, "parent::div")
+      sub <- if (!is.na(box)) xml_find_first(box, "following-sibling::div[contains(@class,'hdo_sub_lower')][1]") else NA
+      if (is.na(sub)) return(NULL)
+      links <- xml_find_all(sub, ".//a")
+      sub_rows <- lapply(links, function(a) {
+        title <- trimws(xml_text(a))
+        href  <- xml_attr(a, "href")
+        if (nchar(title) == 0 || is.na(href)) return(NULL)
+        tibble(
+          source_id   = "city_osaka",
+          source_name = "大阪市（報道発表資料）",
+          category    = "行政",
+          lang        = "ja",
+          title       = title,
+          link        = if (grepl("^https?://", href)) href else paste0("https://www.city.osaka.lg.jp", href),
+          pub_date    = d,
+          summary     = NA_character_
+        )
+      })
+      bind_rows(Filter(Negate(is.null), sub_rows))
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("大阪市 エラー: ", e$message); NULL })
+}
+
+# ============================================================
 # PubMed E-utilities — アウトブレイク関連論文取得（APIキー不要）
 # ============================================================
 PUBMED_QUERIES <- c(
@@ -3903,7 +3955,7 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
                    fetch_wakayama_news, fetch_fukuoka_news, fetch_nagasaki_news, fetch_fukui_news,
                    fetch_sakai_news, fetch_kawasaki_news, fetch_kitakyushu_news,
                    fetch_yokohama_news, fetch_kobe_news, fetch_fukuoka_kansen_news,
-                   fetch_saitama_news)) {
+                   fetch_saitama_news, fetch_osaka_city_news)) {
     d <- tryCatch(fn(), error = function(e) NULL)
     if (!is.null(d) && nrow(d) > 0) {
       if (!"retweet_count" %in% names(d)) d$retweet_count <- NA_integer_
