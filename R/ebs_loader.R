@@ -279,10 +279,10 @@ EBS_SOURCES <- list(
        url="https://www.city.hiroshima.lg.jp/news.rss"),
   list(id="city_shizuoka",   name="静岡市（お知らせ）", lang="ja", category="行政",
        url="https://www.city.shizuoka.lg.jp/oshirase.xml"),
-  # 堺市・川崎市・北九州市・横浜市・神戸市はRSS未提供のためHTMLスクレイピング経由の
+  # 堺市・川崎市・北九州市・横浜市・神戸市・福岡市はRSS未提供のためHTMLスクレイピング経由の
   # fetch_sakai_news()/fetch_kawasaki_news()/fetch_kitakyushu_news()/
-  # fetch_yokohama_news()/fetch_kobe_news()で個別取得する
-  # さいたま市・新潟市・大阪市・福岡市・熊本市は未確認、中核市（保健所設置自治体）は継続調査中
+  # fetch_yokohama_news()/fetch_kobe_news()/fetch_fukuoka_kansen_news()で個別取得する
+  # さいたま市・新潟市・大阪市・熊本市は未確認、中核市（保健所設置自治体）は継続調査中
   # ── 国際機関 ───────────────────────────────────────────────
   # who_donはRSS(https://www.who.int/feeds/entity/csr/don/en/rss.xml)が廃止(404)されたため、
   # EBS_SOURCESには含めずJSON API経由のfetch_who_don()で個別取得する（fetch_who_eiosと同様のパターン）
@@ -1503,6 +1503,48 @@ fetch_kobe_news <- function(timeout_sec = 15, n_results = 20) {
     })
     bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
   }, error = function(e) { message("神戸市 エラー: ", e$message); NULL })
+}
+
+# ============================================================
+# 福岡市 感染症関係報道発表資料（HTMLスクレイピング。感染性胃腸炎の集団発生・
+# 腸管出血性大腸菌感染症の発生等、感染症カテゴリ専用の報道発表一覧ページを直接解析する。
+# 各リンクがPDFで、リンクテキスト先頭に和暦"令和X年M月D日"が埋め込まれているため、
+# 正規表現で抽出し西暦に変換する（令和1年=2019年））
+# ============================================================
+FUKUOKA_KANSEN_URL <- "https://www.city.fukuoka.lg.jp/hofuku/hokensho/kansensho/kansenshojoho/hodohappyou/kansenhoudou1.html"
+
+fetch_fukuoka_kansen_news <- function(timeout_sec = 15, n_results = 30) {
+  message("福岡市 感染症関係報道発表資料 取得中...")
+  tryCatch({
+    resp <- GET(FUKUOKA_KANSEN_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    links <- xml_find_all(doc, "//a[contains(@class,'pdf')]")
+    if (length(links) == 0) return(NULL)
+
+    rows <- lapply(links, function(a) {
+      title <- trimws(xml_text(a))
+      href  <- xml_attr(a, "href")
+      m <- regmatches(title, regexec("令和(\\d+)年(\\d{1,2})月(\\d{1,2})日", title))[[1]]
+      if (length(m) < 4 || nchar(title) == 0 || is.na(href)) return(NULL)
+      gyear <- as.integer(m[2]) + 2018
+      d <- suppressWarnings(as.Date(sprintf("%d-%02d-%02d", gyear, as.integer(m[3]), as.integer(m[4]))))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "city_fukuoka",
+        source_name = "福岡市（感染症関係報道発表）",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.city.fukuoka.lg.jp", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>%
+      arrange(desc(pub_date)) %>% head(n_results)
+  }, error = function(e) { message("福岡市 エラー: ", e$message); NULL })
 }
 
 # ============================================================
@@ -3795,7 +3837,7 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
   for (fn in list(fetch_akita_press_news, fetch_nara_press_news, fetch_saga_press_news,
                    fetch_wakayama_news, fetch_fukuoka_news, fetch_nagasaki_news, fetch_fukui_news,
                    fetch_sakai_news, fetch_kawasaki_news, fetch_kitakyushu_news,
-                   fetch_yokohama_news, fetch_kobe_news)) {
+                   fetch_yokohama_news, fetch_kobe_news, fetch_fukuoka_kansen_news)) {
     d <- tryCatch(fn(), error = function(e) NULL)
     if (!is.null(d) && nrow(d) > 0) {
       if (!"retweet_count" %in% names(d)) d$retweet_count <- NA_integer_
