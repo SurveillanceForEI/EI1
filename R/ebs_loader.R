@@ -66,7 +66,13 @@ if (exists("COUNTRY_DB")) {
 }
 
 # 国際ソース：日本キーワードがなければ原則海外
-.OVERSEAS_SOURCE_IDS_LOADER <- c("reliefweb")
+# （台湾CDCの中国語記事等、記事本文が「國內」等の現地語表現を使うため地名キーワード判定
+# だけでは海外記事と検出できず、誤って国内タブに表示されてしまう問題があった。
+# ソース自体が海外の政府機関・国際機関である場合は、記事内容に関わらず原則海外として扱う）
+.OVERSEAS_SOURCE_IDS_LOADER <- c(
+  "reliefweb", "who_eios", "who_don", "cdc", "ukhsa", "rki", "nicd",
+  "taiwan_cdc", "china_cdc", "chp", "spf"
+)
 
 # Google Newsは「記事タイトル - メディア名」形式（title）、
 # および「記事タイトル &nbsp;&nbsp; メディア名」形式（summary、区切りがダッシュではない）で
