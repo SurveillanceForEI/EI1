@@ -371,14 +371,28 @@ EBS_SOURCES <- list(
        url="https://www.city.akashi.lg.jp/oshirase.xml"),
   list(id="city_sasebo",     name="佐世保市",   lang="ja", category="行政",
        url="https://www.city.sasebo.lg.jp/oshirase.xml"),
-  list(id="city_kasugai",    name="春日井市",   lang="ja", category="行政",
-       url="https://www.city.kasugai.lg.jp/rss.rss"),
   list(id="city_ichinomiya", name="一宮市",     lang="ja", category="行政",
        url="https://www.city.ichinomiya.aichi.jp/news.rss"),
-  list(id="city_suzuka",     name="鈴鹿市",     lang="ja", category="行政",
+  list(id="city_akita",      name="秋田市",     lang="ja", category="行政",
+       url="https://www.city.akita.lg.jp/rss.rss"),
+  list(id="city_yamagata_c", name="山形市",     lang="ja", category="行政",
+       url="https://www.city.yamagata-yamagata.lg.jp/news.rss"),
+  list(id="city_fukushima_c",name="福島市",     lang="ja", category="行政",
+       url="https://www.city.fukushima.fukushima.jp/cgi-bin/feed.php?siteNew=1&displayRange=90"),
+  list(id="city_suita",      name="吹田市",     lang="ja", category="行政",
+       url="https://www.city.suita.osaka.jp/news.rss"),
+  # 春日井市・鈴鹿市は厚労省「設置主体別保健所数」(令和8年4月1日現在)に記載がなく、
+  # 実際には中核市／保健所設置市ではない（保健所は愛知県・三重県が所管）。
+  # ニュース取得元としては引き続き有用なため取得は継続するが、「保健所設置自治体」
+  # とはみなさない（is_official_ebs_sourceの判定自体には影響しない＝市の公式発表として扱う）
+  list(id="city_kasugai",    name="春日井市（保健所設置市ではない）",   lang="ja", category="行政",
+       url="https://www.city.kasugai.lg.jp/rss.rss"),
+  list(id="city_suzuka",     name="鈴鹿市（保健所設置市ではない）",     lang="ja", category="行政",
        url="https://www.city.suzuka.lg.jp/news.rss"),
-  # 旭川・函館・前橋・越谷・柏・金沢・大津・福井・長野・松江・寝屋川・高松・つくば・八戸ほか
+  # 旭川・函館・前橋・越谷・柏・金沢・大津・福井・長野・松江・寝屋川・高松・八戸ほか
   # その他多数の保健所設置市は未確認（継続調査中）。
+  # つくば市・佐賀市も同様に保健所設置市ではないが、ニュース取得元としては
+  # fetch_tsukuba_news()/fetch_saga_news()で継続取得する
   # 郡山市は接続不能だったがユーザー提供URLで解決済み（fetch_koriyama_news参照）、
   # 宇都宮市はSSL証明書期限切れと思われたが実際はブラウザ確認で静的HTML取得可能と判明
   # （fetch_utsunomiya_news参照）
