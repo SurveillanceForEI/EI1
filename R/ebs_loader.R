@@ -279,10 +279,10 @@ EBS_SOURCES <- list(
        url="https://www.city.hiroshima.lg.jp/news.rss"),
   list(id="city_shizuoka",   name="静岡市（お知らせ）", lang="ja", category="行政",
        url="https://www.city.shizuoka.lg.jp/oshirase.xml"),
-  # 堺市・川崎市・北九州市はRSS未提供のためHTMLスクレイピング経由のfetch_sakai_news()/
-  # fetch_kawasaki_news()/fetch_kitakyushu_news()で個別取得する
-  # さいたま市・横浜市・新潟市・大阪市・神戸市・福岡市・熊本市は未確認、
-  # 中核市（保健所設置自治体）は継続調査中
+  # 堺市・川崎市・北九州市・横浜市・神戸市はRSS未提供のためHTMLスクレイピング経由の
+  # fetch_sakai_news()/fetch_kawasaki_news()/fetch_kitakyushu_news()/
+  # fetch_yokohama_news()/fetch_kobe_news()で個別取得する
+  # さいたま市・新潟市・大阪市・福岡市・熊本市は未確認、中核市（保健所設置自治体）は継続調査中
   # ── 国際機関 ───────────────────────────────────────────────
   # who_donはRSS(https://www.who.int/feeds/entity/csr/don/en/rss.xml)が廃止(404)されたため、
   # EBS_SOURCESには含めずJSON API経由のfetch_who_don()で個別取得する（fetch_who_eiosと同様のパターン）
@@ -1411,6 +1411,98 @@ fetch_kitakyushu_news <- function(timeout_sec = 15, n_results = 20) {
     })
     bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
   }, error = function(e) { message("北九州市 エラー: ", e$message); NULL })
+}
+
+# ============================================================
+# 横浜市 記者発表資料（HTMLスクレイピング。RSS未提供のため記事一覧ページを直接解析する）
+# ============================================================
+YOKOHAMA_NEWS_URL <- "https://www.city.yokohama.lg.jp/city-info/koho-kocho/press/"
+
+fetch_yokohama_news <- function(timeout_sec = 15, n_results = 20) {
+  message("横浜市 記者発表資料 取得中...")
+  tryCatch({
+    resp <- GET(YOKOHAMA_NEWS_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    items <- xml_find_all(doc, "//ul[contains(@class,'info-list')]//li")
+    if (length(items) == 0) return(NULL)
+
+    rows <- lapply(items, function(li) {
+      date_str <- trimws(xml_text(xml_find_first(li, ".//span[contains(@class,'date')]")))
+      a <- xml_find_first(li, ".//span[contains(@class,'link')]//a")
+      title <- trimws(xml_text(a))
+      href  <- xml_attr(a, "href")
+      if (nchar(title) == 0 || is.na(href) || nchar(date_str) == 0) return(NULL)
+      d <- suppressWarnings(as.Date(gsub("年|月", "-", gsub("日", "", date_str)), format = "%Y-%m-%d"))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "city_yokohama",
+        source_name = "横浜市（記者発表資料）",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.city.yokohama.lg.jp", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("横浜市 エラー: ", e$message); NULL })
+}
+
+# ============================================================
+# 神戸市 記者発表資料（HTMLスクレイピング。RSS未提供のため記事一覧ページを直接解析する。
+# <h2>YYYY年M月</h2>の直後に<h3>M月D日（曜日）</h3>が複数続き、それぞれの直後の
+# <ul class="information">に記事一覧が続く構造のため、直近のh2(年月)とh3(日)を
+# 組み合わせて日付を復元する）
+# ============================================================
+KOBE_NEWS_URL <- "https://www.city.kobe.lg.jp/a57337/shise/press/index.html"
+
+fetch_kobe_news <- function(timeout_sec = 15, n_results = 20) {
+  message("神戸市 記者発表資料 取得中...")
+  tryCatch({
+    resp <- GET(KOBE_NEWS_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    day_headers <- xml_find_all(doc, "//h3[contains(text(),'月') and contains(text(),'日')]")
+    if (length(day_headers) == 0) return(NULL)
+
+    rows <- lapply(day_headers, function(h3) {
+      # 直近の年月見出し(h2, 例:"2026年7月")を遡って取得
+      ym_node <- xml_find_first(h3, "preceding-sibling::h2[1]")
+      ym_txt  <- if (!is.na(ym_node)) xml_text(ym_node) else format(Sys.Date(), "%Y年%m月")
+      day_txt <- xml_text(h3)
+      ym_m <- regmatches(ym_txt, regexec("(\\d{4})年(\\d{1,2})月", ym_txt))[[1]]
+      d_m  <- regmatches(day_txt, regexec("(\\d{1,2})月(\\d{1,2})日", day_txt))[[1]]
+      if (length(ym_m) < 3 || length(d_m) < 3) return(NULL)
+      d <- suppressWarnings(as.Date(paste(ym_m[2], d_m[3], sep = "-"),
+                                     format = paste0(ym_m[2], "-%d")))
+      d <- suppressWarnings(as.Date(sprintf("%s-%02d-%02d", ym_m[2], as.integer(d_m[2]), as.integer(d_m[3]))))
+      if (is.na(d)) return(NULL)
+      ul <- xml_find_first(h3, "following-sibling::ul[1]")
+      if (is.na(ul)) return(NULL)
+      links <- xml_find_all(ul, ".//a")
+      sub_rows <- lapply(links, function(a) {
+        title <- trimws(xml_text(a))
+        href  <- xml_attr(a, "href")
+        if (nchar(title) == 0 || is.na(href)) return(NULL)
+        tibble(
+          source_id   = "city_kobe",
+          source_name = "神戸市（記者発表資料）",
+          category    = "行政",
+          lang        = "ja",
+          title       = title,
+          link        = if (grepl("^https?://", href)) href else paste0("https://www.city.kobe.lg.jp", href),
+          pub_date    = d,
+          summary     = NA_character_
+        )
+      })
+      bind_rows(Filter(Negate(is.null), sub_rows))
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("神戸市 エラー: ", e$message); NULL })
 }
 
 # ============================================================
@@ -3702,7 +3794,8 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
   # 秋田県・奈良県・佐賀県・和歌山県・福岡県・長崎県・福井県 報道発表（HTMLスクレイピング）
   for (fn in list(fetch_akita_press_news, fetch_nara_press_news, fetch_saga_press_news,
                    fetch_wakayama_news, fetch_fukuoka_news, fetch_nagasaki_news, fetch_fukui_news,
-                   fetch_sakai_news, fetch_kawasaki_news, fetch_kitakyushu_news)) {
+                   fetch_sakai_news, fetch_kawasaki_news, fetch_kitakyushu_news,
+                   fetch_yokohama_news, fetch_kobe_news)) {
     d <- tryCatch(fn(), error = function(e) NULL)
     if (!is.null(d) && nrow(d) > 0) {
       if (!"retweet_count" %in% names(d)) d$retweet_count <- NA_integer_
