@@ -1809,6 +1809,63 @@ fetch_kumamoto_news <- function(timeout_sec = 15, n_results = 20) {
 }
 
 # ============================================================
+# 郡山市 報道資料（HTMLスクレイピング。RSS未提供のため、月別インデックスページから
+# 最新の「令和X年M月の報道資料」を動的に特定してから記事一覧を解析する。
+# 年月は月別ページの<title>から取得し、各記事は<li><a>M月D日（曜）タイトル</a></li>
+# 形式のため正規表現で日を抽出する）
+# ============================================================
+KORIYAMA_PRESS_INDEX_URL <- "https://www.city.koriyama.lg.jp/life/6/36/243/"
+
+fetch_koriyama_news <- function(timeout_sec = 15, n_results = 20) {
+  message("郡山市 報道資料 取得中...")
+  tryCatch({
+    idx_resp <- GET(KORIYAMA_PRESS_INDEX_URL, timeout(timeout_sec),
+                     add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(idx_resp) != 200) return(NULL)
+    idx_doc <- read_html(content(idx_resp, "text", encoding = "UTF-8"))
+    a <- xml_find_first(idx_doc, "//span[contains(@class,'article_title')]//a")
+    if (is.na(a)) return(NULL)
+    href <- xml_attr(a, "href")
+    if (is.na(href)) return(NULL)
+    month_url <- if (grepl("^https?://", href)) href else paste0("https://www.city.koriyama.lg.jp", href)
+
+    resp <- GET(month_url, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    title_txt <- xml_text(xml_find_first(doc, "//title"))
+    ym_m <- regmatches(title_txt, regexec("令和(\\d+)年(\\d{1,2})月", title_txt))[[1]]
+    if (length(ym_m) < 3) return(NULL)
+    gyear <- as.integer(ym_m[2]) + 2018
+    gmonth <- as.integer(ym_m[3])
+
+    items <- xml_find_all(doc, "//li[a[contains(@href,'.pdf')]]")
+    if (length(items) == 0) return(NULL)
+
+    rows <- lapply(items, function(li) {
+      a2 <- xml_find_first(li, ".//a")
+      title <- trimws(xml_text(a2))
+      href2 <- xml_attr(a2, "href")
+      dm <- regmatches(title, regexec("^(\\d{1,2})月(\\d{1,2})日", title))[[1]]
+      if (length(dm) < 3 || nchar(title) == 0 || is.na(href2)) return(NULL)
+      d <- suppressWarnings(as.Date(sprintf("%d-%02d-%02d", gyear, as.integer(dm[2]), as.integer(dm[3]))))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "city_koriyama",
+        source_name = "郡山市（報道資料）",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href2)) href2 else paste0("https://www.city.koriyama.lg.jp", href2),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("郡山市 エラー: ", e$message); NULL })
+}
+
+# ============================================================
 # PubMed E-utilities — アウトブレイク関連論文取得（APIキー不要）
 # ============================================================
 PUBMED_QUERIES <- c(
@@ -4099,7 +4156,8 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
                    fetch_wakayama_news, fetch_fukuoka_news, fetch_nagasaki_news, fetch_fukui_news,
                    fetch_sakai_news, fetch_kawasaki_news, fetch_kitakyushu_news,
                    fetch_yokohama_news, fetch_kobe_news, fetch_fukuoka_kansen_news,
-                   fetch_saitama_news, fetch_osaka_city_news, fetch_niigata_news, fetch_kumamoto_news)) {
+                   fetch_saitama_news, fetch_osaka_city_news, fetch_niigata_news, fetch_kumamoto_news,
+                   fetch_koriyama_news)) {
     d <- tryCatch(fn(), error = function(e) NULL)
     if (!is.null(d) && nrow(d) > 0) {
       if (!"retweet_count" %in% names(d)) d$retweet_count <- NA_integer_
