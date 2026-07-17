@@ -1866,6 +1866,48 @@ fetch_koriyama_news <- function(timeout_sec = 15, n_results = 20) {
 }
 
 # ============================================================
+# 宇都宮市 新着更新情報（HTMLスクレイピング。RSS未提供のため記事一覧ページを直接解析する。
+# 日付が和暦"令和X年M月D日"形式のため西暦に変換する）
+# ============================================================
+UTSUNOMIYA_NEWS_URL <- "https://www.city.utsunomiya.lg.jp/arrival.html"
+
+fetch_utsunomiya_news <- function(timeout_sec = 15, n_results = 20) {
+  message("宇都宮市 新着更新情報 取得中...")
+  tryCatch({
+    resp <- GET(UTSUNOMIYA_NEWS_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    items <- xml_find_all(doc, "//ul[contains(@class,'newslist')]//li")
+    if (length(items) == 0) return(NULL)
+
+    rows <- lapply(items, function(li) {
+      date_str <- trimws(xml_text(xml_find_first(li, ".//span[contains(@class,'date')]")))
+      a <- xml_find_first(li, ".//span[contains(@class,'newsli')]//a")
+      title <- trimws(xml_text(a))
+      href  <- xml_attr(a, "href")
+      m <- regmatches(date_str, regexec("令和(\\d+)年(\\d{1,2})月(\\d{1,2})日", date_str))[[1]]
+      if (length(m) < 4 || nchar(title) == 0 || is.na(href)) return(NULL)
+      gyear <- as.integer(m[2]) + 2018
+      d <- suppressWarnings(as.Date(sprintf("%d-%02d-%02d", gyear, as.integer(m[3]), as.integer(m[4]))))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "city_utsunomiya",
+        source_name = "宇都宮市",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href
+                       else paste0("https://www.city.utsunomiya.lg.jp/", sub("^\\./", "", href)),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("宇都宮市 エラー: ", e$message); NULL })
+}
+
+# ============================================================
 # PubMed E-utilities — アウトブレイク関連論文取得（APIキー不要）
 # ============================================================
 PUBMED_QUERIES <- c(
@@ -4157,7 +4199,7 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
                    fetch_sakai_news, fetch_kawasaki_news, fetch_kitakyushu_news,
                    fetch_yokohama_news, fetch_kobe_news, fetch_fukuoka_kansen_news,
                    fetch_saitama_news, fetch_osaka_city_news, fetch_niigata_news, fetch_kumamoto_news,
-                   fetch_koriyama_news)) {
+                   fetch_koriyama_news, fetch_utsunomiya_news)) {
     d <- tryCatch(fn(), error = function(e) NULL)
     if (!is.null(d) && nrow(d) > 0) {
       if (!"retweet_count" %in% names(d)) d$retweet_count <- NA_integer_
