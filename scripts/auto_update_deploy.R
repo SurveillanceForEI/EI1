@@ -56,6 +56,9 @@ tryCatch({
     } else {
       merged <- new_data
     }
+    # フィード表示範囲外に出て再取得されなくなった過去記事も含め、
+    # マージ後の全件を再スクリーニング（screen_entry修正の遡及反映）
+    merged <- rescreen_ebs_data(merged)
     saveRDS(merged, cache_path)
     log("EBS キャッシュ更新完了: ", nrow(merged), " 件")
   } else {

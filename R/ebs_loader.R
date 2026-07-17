@@ -4675,6 +4675,69 @@ signal_color <- function(level) {
 }
 
 # ============================================================
+# WHO EBS 7基準スクリーニング（再利用可能版）
+# 新規取得データだけでなく、キャッシュに残る既存記事も含めた
+# データフレーム全体に対して呼び出せる。screen_entry() のロジック
+# 修正が、フィードの表示範囲外に出て再取得されなくなった過去記事にも
+# 反映されるようにするため、マージ後の全件に対して再実行する用途を想定。
+# ============================================================
+rescreen_ebs_data <- function(df) {
+  if (is.null(df) || nrow(df) == 0) return(df)
+  if (!exists("screen_entry", mode = "function")) return(df)
+
+  fyi_result <- list(
+    unusual_unexpected="", serious_ph_country="", serious_ph_japan="",
+    epidemic_prone="", mass_exposure="", high_profile="", special_pathogen="",
+    signal_weight="FYI", disease_category=NA_character_,
+    disease_name_en=NA_character_, disease_name_ja=NA_character_,
+    location=NA_character_, region=NA_character_
+  )
+
+  screen_fn <- function(i) {
+    # PubMedは常にFYI（スクリーニング不要）
+    if (coalesce(df$source_id[i], "") == "pubmed") return(fyi_result)
+    ep <- if ("ebs_pref" %in% names(df)) coalesce(df$ebs_pref[i], NA_character_) else NA_character_
+    is_ov <- is_overseas_article(
+      title       = coalesce(df$title[i], ""),
+      summary     = coalesce(df$summary[i], ""),
+      ebs_pref    = ep,
+      source_id   = coalesce(df$source_id[i], ""),
+      source_name = coalesce(df$source_name[i], "")
+    )
+    tryCatch(
+      screen_entry(
+        title       = coalesce(df$title[i], ""),
+        summary     = coalesce(df$summary[i], ""),
+        source_id   = coalesce(df$source_id[i], ""),
+        source_name = coalesce(df$source_name[i], ""),
+        lang        = coalesce(df$lang[i], ""),
+        is_overseas = is_ov
+      ),
+      error = function(e) fyi_result
+    )
+  }
+
+  screen_results <- lapply(seq_len(nrow(df)), screen_fn)
+
+  df$signal_level  <- factor(sapply(screen_results, `[[`, "signal_weight"),
+                              levels = c("Signal High","Signal Low","FYI"))
+  df$ebs_unusual   <- sapply(screen_results, `[[`, "unusual_unexpected")
+  df$ebs_serious_c <- sapply(screen_results, `[[`, "serious_ph_country")
+  df$ebs_serious_j <- sapply(screen_results, `[[`, "serious_ph_japan")
+  df$ebs_epidemic  <- sapply(screen_results, `[[`, "epidemic_prone")
+  df$ebs_mass      <- sapply(screen_results, `[[`, "mass_exposure")
+  df$ebs_high      <- sapply(screen_results, `[[`, "high_profile")
+  df$ebs_special   <- sapply(screen_results, `[[`, "special_pathogen")
+  df$ebs_disease_en <- sapply(screen_results, `[[`, "disease_name_en")
+  df$ebs_disease_ja <- sapply(screen_results, `[[`, "disease_name_ja")
+  df$ebs_location  <- sapply(screen_results, `[[`, "location")
+  df$ebs_region    <- sapply(screen_results, `[[`, "region")
+  df$signal_weight <- sapply(df$signal_level, signal_weight)
+
+  df
+}
+
+# ============================================================
 # 全ソース統合取得
 # ============================================================
 fetch_all_ebs <- function(sources      = EBS_SOURCES,
@@ -4870,67 +4933,12 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
   # WHO EBS 7基準ルールベーススクリーニング → signal_level を決定
   if (exists("screen_entry", mode = "function") && nrow(all_df) > 0) {
     message("EBSスクリーニング開始: ", nrow(all_df), " 件")
-
-    fyi_result <- list(
-      unusual_unexpected="", serious_ph_country="", serious_ph_japan="",
-      epidemic_prone="", mass_exposure="", high_profile="", special_pathogen="",
-      signal_weight="FYI", disease_category=NA_character_,
-      disease_name_en=NA_character_, disease_name_ja=NA_character_,
-      location=NA_character_, region=NA_character_
-    )
-
-    screen_fn <- function(i) {
-      # PubMedは常にFYI（スクリーニング不要）
-      if (coalesce(all_df$source_id[i], "") == "pubmed") return(fyi_result)
-      # 海外記事かどうかを判定（ebs_pref + テキスト地名）
-      ep <- if ("ebs_pref" %in% names(all_df)) coalesce(all_df$ebs_pref[i], NA_character_) else NA_character_
-      is_ov <- is_overseas_article(
-        title       = coalesce(all_df$title[i], ""),
-        summary     = coalesce(all_df$summary[i], ""),
-        ebs_pref    = ep,
-        source_id   = coalesce(all_df$source_id[i], ""),
-        source_name = coalesce(all_df$source_name[i], "")
-      )
-      tryCatch(
-        screen_entry(
-          title       = coalesce(all_df$title[i], ""),
-          summary     = coalesce(all_df$summary[i], ""),
-          source_id   = coalesce(all_df$source_id[i], ""),
-          source_name = coalesce(all_df$source_name[i], ""),
-          lang        = coalesce(all_df$lang[i], ""),
-          is_overseas = is_ov
-        ),
-        error = function(e) list(
-          unusual_unexpected="", serious_ph_country="", serious_ph_japan="",
-          epidemic_prone="", mass_exposure="", high_profile="", special_pathogen="",
-          signal_weight="FYI", disease_category=NA_character_,
-          disease_name_en=NA_character_, disease_name_ja=NA_character_,
-          location=NA_character_, region=NA_character_
-        )
-      )
-    }
-
-    screen_results <- lapply(seq_len(nrow(all_df)), screen_fn)
-
+    all_df <- rescreen_ebs_data(all_df)
     message("EBSスクリーニング完了")
-    all_df$signal_level  <- factor(sapply(screen_results, `[[`, "signal_weight"),
-                                   levels = c("Signal High","Signal Low","FYI"))
-    all_df$ebs_unusual   <- sapply(screen_results, `[[`, "unusual_unexpected")
-    all_df$ebs_serious_c <- sapply(screen_results, `[[`, "serious_ph_country")
-    all_df$ebs_serious_j <- sapply(screen_results, `[[`, "serious_ph_japan")
-    all_df$ebs_epidemic  <- sapply(screen_results, `[[`, "epidemic_prone")
-    all_df$ebs_mass      <- sapply(screen_results, `[[`, "mass_exposure")
-    all_df$ebs_high      <- sapply(screen_results, `[[`, "high_profile")
-    all_df$ebs_special   <- sapply(screen_results, `[[`, "special_pathogen")
-    all_df$ebs_disease_en <- sapply(screen_results, `[[`, "disease_name_en")
-    all_df$ebs_disease_ja <- sapply(screen_results, `[[`, "disease_name_ja")
-    all_df$ebs_location  <- sapply(screen_results, `[[`, "location")
-    all_df$ebs_region    <- sapply(screen_results, `[[`, "region")
   } else {
-    all_df$signal_level <- factor("FYI", levels = c("Signal High","Signal Low","FYI"))
+    all_df$signal_level  <- factor("FYI", levels = c("Signal High","Signal Low","FYI"))
+    all_df$signal_weight <- sapply(all_df$signal_level, signal_weight)
   }
-
-  all_df$signal_weight <- sapply(all_df$signal_level, signal_weight)
 
   all_df <- all_df %>%
     arrange(signal_level, desc(pub_date)) %>%

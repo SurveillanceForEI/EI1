@@ -149,10 +149,13 @@ merge_ebs_cache <- function(new_data, cache_path = EBS_STARTUP_CACHE, keep_days 
   } else {
     new_data
   }
-  combined %>%
+  combined <- combined %>%
     dplyr::filter(is.na(pub_date) | pub_date >= cutoff) %>%
-    dplyr::distinct(title, source_id, .keep_all = TRUE) %>%
-    dplyr::arrange(signal_level, dplyr::desc(pub_date))
+    dplyr::distinct(title, source_id, .keep_all = TRUE)
+  # フィード表示範囲外に出て再取得されなくなった過去記事にも、screen_entry() の
+  # ロジック修正が反映されるよう、マージ後の全件を再スクリーニングする
+  combined <- rescreen_ebs_data(combined)
+  combined %>% dplyr::arrange(signal_level, dplyr::desc(pub_date))
 }
 
 save_ebs_cache <- function(data, cache_path = EBS_STARTUP_CACHE) {
