@@ -5018,7 +5018,7 @@ server <- function(input, output, session) {
         pref_val <- if ("ebs_pref" %in% names(row)) coalesce(row$ebs_pref, NA_character_) else NA_character_
         loc_val  <- if ("ebs_location" %in% names(row)) coalesce(row$ebs_location, NA_character_) else NA_character_
         r <- find_idsc_domestic_link(pref_val, loc_val)
-        if (is.null(r)) r <- find_idsc_overseas_link(loc_val)
+        if (is.null(r) && !is.na(loc_val) && loc_val != "Global") r <- find_idsc_overseas_link(loc_val)
         r
       }, error = function(e) NULL)
       idsc_ref_line <- if (!is.null(idsc_ref)) {
@@ -5026,7 +5026,7 @@ server <- function(input, output, session) {
           icon("circle-info"), " 参考: 地域の公式情報 ",
           tags$a(href=idsc_ref$url, target="_blank", rel="noopener noreferrer",
                  style="color:#7f8c8d;text-decoration:underline;", idsc_ref$label),
-          "（記事の情報源ではありません）")
+          "（記事の情報源とは限りません）")
       }
 
       tags$div(
@@ -5191,7 +5191,7 @@ server <- function(input, output, session) {
         pref_val <- if ("ebs_pref" %in% names(row)) coalesce(row$ebs_pref, NA_character_) else NA_character_
         loc_val  <- if ("ebs_location" %in% names(row)) coalesce(row$ebs_location, NA_character_) else NA_character_
         r <- find_idsc_domestic_link(pref_val, loc_val)
-        if (is.null(r)) r <- find_idsc_overseas_link(loc_val)
+        if (is.null(r) && !is.na(loc_val) && loc_val != "Global") r <- find_idsc_overseas_link(loc_val)
         r
       }, error = function(e) NULL)
       idsc_ref_line <- if (!is.null(idsc_ref)) {
@@ -5199,7 +5199,7 @@ server <- function(input, output, session) {
           icon("circle-info"), " 参考: 地域の公式情報 ",
           tags$a(href=idsc_ref$url, target="_blank", rel="noopener noreferrer",
                  style="color:#7f8c8d;text-decoration:underline;", idsc_ref$label),
-          "（記事の情報源ではありません）")
+          "（記事の情報源とは限りません）")
       }
       tags$div(
         style=paste0("background:#fff;border-radius:6px;padding:14px 16px;",

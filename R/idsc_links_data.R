@@ -336,7 +336,7 @@ IDSC_NATIONAL <- list(
 IDSC_OVERSEAS <- list(
   # ── WHO本部・国際機関 ──────────────────────────────────────
   .idsc_overseas("WHO Disease Outbreak News", "世界保健機関（WHO）",
-                 "https://www.who.int/emergencies/disease-outbreak-news", "国際機関", country_en = "Global"),
+                 "https://www.who.int/emergencies/disease-outbreak-news", "国際機関"),
   .idsc_overseas("WHO EIOS（疫学情報収集ツール）", "世界保健機関（WHO）",
                  "https://www.who.int/initiatives/eios", "国際機関"),
   .idsc_overseas("ReliefWeb（人道情報・アウトブレイク速報）", "国連人道問題調整事務所（OCHA）",
