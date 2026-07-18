@@ -329,7 +329,7 @@ IDSC_NATIONAL <- list(
 
 IDSC_OVERSEAS <- list(
   # ── WHO本部・国際機関 ──────────────────────────────────────
-  .idsc_overseas("WHO 疾病突発事件ニュース（Disease Outbreak News）", "世界保健機関（WHO）",
+  .idsc_overseas("WHO Disease Outbreak News", "世界保健機関（WHO）",
                  "https://www.who.int/emergencies/disease-outbreak-news", "国際機関"),
   .idsc_overseas("WHO EIOS（疫学情報収集ツール）", "世界保健機関（WHO）",
                  "https://www.who.int/initiatives/eios", "国際機関"),
