@@ -351,12 +351,27 @@ IDSC_OVERSEAS <- list(
   .idsc_overseas("中国 CDC（中国疾病預防控制中心）", "中国疾病預防控制中心",
                  "https://www.chinacdc.cn/", "東・東南アジア"),
   .idsc_overseas("香港 CHP（衛生防護中心）", "香港衛生署 衛生防護中心",
-                 "https://www.chp.gov.hk/", "東・東南アジア")
+                 "https://www.chp.gov.hk/", "東・東南アジア"),
+  # ── 西太平洋地域（WHO西太平洋事務局管轄、WPRO）─────────────
+  .idsc_overseas("Australian CDC — NNDSS（全国届出感染症サーベイランスシステム）", "オーストラリア疾病予防管理センター（CDC Australia）",
+                 "https://www.cdc.gov.au/diseases/surveillance-systems-and-networks/national-notifiable-diseases-surveillance-system-nndss", "西太平洋地域"),
+  .idsc_overseas("PHF Science（旧ESR）感染症サーベイランス", "ニュージーランド公衆衛生・法科学研究所（PHF Science）",
+                 "https://www.esr.cri.nz/expertise/public-health/infectious-disease-intelligence-surveillance/", "西太平洋地域"),
+  .idsc_overseas("KDCA 感染症サーベイランスシステム", "韓国疾病管理庁（KDCA）",
+                 "https://www.kdca.go.kr/eng/4354/subview.do", "西太平洋地域"),
+  .idsc_overseas("CDA（感染症庁）", "シンガポール感染症庁（Communicable Diseases Agency）",
+                 "https://www.cda.gov.sg/", "西太平洋地域"),
+  .idsc_overseas("DOH 週間疾病サーベイランス報告", "フィリピン保健省 疫学局（Epidemiology Bureau, DOH）",
+                 "https://doh.gov.ph/health-statistics/weekly-disease-surveillance-report/", "西太平洋地域"),
+  .idsc_overseas("KKMNOW（保健省オープンデータ・感染症統計）", "マレーシア保健省（MOH Malaysia）",
+                 "https://data.moh.gov.my/", "西太平洋地域"),
+  .idsc_overseas("保健省（感染症サーベイランス専用ページは未確認）", "ベトナム保健省（Ministry of Health）",
+                 "https://moh.gov.vn/", "西太平洋地域")
 )
 
 .idsc_overseas_region_color <- function(region) {
   c("国際機関"="#7f8c8d", "北米"="#2980b9", "欧州"="#8e44ad",
-    "アフリカ"="#d35400", "東・東南アジア"="#27ae60")[region]
+    "アフリカ"="#d35400", "東・東南アジア"="#27ae60", "西太平洋地域"="#c0392b")[region]
 }
 
 # タイプ別バッジ色
