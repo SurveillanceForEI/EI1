@@ -168,7 +168,7 @@ IDSC_LINKS <- list(
          .idsc_city("静岡市", "政令指定都市", "静岡市感染症発生動向調査", "https://www.city.shizuoka.lg.jp/s2371/s003411.html"),
          .idsc_city("浜松市", "政令指定都市", "浜松市感染症情報センター", "https://www.city.hamamatsu.shizuoka.jp/hokanken/idwr/index.html")
        )),
-  list(pref = "愛知県", center = "愛知県感染症情報（週報）",
+  list(pref = "愛知県", center = "感染症の発生状況",
        url = "https://www.pref.aichi.jp/eiseiken/kansentop.html",
        cities = list(
          .idsc_city("名古屋市", "政令指定都市", "名古屋市感染症情報センター", "https://www.city.nagoya.jp/kenkofukushi/eisei/1015269/1015388/index.html"),
@@ -272,7 +272,7 @@ IDSC_LINKS <- list(
        cities = list(
          .idsc_city("高知市", "中核市", "高知市 感染症情報", "https://www.city.kochi.kochi.jp/life/27/167/1414/")
        )),
-  list(pref = "福岡県", center = "福岡県感染症情報センター",
+  list(pref = "福岡県", center = "福岡県感染症情報",
        url = "http://www.fihes.pref.fukuoka.jp/~idsc_fukuoka/",
        cities = list(
          .idsc_city("福岡市", "政令指定都市", "福岡市感染症発生報告数（定点報告）", "https://www.city.fukuoka.lg.jp/hofuku/hokensho/kansensho/kansenshojoho/chosa/teitenhoukoku.html"),
@@ -283,7 +283,7 @@ IDSC_LINKS <- list(
        url = "https://kansen.pref.saga.jp/",
        cities = list()),
   list(pref = "長崎県", center = "感染症情報センター",
-       url = "https://www.pref.nagasaki.jp/bunrui/hukushi-hoken/kansensho/kansen-c/",
+       url = "https://www.pref.nagasaki.jp/bunrui/hukushi-hoken/hoken-iryo/kansensho/kansen-c/",
        cities = list(
          .idsc_city("長崎市", "中核市", "県感染症情報センターに準拠、市も発生動向ページあり", "https://www.city.nagasaki.lg.jp/page/4047.html"),
          .idsc_city("佐世保市", "中核市", "佐世保市 感染症ページ", "https://www.city.sasebo.lg.jp/hokenhukusi/kansen/20231011.html")
