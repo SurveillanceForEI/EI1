@@ -18,13 +18,13 @@ IDSC_LINKS <- list(
        cities = list(
          .idsc_city("札幌市", "政令指定都市", "札幌市衛生研究所 感染症情報", "https://www.city.sapporo.jp/eiken/infect/index.html"),
          .idsc_city("旭川市", "中核市", "北海道感染症情報センター（旭川市保健所管内）", "https://www.iph.pref.hokkaido.jp/kansen/asahikawa/index.html", own = FALSE),
-         .idsc_city("函館市", "中核市", "北海道感染症情報センター（市立函館保健所管内）", "https://www.iph.pref.hokkaido.jp/kansen/hakodate/index.html", own = FALSE),
-         .idsc_city("小樽市", "保健所政令市", "感染症発生動向調査", "https://www.city.otaru.lg.jp/docs/2020101600662", own = FALSE)
+         .idsc_city("函館市", "中核市", "市内の感染症発生状況について", "https://www.city.hakodate.hokkaido.jp/docs/2024020800073/"),
+         .idsc_city("小樽市", "保健所政令市", "市内の感染症発生状況について（感染症発生動向調査）", "https://www.city.otaru.lg.jp/docs/2020101600662/")
        )),
   list(pref = "青森県", center = "青森県感染症情報ネット",
        url = "https://www.pref.aomori.lg.jp/soshiki/kenko/hoken/tubeculosis-kansen_home.html",
        cities = list(
-         .idsc_city("青森市", "中核市", "青森市保健所（感染症の流行状況についてのお知らせ）", "https://www.city.aomori.aomori.jp/hukushi_kenkou/kenkou_iryou/1003125/1003152/1003153.html", own = FALSE),
+         .idsc_city("青森市", "中核市", "青森市保健所（感染症の流行状況についてのお知らせ）", "https://www.city.aomori.aomori.jp/hukushi_kenkou/kenkou_iryou/1003125/1003152/1003153.html"),
          .idsc_city("八戸市", "中核市", "県感染症情報ネットに準拠（市独自ページ未確認）", "https://www.pref.aomori.lg.jp/soshiki/kenko/hoken/tubeculosis-kansen_home.html", own = FALSE)
        )),
   list(pref = "岩手県", center = "岩手県感染症情報センター",
@@ -40,24 +40,24 @@ IDSC_LINKS <- list(
   list(pref = "秋田県", center = "秋田県感染症情報センター",
        url = "https://idsc.pref.akita.jp/",
        cities = list(
-         .idsc_city("秋田市", "中核市", "秋田市公式サイト「感染症情報」", "https://www.city.akita.lg.jp/kurashi/kenko/1005371/1019138/index.html", own = FALSE)
+         .idsc_city("秋田市", "中核市", "秋田市公式サイト「感染症情報」", "https://www.city.akita.lg.jp/kurashi/kenko/1005371/1019138/index.html")
        )),
   list(pref = "山形県", center = "感染症情報センター（山形県衛生研究所）",
        url = "https://www.eiken.yamagata.yamagata.jp/kansen.html",
        cities = list(
-         .idsc_city("山形市", "中核市", "山形市「山形県感染症発生動向調査について」", "https://www.city.yamagata-yamagata.lg.jp/kenkofukushi/iryou/1006676/1006677/1003407.html", own = FALSE)
+         .idsc_city("山形市", "中核市", "山形市「山形県感染症発生動向調査について」", "https://www.city.yamagata-yamagata.lg.jp/kenkofukushi/iryou/1006676/index.html")
        )),
   list(pref = "福島県", center = "福島県感染症情報センター",
        url = "https://www.pref.fukushima.lg.jp/sec/21910a/kansenshoujouhou.html",
        cities = list(
-         .idsc_city("福島市", "中核市", "福島市「感染症の流行状況」", "https://www.city.fukushima.fukushima.jp/hokenyobo-kt/inhuru.html", own = FALSE),
-         .idsc_city("郡山市", "中核市", "郡山市保健所 保健・感染症課", "https://www.city.koriyama.lg.jp/soshiki/71/116926.html", own = FALSE),
+         .idsc_city("福島市", "中核市", "福島市「感染症の流行状況」", "https://www.city.fukushima.fukushima.jp/soshiki/9/1050/1/1/5429.html"),
+         .idsc_city("郡山市", "中核市", "郡山市保健所 保健・感染症課", "https://www.city.koriyama.lg.jp/soshiki/71/116926.html"),
          .idsc_city("いわき市", "中核市", "いわき市役所「市内の感染症情報」", "https://www.city.iwaki.lg.jp/www/contents/1692257880453/index.html")
        )),
   list(pref = "茨城県", center = "感染症情報センター（茨城県衛生研究所）",
        url = "https://www.pref.ibaraki.jp/hokenfukushi/eiken/idwr/index.html",
        cities = list(
-         .idsc_city("水戸市", "中核市", "水戸市 感染症流行情報", "https://www.city.mito.lg.jp/001245/hokenjo/001/004/p021576.html", own = FALSE)
+         .idsc_city("水戸市", "中核市", "水戸市 感染症流行情報（個別のお知らせページ、週報等の定期サーベイランスではない）", "https://www.city.mito.lg.jp/site/vaccination/2493.html")
        )),
   list(pref = "栃木県", center = "栃木県感染症情報センター（TIDC）",
        url = "https://www.pref.tochigi.lg.jp/e60/tidctop.html",
@@ -68,7 +68,7 @@ IDSC_LINKS <- list(
        url = "https://www.pref.gunma.jp/page/3296.html",
        cities = list(
          .idsc_city("前橋市", "中核市", "群馬県衛生環境研究所 感染症情報センターに準拠（市独自センター未確認）", "https://www.pref.gunma.jp/page/3302.html", own = FALSE),
-         .idsc_city("高崎市", "中核市", "高崎市医師会 感染症情報", "https://takasaki.gunma.med.or.jp/topics/", own = FALSE)
+         .idsc_city("高崎市", "中核市", "高崎市 感染症情報（個別のお知らせページ、週報等の定期サーベイランスではない）", "https://www.city.takasaki.gunma.jp/page/62103.html")
        )),
   list(pref = "埼玉県", center = "感染症情報センター",
        url = "https://www.pref.saitama.lg.jp/b0714/surveillance/",
@@ -76,7 +76,7 @@ IDSC_LINKS <- list(
          .idsc_city("さいたま市", "政令指定都市", "さいたま市感染症情報センター", "https://www.city.saitama.lg.jp/008/016/004/index.html"),
          .idsc_city("川越市", "中核市", "感染症ジャーナルかわごえ", "https://www.city.kawagoe.saitama.jp/kenko/iryo/1006178/1006180/1013879.html"),
          .idsc_city("川口市", "中核市", "川口市「最新の感染症流行状況」", "https://www.city.kawaguchi.lg.jp/soshiki/01090/020/hasseijyoukyou/20672.html"),
-         .idsc_city("越谷市", "中核市", "越谷市保健所「感染症」ページ", "https://www.city.koshigaya.saitama.jp/kurashi_shisei/fukushi/hokenjo/kansensho/index.html", own = FALSE)
+         .idsc_city("越谷市", "中核市", "越谷市保健所「感染症」ページ", "https://www.city.koshigaya.saitama.jp/kurashi_shisei/fukushi/hokenjo/kansensho/koshigaya_contents_20190829.html")
        )),
   list(pref = "千葉県", center = "千葉県感染症情報センター",
        url = "https://www.pref.chiba.lg.jp/eiken/c-idsc/index.html",
@@ -87,24 +87,26 @@ IDSC_LINKS <- list(
        )),
   list(pref = "東京都", center = "東京都感染症情報センター",
        url = "https://idsc.tokyo-eiken.go.jp/",
+       institute_name = "東京都健康安全研究センター（運営母体）",
+       institute_url  = "https://www.tmiph.metro.tokyo.lg.jp/",
        cities = list(
          .idsc_city("八王子市", "中核市", "八王子市「感染症」ページ", "https://www.city.hachioji.tokyo.jp/kurashi/hoken/007/009/index.html"),
          .idsc_city("町田市", "保健所政令市", "町田市感染症週報", "https://www.city.machida.tokyo.jp/iryo/hokenjo/kansen/kansensyosyuhou22.html"),
-         .idsc_city("千代田区", "特別区", "インフルエンザ情報", "https://www.city.chiyoda.lg.jp/koho/kenko/kenko/kansensho/sonota/influenza.html", own = FALSE),
+         .idsc_city("千代田区", "特別区", "新型コロナウイルス感染症の発生状況（個別のお知らせページ、週報等の定期サーベイランスではない）", "https://www.city.chiyoda.lg.jp/koho/kenko/kenko/kansensho/coronavirus/hasseijokyo.html"),
          .idsc_city("中央区", "特別区", "中央区感染症発生動向（週報）", "https://www.city.chuo.lg.jp/kenkouiryou/iryou/kansen/index.html"),
          .idsc_city("港区", "特別区", "感染症発生動向調査（港区感染症週報）", "https://www.city.minato.tokyo.jp/hokenyobou/doukou/"),
          .idsc_city("新宿区", "特別区", "新宿区感染症発生動向調査 週報", "https://www.city.shinjuku.lg.jp/kenkou/yobo01_002243.html"),
          .idsc_city("文京区", "特別区", "文京区感染症週報", "https://www.city.bunkyo.lg.jp/b028/p002572.html"),
-         .idsc_city("台東区", "特別区", "感染症情報／インフルエンザ発生状況", "https://www.city.taito.lg.jp/kenkohukusi/kenkokikikanrieisei/kansensho/kansenshoyobo/index.html", own = FALSE),
-         .idsc_city("墨田区", "特別区", "感染症の予防と対応", "https://www.city.sumida.lg.jp/kenko_fukushi/kenko/kansensyou_yobou/index.html", own = FALSE),
-         .idsc_city("江東区", "特別区", "保健予防課ページ", "https://www.city.koto.lg.jp/fukushi/hoken/yobo/index.html", own = FALSE),
+         .idsc_city("台東区", "特別区", "感染症情報 注目のお知らせ（個別のお知らせページ、週報等の定期サーベイランスではない）", "https://www.city.taito.lg.jp/kenkohukusi/kenkokikikanrieisei/kansensho/kansenshoyobo/chuumoku/01587234.html"),
+         .idsc_city("墨田区", "特別区", "感染症のお知らせ（令和8年度、個別のお知らせページ、週報等の定期サーベイランスではない）", "https://www.city.sumida.lg.jp/kenko_fukushi/kenko/kansensyou_yobou/osirase/kosirase/r8.html"),
+         .idsc_city("江東区", "特別区", "保健予防課ページ", "https://www.city.koto.lg.jp/fukushi/hoken/yobo/index.html"),
          .idsc_city("品川区", "特別区", "品川区の感染症流行状況", "https://www.city.shinagawa.tokyo.jp/PC/kenkou/kenkou-byouki/kenkou-byouki-oshirasenyuryoku/hpg000033447.html"),
          .idsc_city("目黒区", "特別区", "目黒区感染症発生動向調査 週報", "https://www.city.meguro.tokyo.jp/hokenyobou/kenkoufukushi/iryou/haseidoukou.html"),
          .idsc_city("大田区", "特別区", "感染症発生動向調査（区内流行情報）", "https://www.city.ota.tokyo.jp/seikatsu/hoken/kansen_taisaku/syuuhou.html"),
          .idsc_city("世田谷区", "特別区", "感染症発生動向調査", "https://www.city.setagaya.lg.jp/02015/3155.html"),
          .idsc_city("渋谷区", "特別区", "渋谷区感染症週報・月報", "https://www.city.shibuya.tokyo.jp/kenko/kansen/kansen-jokyo/kansen-doko.html"),
          .idsc_city("中野区", "特別区", "中野区の感染症最新情報", "https://www.city.tokyo-nakano.lg.jp/kenko_hukushi/kansen/saishin.html"),
-         .idsc_city("杉並区", "特別区", "感染症（杉並保健所）", "https://www.city.suginami.tokyo.jp/kenkou/kenkou/kansenshou/index.html", own = FALSE),
+         .idsc_city("杉並区", "特別区", "感染症（杉並保健所）", "https://www.city.suginami.tokyo.jp/kenkou/kenkou/kansenshou/index.html"),
          .idsc_city("豊島区", "特別区", "感染症情報", "https://www.city.toshima.lg.jp/543/kenko/kenko/kansensho/1803141318.html"),
          .idsc_city("北区", "特別区", "北区の感染症最新情報", "https://www.city.kita.tokyo.jp/kenko/kansensho/shuho/shuho2023-2025.html"),
          .idsc_city("荒川区", "特別区", "感染症発生情報", "https://www.city.arakawa.tokyo.jp/a034/kenkouiryou/kansenshou/hasseidoukou.html"),
@@ -132,17 +134,17 @@ IDSC_LINKS <- list(
   list(pref = "富山県", center = "富山県感染症情報センター",
        url = "https://www.pref.toyama.jp/1279/kansen/",
        cities = list(
-         .idsc_city("富山市", "中核市", "富山県感染症情報センターに一元化（市独自センターなし）", "https://www.pref.toyama.jp/1279/kansen/", own = FALSE)
+         .idsc_city("富山市", "中核市", "富山市 感染症発生状況", "https://www.city.toyama.lg.jp/health/kenshin/1010470/index.html")
        )),
   list(pref = "石川県", center = "石川県感染症情報センター",
        url = "https://www.pref.ishikawa.lg.jp/hokan/kansenjoho/top/top.html",
        cities = list(
-         .idsc_city("金沢市", "中核市", "金沢市保健所地域保健課ページ", "https://www4.city.kanazawa.lg.jp/soshikikarasagasu/chiikihokenka/1_1/1_2/1_2_4/1_2_4_6/24603.html", own = FALSE)
+         .idsc_city("金沢市", "中核市", "金沢市保健所地域保健課ページ", "https://www4.city.kanazawa.lg.jp/soshikikarasagasu/chiikihokenka/27342.html")
        )),
   list(pref = "福井県", center = "福井県感染症情報",
        url = "https://info.pref.fukui.lg.jp/kansensyou/",
        cities = list(
-         .idsc_city("福井市", "中核市", "福井市「感染症発生動向調査について」", "https://www.city.fukui.lg.jp/fukusi/iryou/kensen/surveillance.html", own = FALSE)
+         .idsc_city("福井市", "中核市", "福井市「感染症発生動向調査について」", "https://www.city.fukui.lg.jp/fukusi/iryou/kensen/index.html")
        )),
   list(pref = "山梨県", center = "やまなし感染症ポータルサイト",
        url = "https://www.pref.yamanashi.jp/kansensho_portal/",
@@ -158,12 +160,12 @@ IDSC_LINKS <- list(
   list(pref = "岐阜県", center = "感染症情報センター（岐阜県保健環境研究所）",
        url = "https://www.pref.gifu.lg.jp/page/9550.html",
        cities = list(
-         .idsc_city("岐阜市", "中核市", "岐阜県感染症情報センターに準拠（市独自センター未確認）", "https://www.pref.gifu.lg.jp/page/9550.html", own = FALSE)
+         .idsc_city("岐阜市", "中核市", "岐阜市 感染症情報", "https://www.city.gifu.lg.jp/kenko/kansensyou/1004430.html")
        )),
   list(pref = "静岡県", center = "感染症情報センター",
        url = "https://www.pref.shizuoka.jp/kenkofukushi/shippeikansensho/kansensho/1003065/index.html",
        cities = list(
-         .idsc_city("静岡市", "政令指定都市", "静岡市感染症発生動向調査", "https://www.city.shizuoka.lg.jp/s2371/s003411.html", own = FALSE),
+         .idsc_city("静岡市", "政令指定都市", "静岡市感染症発生動向調査", "https://www.city.shizuoka.lg.jp/s2371/s003411.html"),
          .idsc_city("浜松市", "政令指定都市", "浜松市感染症情報センター", "https://www.city.hamamatsu.shizuoka.jp/hokanken/idwr/index.html")
        )),
   list(pref = "愛知県", center = "愛知県感染症情報（週報）",
@@ -178,7 +180,7 @@ IDSC_LINKS <- list(
   list(pref = "三重県", center = "三重県感染症情報センター",
        url = "https://www.kenkou.pref.mie.jp/",
        cities = list(
-         .idsc_city("四日市市", "保健所政令市", "四日市市「感染症（発生）情報」（県センターへの依存の可能性あり）", "https://www.city.yokkaichi.lg.jp/www/genre/1000100000448/index.html", own = FALSE)
+         .idsc_city("四日市市", "保健所政令市", "四日市市「感染症（発生）情報」", "https://www.city.yokkaichi.lg.jp/www/genre/1000100000448/index.html")
        )),
   list(pref = "滋賀県", center = "感染症情報センター（滋賀県衛生科学センター）",
        url = "https://www.pref.shiga.lg.jp/eiseikagaku/kansensyou/",
@@ -192,16 +194,18 @@ IDSC_LINKS <- list(
        )),
   list(pref = "大阪府", center = "大阪府感染症情報センター",
        url = "https://www.iph.pref.osaka.jp/",
+       institute_name = "大阪健康安全基盤研究所（運営母体）",
+       institute_url  = "https://www.iph.osaka.jp/",
        cities = list(
-         .idsc_city("大阪市", "政令指定都市", "大阪市感染症週報", "https://www.city.osaka.lg.jp/kenko/page/0000025741.html", own = FALSE),
+         .idsc_city("大阪市", "政令指定都市", "大阪市感染症週報", "https://www.city.osaka.lg.jp/kenko/page/0000025741.html"),
          .idsc_city("堺市", "政令指定都市", "堺市感染症情報センター", "https://www.city.sakai.lg.jp/kenko/kenko/hokencenter/eiken/id_db/eiken.html"),
          .idsc_city("豊中市", "中核市", "豊中市「感染症流行状況」", "https://www.city.toyonaka.osaka.jp/kenko/kenko_hokeneisei/kekkaku_kansensho/sonota_kansensho/kansenryuukou.html"),
-         .idsc_city("吹田市", "中核市", "吹田市「感染症サーベイランスシステムについて」", "https://www.city.suita.osaka.jp/kenko/1018600/1018623/1023375/index.html", own = FALSE),
-         .idsc_city("高槻市", "中核市", "高槻市「感染症発生動向調査」", "https://www.city.takatsuki.osaka.jp/soshiki/40/85441.html", own = FALSE),
-         .idsc_city("枚方市", "中核市", "枚方市「感染症流行状況」", "https://www.city.hirakata.osaka.jp/0000050947.html", own = FALSE),
+         .idsc_city("吹田市", "中核市", "吹田市「感染症サーベイランスシステムについて」", "https://www.city.suita.osaka.jp/kenko/1018600/1018623/1023375/index.html"),
+         .idsc_city("高槻市", "中核市", "高槻市「感染症発生動向調査」", "https://www.city.takatsuki.osaka.jp/life/3/36/203/"),
+         .idsc_city("枚方市", "中核市", "枚方市「感染症流行状況」", "https://www.city.hirakata.osaka.jp/0000050814.html"),
          .idsc_city("八尾市", "中核市", "八尾市保健所管内感染症情報", "https://www.city.yao.osaka.jp/kenkou_fukushi/iryou/1008460/1008461/1008462.html"),
          .idsc_city("寝屋川市", "中核市", "感染症発生状況詳細（定点把握疾患）", "https://www.city.neyagawa.osaka.jp/organization_list/kenkou/hokenyobou/kansensyo/survey/16720.html"),
-         .idsc_city("東大阪市", "中核市", "東大阪市保健所 感染症対策課", "https://www.city.higashiosaka.lg.jp/0000041576.html", own = FALSE)
+         .idsc_city("東大阪市", "中核市", "東大阪市保健所 感染症対策課", "https://www.city.higashiosaka.lg.jp/0000041576.html")
        )),
   list(pref = "兵庫県", center = "兵庫県感染症情報センター",
        url = "https://web.pref.hyogo.lg.jp/iphs01/kansensho_jyoho/infectdis2.html",
@@ -215,7 +219,7 @@ IDSC_LINKS <- list(
   list(pref = "奈良県", center = "奈良県感染症情報センター",
        url = "https://www.pref.nara.jp/27874.htm",
        cities = list(
-         .idsc_city("奈良市", "中核市", "奈良市 インフルエンザ流行情報", "https://www.city.nara.lg.jp/soshiki/98/50161.html", own = FALSE)
+         .idsc_city("奈良市", "中核市", "奈良市 感染症情報", "https://www.city.nara.lg.jp/life/4/31/126/")
        )),
   list(pref = "和歌山県", center = "和歌山県感染症情報センター",
        url = "https://www.pref.wakayama.lg.jp/prefg/031801/idsw/d00153659.html",
@@ -225,7 +229,7 @@ IDSC_LINKS <- list(
   list(pref = "鳥取県", center = "感染症情報（週報）",
        url = "https://www.pref.tottori.lg.jp/60743.htm",
        cities = list(
-         .idsc_city("鳥取市", "中核市", "鳥取市保健所 感染症情報", "https://www.city.tottori.lg.jp/site/kansen/4925.html", own = FALSE)
+         .idsc_city("鳥取市", "中核市", "鳥取市保健所 感染症情報", "https://www.city.tottori.lg.jp/site/kansen/4913.html")
        )),
   list(pref = "島根県", center = "島根県感染症情報提供システム",
        url = "https://www1.pref.shimane.lg.jp/contents/kansen/",
@@ -261,19 +265,19 @@ IDSC_LINKS <- list(
   list(pref = "愛媛県", center = "愛媛県感染症情報センター",
        url = "https://www.pref.ehime.jp/site/kanjyo/",
        cities = list(
-         .idsc_city("松山市", "中核市", "松山市保健所 感染症対策", "https://www.city.matsuyama.ehime.jp/kurashi/iryo/hokenyobo/kansensho/index.html", own = FALSE)
+         .idsc_city("松山市", "中核市", "松山市保健所 感染症対策", "https://www.city.matsuyama.ehime.jp/kurashi/iryo/hokenyobo/kansensho/index.html")
        )),
   list(pref = "高知県", center = "感染症に関する情報",
        url = "https://www.pref.kochi.lg.jp/doc/kansenshou/",
        cities = list(
-         .idsc_city("高知市", "中核市", "高知市 地域保健課 感染症関連通知", "https://www.city.kochi.kochi.jp/soshiki/35/kannsensyou-iryoukikansyuti.html", own = FALSE)
+         .idsc_city("高知市", "中核市", "高知市 感染症情報", "https://www.city.kochi.kochi.jp/life/27/167/1414/")
        )),
   list(pref = "福岡県", center = "福岡県感染症情報センター",
        url = "http://www.fihes.pref.fukuoka.jp/~idsc_fukuoka/",
        cities = list(
          .idsc_city("福岡市", "政令指定都市", "福岡市感染症発生報告数（定点報告）", "https://www.city.fukuoka.lg.jp/hofuku/hokensho/kansensho/kansenshojoho/chosa/teitenhoukoku.html"),
          .idsc_city("北九州市", "政令指定都市", "北九州市の感染症発生動向（定点報告）", "https://www.city.kitakyushu.lg.jp/contents/18300149.html"),
-         .idsc_city("久留米市", "中核市", "久留米市 感染症ページ", "https://www.city.kurume.fukuoka.jp/1070kenkou/2040hokeneisei/3090kansensho/", own = FALSE)
+         .idsc_city("久留米市", "中核市", "久留米市 感染症ページ", "https://www.city.kurume.fukuoka.jp/1070kenkou/2040hokeneisei/3090kansensho/")
        )),
   list(pref = "佐賀県", center = "佐賀県感染症情報センター",
        url = "https://kansen.pref.saga.jp/",
@@ -282,7 +286,7 @@ IDSC_LINKS <- list(
        url = "https://www.pref.nagasaki.jp/bunrui/hukushi-hoken/kansensho/kansen-c/",
        cities = list(
          .idsc_city("長崎市", "中核市", "県感染症情報センターに準拠、市も発生動向ページあり", "https://www.city.nagasaki.lg.jp/page/4047.html"),
-         .idsc_city("佐世保市", "中核市", "佐世保市 感染症ページ", "https://www.city.sasebo.lg.jp/hokenhukusi/kansen/kansenshou.html", own = FALSE)
+         .idsc_city("佐世保市", "中核市", "佐世保市 感染症ページ", "https://www.city.sasebo.lg.jp/hokenhukusi/kansen/20231011.html")
        )),
   list(pref = "熊本県", center = "感染症発生情報（週報）",
        url = "https://www.pref.kumamoto.jp/soshiki/30/51400.html",
@@ -292,12 +296,12 @@ IDSC_LINKS <- list(
   list(pref = "大分県", center = "感染症情報",
        url = "https://www.pref.oita.jp/site/kansenpotal03/",
        cities = list(
-         .idsc_city("大分市", "中核市", "大分市 感染症発生動向情報", "https://www.city.oita.oita.jp/o096/kenko/hoken/1137572759760.html", own = FALSE)
+         .idsc_city("大分市", "中核市", "大分市 感染症発生動向情報", "https://www.city.oita.oita.jp/o096/kenko/hoken/1137572759760.html")
        )),
   list(pref = "宮崎県", center = "宮崎県感染症情報センター",
        url = "https://www.pref.miyazaki.lg.jp/contents/org/fukushi/eikanken/center/",
        cities = list(
-         .idsc_city("宮崎市", "中核市", "宮崎市 感染症の予防ページ", "https://www.city.miyazaki.miyazaki.jp/health/health/infection/", own = FALSE)
+         .idsc_city("宮崎市", "中核市", "宮崎市 感染症の予防ページ", "https://www.city.miyazaki.miyazaki.jp/health/health/infection/12246.html")
        )),
   list(pref = "鹿児島県", center = "鹿児島県感染症情報",
        url = "http://www.pref.kagoshima.jp/kenko-fukushi/kenko-iryo/kansen/info/index.html",
@@ -457,6 +461,9 @@ render_idsc_links_ui <- function() {
               tags$span(class="badge", style="background:#7f8c8d;color:#fff;font-size:0.75em;padding:2px 6px;border-radius:3px;", "都道府県")),
       tags$td(style="padding:6px 8px;border-top:2px solid #dfe6e9;",
         tags$a(href = p$url, target = "_blank", rel = "noopener noreferrer", p$center),
+        if (!is.null(p$institute_url))
+          tags$span(style="color:#555;font-size:0.85em;margin-left:8px;",
+            "／ ", tags$a(href = p$institute_url, target = "_blank", rel = "noopener noreferrer", p$institute_name)),
         if (length(ref_cities) > 0)
           tags$div(style="color:#888;font-size:0.82em;margin-top:2px;",
             "（参照: ", paste(vapply(ref_cities, function(c) c$name, character(1)), collapse="・"), "）")
@@ -491,11 +498,10 @@ render_idsc_links_ui <- function() {
       style="background:#eaf4fb;border-left:4px solid #2980b9;border-radius:4px;padding:14px 18px;margin-bottom:20px;font-size:0.9em;",
       tags$p(style="margin:0;",
         "国内の保健所設置自治体（都道府県47・政令指定都市20・中核市62・保健所政令市5・東京23特別区、計157団体）および国レベルの公的機関、",
-        "海外の感染症サーベイランス発信機関の公式リンク集です。都道府県ごとに、独自に感染症情報の発信サイト／ページを",
-        "持つ市区は都道府県と並列に一覧表示し、独自サイトを持たない市区は都道府県行に「参照」として名前のみ記載しています。"),
+        "海外の感染症サーベイランス情報等発信機関のリンク集です。なお、保健所設置市の一部は都道府県等の感染症情報センターのデータを参照する場合があります"),
       tags$p(style="margin:6px 0 0;color:#555;",
         icon("triangle-exclamation"),
-        " URLはリンク切れ・ページ移転の可能性があります。2026年7月時点の調査結果です。")
+        " URLはリンク切れ・ページ移転の可能性があります。2026年7月時点")
     ),
 
     tags$h4(style="border-bottom:2px solid #2980b9;padding-bottom:4px;color:#2c3e50;margin-top:0;",
