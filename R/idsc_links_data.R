@@ -311,6 +311,54 @@ IDSC_LINKS <- list(
        ))
 )
 
+# ============================================================
+# 国レベルの公的機関（国内）
+# ============================================================
+IDSC_NATIONAL <- list(
+  list(name = "JIHS（国立健康危機管理研究機構）感染症情報提供サイト",
+       org  = "国立健康危機管理研究機構（JIHS、旧NIID国立感染症研究所）",
+       url  = "https://id-info.jihs.go.jp/")
+)
+
+# ============================================================
+# 海外の公的機関・国際機関（サーベイランス情報を発信）
+# ============================================================
+.idsc_overseas <- function(name, org, url, region) {
+  list(name = name, org = org, url = url, region = region)
+}
+
+IDSC_OVERSEAS <- list(
+  .idsc_overseas("WHO 疾病突発事件ニュース（Disease Outbreak News）", "世界保健機関（WHO）",
+                 "https://www.who.int/emergencies/disease-outbreak-news", "国際機関"),
+  .idsc_overseas("WHO EIOS（疫学情報収集ツール）", "世界保健機関（WHO）",
+                 "https://www.who.int/initiatives/eios", "国際機関"),
+  .idsc_overseas("ReliefWeb（人道情報・アウトブレイク速報）", "国連人道問題調整事務所（OCHA）",
+                 "https://reliefweb.int/", "国際機関"),
+  .idsc_overseas("CDC Outbreaks", "米国疾病予防管理センター（CDC）",
+                 "https://www.cdc.gov/outbreaks/index.html", "北米"),
+  .idsc_overseas("ECDC Surveillance and disease data", "欧州疾病予防管理センター（ECDC）",
+                 "https://www.ecdc.europa.eu/en/surveillance-and-disease-data", "欧州"),
+  .idsc_overseas("UK Health Security Agency", "英国健康安全保障庁（UKHSA）",
+                 "https://www.gov.uk/government/organisations/uk-health-security-agency", "欧州"),
+  .idsc_overseas("Robert Koch-Institut（感染症サーベイランス）", "ロベルト・コッホ研究所（ドイツ）",
+                 "https://www.rki.de/DE/Themen/Infektionskrankheiten/infektionskrankheiten_node.html", "欧州"),
+  .idsc_overseas("Santé publique France", "フランス公衆衛生局",
+                 "https://www.santepubliquefrance.fr/", "欧州"),
+  .idsc_overseas("NICD（感染症サーベイランス）", "国立感染症研究所（南アフリカ）",
+                 "https://www.nicd.ac.za/", "アフリカ"),
+  .idsc_overseas("台湾 CDC（衛生福利部疾病管制署）", "台湾 衛生福利部疾病管制署",
+                 "https://www.cdc.gov.tw/", "東・東南アジア"),
+  .idsc_overseas("中国 CDC（中国疾病預防控制中心）", "中国疾病預防控制中心",
+                 "https://www.chinacdc.cn/", "東・東南アジア"),
+  .idsc_overseas("香港 CHP（衛生防護中心）", "香港衛生署 衛生防護中心",
+                 "https://www.chp.gov.hk/", "東・東南アジア")
+)
+
+.idsc_overseas_region_color <- function(region) {
+  c("国際機関"="#7f8c8d", "北米"="#2980b9", "欧州"="#8e44ad",
+    "アフリカ"="#d35400", "東・東南アジア"="#27ae60")[region]
+}
+
 # タイプ別バッジ色
 .idsc_type_color <- function(type) {
   c("政令指定都市"="#2980b9", "中核市"="#27ae60", "保健所政令市"="#e67e22",
@@ -351,18 +399,40 @@ render_idsc_links_ui <- function() {
     c(list(pref_row), city_rows)
   })
 
+  overseas_rows <- lapply(IDSC_OVERSEAS, function(o) {
+    tags$tr(
+      tags$td(style="padding:5px 8px;",
+        tags$span(class="badge", style=paste0("background:", .idsc_overseas_region_color(o$region), ";color:#fff;font-size:0.75em;padding:2px 6px;border-radius:3px;"), o$region)),
+      tags$td(style="padding:5px 8px;color:#2c3e50;white-space:nowrap;", o$org),
+      tags$td(style="padding:5px 8px;",
+        tags$a(href = o$url, target = "_blank", rel = "noopener noreferrer", o$name))
+    )
+  })
+
   tags$div(style="padding:20px;max-width:1000px;",
     tags$div(
       style="background:#eaf4fb;border-left:4px solid #2980b9;border-radius:4px;padding:14px 18px;margin-bottom:20px;font-size:0.9em;",
       tags$p(style="margin:0;",
-        "全国の保健所設置自治体（都道府県47・政令指定都市20・中核市62・保健所政令市5・東京23特別区、計157団体）が公表する",
-        "「感染症情報センター」または相当ページへのリンク集です。都道府県ごとに、独自に感染症情報の発信サイト／ページを",
+        "国内の保健所設置自治体（都道府県47・政令指定都市20・中核市62・保健所政令市5・東京23特別区、計157団体）および国レベルの公的機関、",
+        "海外の感染症サーベイランス発信機関の公式リンク集です。都道府県ごとに、独自に感染症情報の発信サイト／ページを",
         "持つ市区は都道府県と並列に一覧表示し、独自サイトを持たない市区は都道府県行に「参照」として名前のみ記載しています。"),
       tags$p(style="margin:6px 0 0;color:#555;",
         icon("triangle-exclamation"),
         " URLはリンク切れ・ページ移転の可能性があります。2026年7月時点の調査結果です。")
     ),
-    tags$table(style="width:100%;border-collapse:collapse;font-size:0.92em;",
+
+    tags$h4(style="border-bottom:2px solid #2980b9;padding-bottom:4px;color:#2c3e50;margin-top:0;",
+            icon("flag"), " 国内"),
+    tags$div(style="margin-bottom:16px;",
+      lapply(IDSC_NATIONAL, function(n) {
+        tags$div(style="background:#fdf6e3;border-left:4px solid #e67e22;border-radius:4px;padding:10px 14px;margin-bottom:8px;",
+          tags$a(href = n$url, target = "_blank", rel = "noopener noreferrer",
+                 style="font-weight:bold;", n$name),
+          tags$span(style="color:#777;font-size:0.85em;", paste0(" ― ", n$org))
+        )
+      })
+    ),
+    tags$table(style="width:100%;border-collapse:collapse;font-size:0.92em;margin-bottom:30px;",
       tags$thead(
         tags$tr(style="border-bottom:2px solid #2c3e50;",
           tags$th(style="text-align:left;padding:6px 8px;", "自治体"),
@@ -371,6 +441,19 @@ render_idsc_links_ui <- function() {
         )
       ),
       tags$tbody(rows)
+    ),
+
+    tags$h4(style="border-bottom:2px solid #8e44ad;padding-bottom:4px;color:#2c3e50;",
+            icon("globe"), " 海外"),
+    tags$table(style="width:100%;border-collapse:collapse;font-size:0.92em;",
+      tags$thead(
+        tags$tr(style="border-bottom:2px solid #2c3e50;",
+          tags$th(style="text-align:left;padding:6px 8px;", "地域"),
+          tags$th(style="text-align:left;padding:6px 8px;", "機関"),
+          tags$th(style="text-align:left;padding:6px 8px;", "サーベイランス情報ページ")
+        )
+      ),
+      tags$tbody(overseas_rows)
     )
   )
 }
