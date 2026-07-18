@@ -345,6 +345,12 @@ IDSC_OVERSEAS <- list(
                  "http://guidelines.health.go.ke/", "アフリカ地域"),
   .idsc_overseas("NICD（感染症サーベイランス）", "国立感染症研究所（南アフリカ）",
                  "https://www.nicd.ac.za/", "アフリカ地域"),
+  .idsc_overseas("エチオピア公衆衛生研究所（公衆衛生緊急事態サーベイランス）", "エチオピア公衆衛生研究所（EPHI）",
+                 "https://ephi.gov.et/", "アフリカ地域"),
+  .idsc_overseas("Disease Outbreak Monitoring", "ガーナ保健サービス（GHS）",
+                 "https://ghs.gov.gh/disease-outbreaks", "アフリカ地域"),
+  .idsc_overseas("Ministère de la Santé Publique（感染症流行情報含む）", "コンゴ民主共和国保健省",
+                 "https://sante.gouv.cd/", "アフリカ地域"),
 
   # ── 米州地域（AMRO/PAHO）───────────────────────────────────
   .idsc_overseas("PAHO Epidemiological Alerts and Updates", "汎米保健機構（PAHO/WHO）",
@@ -355,12 +361,22 @@ IDSC_OVERSEAS <- list(
                  "https://diseases.canada.ca/notifiable/", "米州地域"),
   .idsc_overseas("Boletim Epidemiológico（疫学速報）", "ブラジル保健省",
                  "https://www.gov.br/saude/pt-br/centrais-de-conteudo/publicacoes/boletins/epidemiologicos/ultimos", "米州地域"),
+  .idsc_overseas("Boletín Epidemiológico（全国疫学速報）", "メキシコ保健省",
+                 "https://www.gob.mx/salud/acciones-y-programas/direccion-general-de-epidemiologia-boletin-epidemiologico", "米州地域"),
+  .idsc_overseas("Boletín Epidemiológico Nacional（全国疫学速報）", "アルゼンチン保健省",
+                 "https://www.argentina.gob.ar/salud/boletin-epidemiologico-nacional", "米州地域"),
+  .idsc_overseas("Instituto Nacional de Salud（SIVIGILA公衆衛生サーベイランス）", "コロンビア国立衛生研究所（INS）",
+                 "https://www.ins.gov.co/", "米州地域"),
 
   # ── 東地中海地域（EMRO）─────────────────────────────────────
   .idsc_overseas("WHO EMRO（東地中海地域事務局）", "世界保健機関 東地中海地域事務局",
                  "https://www.emro.who.int/", "東地中海地域"),
   .idsc_overseas("感染症に関する健康啓発情報", "サウジアラビア保健省",
                  "https://www.moh.gov.sa/en/HealthAwareness/EducationalContent/Diseases/Infectious/Pages/default.aspx", "東地中海地域"),
+  .idsc_overseas("National Institutes of Health（感染症サーベイランス指針）", "パキスタン国立衛生研究所（NIH）",
+                 "https://www.nih.org.pk/", "東地中海地域"),
+  .idsc_overseas("感染症対策（Combatting Communicable Diseases）", "アラブ首長国連邦政府",
+                 "https://u.ae/en/information-and-services/health-and-fitness/combatting-communicable-diseases", "東地中海地域"),
 
   # ── 欧州地域（EURO）─────────────────────────────────────────
   .idsc_overseas("ECDC Surveillance and disease data", "欧州疾病予防管理センター（ECDC）",
@@ -371,6 +387,12 @@ IDSC_OVERSEAS <- list(
                  "https://www.rki.de/DE/Themen/Infektionskrankheiten/infektionskrankheiten_node.html", "欧州地域"),
   .idsc_overseas("Santé publique France", "フランス公衆衛生局",
                  "https://www.santepubliquefrance.fr/", "欧州地域"),
+  .idsc_overseas("EpiCentro（疫学サーベイランスポータル）", "イタリア国立衛生研究所（ISS）",
+                 "https://www.epicentro.iss.it/", "欧州地域"),
+  .idsc_overseas("RIVM Infectious Disease Control", "オランダ国立公衆衛生環境研究所（RIVM）",
+                 "https://www.rivm.nl/en/infectious-disease-control", "欧州地域"),
+  .idsc_overseas("RENAVE（国家公衆衛生サーベイランスネットワーク）", "スペイン カルロス3世保健研究所（ISCIII）",
+                 "https://www.isciii.es/en/servicios/vigilancia-salud-publica-renave", "欧州地域"),
 
   # ── 東南アジア地域（SEARO）──────────────────────────────────
   .idsc_overseas("IDSP（統合疾病サーベイランスプログラム）", "インド国立疾病予防管理センター（NCDC）",
@@ -379,6 +401,11 @@ IDSC_OVERSEAS <- list(
                  "https://infeksiemerging.kemkes.go.id/", "東南アジア地域"),
   .idsc_overseas("Department of Disease Control（DDC）", "タイ保健省 疾病管理局",
                  "https://ddc.moph.go.th/en/", "東南アジア地域"),
+  .idsc_overseas("IEDCR（疫学・疾病対策研究所）", "バングラデシュ保健省 IEDCR",
+                 "https://iedcr.gov.bd/", "東南アジア地域"),
+  .idsc_overseas("Epidemiology Unit（週報 Weekly Epidemiological Return）", "スリランカ保健省 疫学ユニット",
+                 "https://www.epid.gov.lk/", "東南アジア地域"),
+  # ミャンマー保健省(moh.gov.mm/mohs.gov.mm)は接続不可のため見送り（継続調査中）
 
   # ── 西太平洋地域（WPRO）─────────────────────────────────────
   .idsc_overseas("台湾 CDC（衛生福利部疾病管制署）", "台湾 衛生福利部疾病管制署",
