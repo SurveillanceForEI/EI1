@@ -28,6 +28,7 @@ source("R/hosp_loader.R")
 source("R/std_loader.R")
 source("R/change_tracker.R")
 source("R/forecast_ts.R")
+source("R/idsc_links_data.R")
 
 # shinyapps.io 上での実行かどうかを判定
 # R_CONFIG_ACTIVE, HOME パス, またはアプリIDのいずれかで判定
@@ -1566,6 +1567,11 @@ function ebsUntranslateCards(containerId) {
             )
           )
         )
+      ),
+
+      # ── 参考リンク（感染症情報センター等）────────────────
+      tabPanel("参考リンク", icon=icon("link"),
+        render_idsc_links_ui()
       )
 
       ) # sub_other
