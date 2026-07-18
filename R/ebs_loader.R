@@ -2522,6 +2522,156 @@ fetch_funabashi_news <- function(timeout_sec = 15, n_results = 20) {
 }
 
 # ============================================================
+# 荒川区・渋谷区・品川区・藤沢市 新着情報一覧（HTMLスクレイピング）
+# RSS未提供のため、ブラウザのネットワーク検証で確認したテーブル/リスト構造を
+# XPathで直接解析する（他の保健所設置自治体と同様のパターン）
+# ============================================================
+fetch_arakawa_news <- function(timeout_sec = 15, n_results = 20) {
+  message("荒川区 新着情報 取得中...")
+  tryCatch({
+    resp <- GET("https://www.city.arakawa.tokyo.jp/kouhou/news/index.html", timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    rows_tr <- xml_find_all(doc, "//table[contains(@class,'list_table')]//tr")
+    if (length(rows_tr) == 0) return(NULL)
+
+    rows <- lapply(rows_tr, function(tr) {
+      date_txt <- trimws(xml_text(xml_find_first(tr, ".//td[contains(@class,'date')]")))
+      a <- xml_find_first(tr, ".//td[not(contains(@class,'date'))]//a")
+      if (is.na(a)) return(NULL)
+      title <- trimws(xml_text(a))
+      href  <- xml_attr(a, "href")
+      dm <- regmatches(date_txt, regexec("(\\d{4})年(\\d{1,2})月(\\d{1,2})日", date_txt))[[1]]
+      if (length(dm) < 4 || nchar(title) == 0 || is.na(href)) return(NULL)
+      d <- suppressWarnings(as.Date(sprintf("%s-%02d-%02d", dm[2], as.integer(dm[3]), as.integer(dm[4]))))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "city_arakawa",
+        source_name = "荒川区",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.city.arakawa.tokyo.jp", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("荒川区 エラー: ", e$message); NULL })
+}
+
+fetch_shibuya_news <- function(timeout_sec = 15, n_results = 20) {
+  message("渋谷区 新着情報 取得中...")
+  tryCatch({
+    resp <- GET("https://www.city.shibuya.tokyo.jp/contents/news/", timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    items <- xml_find_all(doc, "//ul[contains(@class,'m-list-links')]//li/a")
+    if (length(items) == 0) return(NULL)
+
+    rows <- lapply(items, function(a) {
+      title <- trimws(xml_text(xml_find_first(a, ".//p[contains(@class,'title')]")))
+      date_txt <- trimws(xml_text(xml_find_first(a, ".//p[contains(@class,'date')]")))
+      href <- xml_attr(a, "href")
+      dm <- regmatches(date_txt, regexec("(\\d{4})年(\\d{1,2})月(\\d{1,2})日", date_txt))[[1]]
+      if (length(dm) < 4 || nchar(title) == 0 || is.na(href)) return(NULL)
+      d <- suppressWarnings(as.Date(sprintf("%s-%02d-%02d", dm[2], as.integer(dm[3]), as.integer(dm[4]))))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "city_shibuya",
+        source_name = "渋谷区",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.city.shibuya.tokyo.jp", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("渋谷区 エラー: ", e$message); NULL })
+}
+
+fetch_shinagawa_news <- function(timeout_sec = 15, n_results = 20) {
+  message("品川区 新着情報 取得中...")
+  tryCatch({
+    resp <- GET("https://www.city.shinagawa.tokyo.jp/PC/re_direct/hpg000016838.html", timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    items <- xml_find_all(doc, "//ul[contains(@class,'link')]/li")
+    if (length(items) == 0) return(NULL)
+
+    rows <- lapply(items, function(li) {
+      date_txt <- trimws(xml_text(xml_find_first(li, ".//p[contains(@class,'news-list-date')]")))
+      a <- xml_find_first(li, ".//p[contains(@class,'news-list-txt')]//a")
+      if (is.na(a)) return(NULL)
+      title <- trimws(xml_text(a))
+      href  <- xml_attr(a, "href")
+      dm <- regmatches(date_txt, regexec("(\\d{4})年(\\d{1,2})月(\\d{1,2})日", date_txt))[[1]]
+      if (length(dm) < 4 || nchar(title) == 0 || is.na(href)) return(NULL)
+      d <- suppressWarnings(as.Date(sprintf("%s-%02d-%02d", dm[2], as.integer(dm[3]), as.integer(dm[4]))))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "city_shinagawa",
+        source_name = "品川区",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.city.shinagawa.tokyo.jp", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("品川区 エラー: ", e$message); NULL })
+}
+
+fetch_fujisawa_news <- function(timeout_sec = 15, n_results = 20) {
+  message("藤沢市 新着情報 取得中...")
+  tryCatch({
+    resp <- GET("https://www.city.fujisawa.kanagawa.jp/shinchaku/index.html", timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    rows_tr <- xml_find_all(doc, "//table[contains(@class,'news_tbl')]//tr")
+    if (length(rows_tr) == 0) return(NULL)
+
+    today <- Sys.Date()
+    cur_year <- as.integer(format(today, "%Y"))
+    rows <- lapply(rows_tr, function(tr) {
+      date_txt <- trimws(xml_text(xml_find_first(tr, ".//td[contains(@class,'news_date')]")))
+      a <- xml_find_first(tr, ".//td[contains(@class,'news_link')]//a")
+      if (is.na(a)) return(NULL)
+      title <- trimws(xml_text(a))
+      href  <- xml_attr(a, "href")
+      # 年の記載がない「M月D日」形式のため、当日を基準に年を推定する
+      # （未来3日以上先の日付になる場合は前年の記事とみなす）
+      dm <- regmatches(date_txt, regexec("^(\\d{1,2})月(\\d{1,2})日", date_txt))[[1]]
+      if (length(dm) < 3 || nchar(title) == 0 || is.na(href)) return(NULL)
+      mo <- as.integer(dm[2]); da <- as.integer(dm[3])
+      d <- suppressWarnings(as.Date(sprintf("%d-%02d-%02d", cur_year, mo, da)))
+      if (is.na(d)) return(NULL)
+      if (d > today + 3) d <- suppressWarnings(as.Date(sprintf("%d-%02d-%02d", cur_year - 1, mo, da)))
+      if (is.na(d)) return(NULL)
+      tibble(
+        source_id   = "city_fujisawa",
+        source_name = "藤沢市",
+        category    = "行政",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://www.city.fujisawa.kanagawa.jp", href),
+        pub_date    = d,
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("藤沢市 エラー: ", e$message); NULL })
+}
+
+# ============================================================
 # PubMed E-utilities — アウトブレイク関連論文取得（APIキー不要）
 # ============================================================
 PUBMED_QUERIES <- c(
@@ -4881,7 +5031,8 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
                    fetch_fukui_city_news, fetch_nagano_city_news, fetch_takamatsu_news,
                    fetch_tsukuba_news, fetch_kanazawa_news, fetch_otsu_news, fetch_matsue_news,
                    fetch_neyagawa_news, fetch_hachinohe_news, fetch_saga_news, fetch_kawaguchi_news,
-                   fetch_funabashi_news)) {
+                   fetch_funabashi_news, fetch_arakawa_news, fetch_shibuya_news, fetch_shinagawa_news,
+                   fetch_fujisawa_news)) {
     d <- tryCatch(fn(), error = function(e) NULL)
     if (!is.null(d) && nrow(d) > 0) {
       if (!"retweet_count" %in% names(d)) d$retweet_count <- NA_integer_
