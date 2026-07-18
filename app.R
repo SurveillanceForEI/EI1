@@ -5013,6 +5013,22 @@ server <- function(input, output, session) {
           icon("map-marker-alt"), " ", loc_text)
       }
 
+      # 地域タグに対応した参考リンク（記事の情報源ではない旨を明記）
+      idsc_ref <- tryCatch({
+        pref_val <- if ("ebs_pref" %in% names(row)) coalesce(row$ebs_pref, NA_character_) else NA_character_
+        loc_val  <- if ("ebs_location" %in% names(row)) coalesce(row$ebs_location, NA_character_) else NA_character_
+        r <- find_idsc_domestic_link(pref_val, loc_val)
+        if (is.null(r)) r <- find_idsc_overseas_link(loc_val)
+        r
+      }, error = function(e) NULL)
+      idsc_ref_line <- if (!is.null(idsc_ref)) {
+        tags$div(style="font-size:0.72em;color:#999;margin-top:4px;font-style:italic;",
+          icon("circle-info"), " 参考: 地域の公式情報 ",
+          tags$a(href=idsc_ref$url, target="_blank", rel="noopener noreferrer",
+                 style="color:#7f8c8d;text-decoration:underline;", idsc_ref$label),
+          "（記事の情報源ではありません）")
+      }
+
       tags$div(
         style=paste0("background:#fff;border-radius:6px;padding:14px 16px;",
           "box-shadow:0 1px 3px rgba(0,0,0,0.07);",
@@ -5048,7 +5064,8 @@ server <- function(input, output, session) {
           if (length(criteria_badges) > 0)
             tags$span(style="margin-left:8px;",criteria_badges),
           location_badge
-        )
+        ),
+        idsc_ref_line
       )
     })
     more_note <- if (total > PAGE_SIZE)
@@ -5169,6 +5186,21 @@ server <- function(input, output, session) {
           "border-radius:3px;padding:0 5px;font-size:0.65em;font-weight:600;margin:1px;"),
           icon("map-marker-alt"), " ", loc_text)
       }
+      # 地域タグに対応した参考リンク（記事の情報源ではない旨を明記）
+      idsc_ref <- tryCatch({
+        pref_val <- if ("ebs_pref" %in% names(row)) coalesce(row$ebs_pref, NA_character_) else NA_character_
+        loc_val  <- if ("ebs_location" %in% names(row)) coalesce(row$ebs_location, NA_character_) else NA_character_
+        r <- find_idsc_domestic_link(pref_val, loc_val)
+        if (is.null(r)) r <- find_idsc_overseas_link(loc_val)
+        r
+      }, error = function(e) NULL)
+      idsc_ref_line <- if (!is.null(idsc_ref)) {
+        tags$div(style="font-size:0.72em;color:#999;margin-top:4px;font-style:italic;",
+          icon("circle-info"), " 参考: 地域の公式情報 ",
+          tags$a(href=idsc_ref$url, target="_blank", rel="noopener noreferrer",
+                 style="color:#7f8c8d;text-decoration:underline;", idsc_ref$label),
+          "（記事の情報源ではありません）")
+      }
       tags$div(
         style=paste0("background:#fff;border-radius:6px;padding:14px 16px;",
           "margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.07);",
@@ -5203,7 +5235,8 @@ server <- function(input, output, session) {
           if (length(criteria_badges) > 0)
             tags$span(style="margin-left:8px;", criteria_badges),
           location_badge
-        )
+        ),
+        idsc_ref_line
       )
     })
     more_note <- if (total > PAGE_SIZE)
