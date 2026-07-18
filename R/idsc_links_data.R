@@ -122,7 +122,7 @@ IDSC_LINKS <- list(
          .idsc_city("横浜市", "政令指定都市", "横浜市感染症情報センター", "https://www.city.yokohama.lg.jp/kenko-iryo-fukushi/kenko-iryo/eiken/idsc.html"),
          .idsc_city("川崎市", "政令指定都市", "川崎市感染症情報センター", "https://www.city.kawasaki.jp/kurashi/category/22-13-8-11-0-0-0-0-0-0.html"),
          .idsc_city("相模原市", "政令指定都市", "相模原市感染症情報センター", "https://www.city.sagamihara.kanagawa.jp/kosodate/kenko/1026625/kansenyobo/hassei_jokyo/1007129.html"),
-         .idsc_city("横須賀市", "中核市", "横須賀市「感染症（五類定点）発生情報（週報）」", "https://www.city.yokosuka.kanagawa.jp/3170/infection/report/index.html"),
+         .idsc_city("横須賀市", "中核市", "感染症対策・予防接種", "https://www.city.yokosuka.kanagawa.jp/kenko/kenko/kansensho/index.html"),
          .idsc_city("藤沢市", "保健所政令市", "藤沢市感染症発生状況", "https://www.city.fujisawa.kanagawa.jp/kenko/iryo/kansensho/kansensho/hassei/index.html"),
          .idsc_city("茅ヶ崎市", "保健所政令市", "感染症情報（週報）", "https://www.city.chigasaki.kanagawa.jp/kenko/1022933/1038459/1046393/1046735.html")
        )),
