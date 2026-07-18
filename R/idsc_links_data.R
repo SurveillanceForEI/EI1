@@ -446,16 +446,32 @@ IDSC_OVERSEAS <- list(
     "特別区"="#8e44ad")[type]
 }
 
+# 都道府県を8地方区分にグルーピングするための境界（IDSC_LINKSはJIS標準順）
+.IDSC_REGION_BOUNDS <- list(
+  "北海道"     = c(1, 1),
+  "東北"       = c(2, 7),
+  "関東"       = c(8, 14),
+  "中部"       = c(15, 23),
+  "近畿"       = c(24, 30),
+  "中国"       = c(31, 35),
+  "四国"       = c(36, 39),
+  "九州・沖縄" = c(40, 47)
+)
+
 # 参考リンクタブのUIを生成（アコーディオンは使わず、独自サイトを持つ市区は
 # 都道府県と並列のフラットな一覧として表示。独自サイトを持たない市区は
 # 都道府県行に「参照」として自治体名のみ注記する）
+# 縦に長いページのため、上部に地方区分別クイックジャンプと検索ボックス、
+# 下部に「トップに戻る」ボタンを設置してアクセス性を確保している
 render_idsc_links_ui <- function() {
-  rows <- lapply(IDSC_LINKS, function(p) {
+  rows <- lapply(seq_along(IDSC_LINKS), function(i) {
+    p <- IDSC_LINKS[[i]]
     own_cities  <- Filter(function(c) isTRUE(c$own),  p$cities)
     ref_cities  <- Filter(function(c) !isTRUE(c$own), p$cities)
 
     pref_row <- tags$tr(
-      tags$td(style="font-weight:bold;color:#2c3e50;padding:6px 8px;border-top:2px solid #dfe6e9;white-space:nowrap;",
+      id = paste0("pref-", i),
+      tags$td(style="font-weight:bold;color:#2c3e50;padding:6px 8px;border-top:2px solid #dfe6e9;white-space:nowrap;scroll-margin-top:70px;",
               p$pref),
       tags$td(style="padding:6px 8px;border-top:2px solid #dfe6e9;",
               tags$span(class="badge", style="background:#7f8c8d;color:#fff;font-size:0.75em;padding:2px 6px;border-radius:3px;", "都道府県")),
@@ -493,7 +509,21 @@ render_idsc_links_ui <- function() {
     )
   })
 
-  tags$div(style="padding:20px;max-width:1000px;",
+  # 地方区分ごとのクイックジャンプ用チップを生成
+  region_nav <- lapply(names(.IDSC_REGION_BOUNDS), function(region) {
+    rng <- .IDSC_REGION_BOUNDS[[region]]
+    chips <- lapply(seq(rng[1], rng[2]), function(i) {
+      tags$a(href = paste0("#pref-", i),
+             style="display:inline-block;background:#fff;border:1px solid #b8d4e8;color:#2980b9;font-size:0.8em;padding:2px 8px;border-radius:12px;margin:2px;text-decoration:none;",
+             IDSC_LINKS[[i]]$pref)
+    })
+    tags$div(style="margin-bottom:4px;",
+      tags$span(style="font-weight:bold;color:#2c3e50;font-size:0.82em;margin-right:6px;", region, "："),
+      chips
+    )
+  })
+
+  tags$div(id = "idsc-top", style="padding:20px;max-width:1000px;",
     tags$div(
       style="background:#eaf4fb;border-left:4px solid #2980b9;border-radius:4px;padding:14px 18px;margin-bottom:20px;font-size:0.9em;",
       tags$p(style="margin:0;",
@@ -504,6 +534,29 @@ render_idsc_links_ui <- function() {
         icon("triangle-exclamation"),
         " URLはリンク切れ・ページ移転の可能性があります。2026年7月時点")
     ),
+
+    # ── クイックジャンプ・検索（縦に長いページのためのナビゲーション）──
+    tags$div(
+      style="position:sticky;top:0;background:#fff;z-index:5;border:1px solid #e0e0e0;border-radius:6px;padding:10px 14px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,0.08);",
+      tags$div(style="margin-bottom:8px;",
+        tags$input(type="text", id="idsc-search", placeholder="自治体名・センター名で検索...",
+                   style="width:100%;max-width:360px;padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;",
+                   oninput="idscFilterTable(this.value)")
+      ),
+      region_nav,
+      tags$div(style="margin-top:4px;",
+        tags$a(href="#idsc-overseas", style="font-size:0.82em;color:#8e44ad;font-weight:bold;text-decoration:none;", "→ 海外セクションへ")
+      )
+    ),
+    tags$script(HTML("
+      function idscFilterTable(term) {
+        term = term.toLowerCase();
+        document.querySelectorAll('#idsc-table tbody tr').forEach(function(tr) {
+          var show = term === '' || tr.textContent.toLowerCase().indexOf(term) !== -1;
+          tr.style.display = show ? '' : 'none';
+        });
+      }
+    ")),
 
     tags$h4(style="border-bottom:2px solid #2980b9;padding-bottom:4px;color:#2c3e50;margin-top:0;",
             icon("flag"), " 国内"),
@@ -516,7 +569,7 @@ render_idsc_links_ui <- function() {
         )
       })
     ),
-    tags$table(style="width:100%;border-collapse:collapse;font-size:0.92em;margin-bottom:30px;",
+    tags$table(id = "idsc-table", style="width:100%;border-collapse:collapse;font-size:0.92em;margin-bottom:30px;",
       tags$thead(
         tags$tr(style="border-bottom:2px solid #2c3e50;",
           tags$th(style="text-align:left;padding:6px 8px;", "自治体"),
@@ -527,7 +580,7 @@ render_idsc_links_ui <- function() {
       tags$tbody(rows)
     ),
 
-    tags$h4(style="border-bottom:2px solid #8e44ad;padding-bottom:4px;color:#2c3e50;",
+    tags$h4(id = "idsc-overseas", style="border-bottom:2px solid #8e44ad;padding-bottom:4px;color:#2c3e50;scroll-margin-top:70px;",
             icon("globe"), " 海外"),
     tags$table(style="width:100%;border-collapse:collapse;font-size:0.92em;",
       tags$thead(
@@ -538,6 +591,14 @@ render_idsc_links_ui <- function() {
         )
       ),
       tags$tbody(overseas_rows)
+    ),
+
+    tags$a(href = "#idsc-top",
+      style="position:fixed;bottom:24px;right:24px;background:#2980b9;color:#fff;width:42px;height:42px;",
+      class="idsc-back-to-top",
+      title="トップに戻る",
+      tags$div(style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.3);",
+        icon("arrow-up"))
     )
   )
 }
