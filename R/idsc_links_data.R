@@ -328,31 +328,65 @@ IDSC_NATIONAL <- list(
 }
 
 IDSC_OVERSEAS <- list(
+  # ── WHO本部・国際機関 ──────────────────────────────────────
   .idsc_overseas("WHO 疾病突発事件ニュース（Disease Outbreak News）", "世界保健機関（WHO）",
                  "https://www.who.int/emergencies/disease-outbreak-news", "国際機関"),
   .idsc_overseas("WHO EIOS（疫学情報収集ツール）", "世界保健機関（WHO）",
                  "https://www.who.int/initiatives/eios", "国際機関"),
   .idsc_overseas("ReliefWeb（人道情報・アウトブレイク速報）", "国連人道問題調整事務所（OCHA）",
                  "https://reliefweb.int/", "国際機関"),
-  .idsc_overseas("CDC Outbreaks", "米国疾病予防管理センター（CDC）",
-                 "https://www.cdc.gov/outbreaks/index.html", "北米"),
-  .idsc_overseas("ECDC Surveillance and disease data", "欧州疾病予防管理センター（ECDC）",
-                 "https://www.ecdc.europa.eu/en/surveillance-and-disease-data", "欧州"),
-  .idsc_overseas("UK Health Security Agency", "英国健康安全保障庁（UKHSA）",
-                 "https://www.gov.uk/government/organisations/uk-health-security-agency", "欧州"),
-  .idsc_overseas("Robert Koch-Institut（感染症サーベイランス）", "ロベルト・コッホ研究所（ドイツ）",
-                 "https://www.rki.de/DE/Themen/Infektionskrankheiten/infektionskrankheiten_node.html", "欧州"),
-  .idsc_overseas("Santé publique France", "フランス公衆衛生局",
-                 "https://www.santepubliquefrance.fr/", "欧州"),
+
+  # ── アフリカ地域（AFRO）─────────────────────────────────────
+  .idsc_overseas("Africa CDC（大陸統括機関）", "アフリカ疾病予防管理センター（Africa CDC）",
+                 "https://africacdc.org/", "アフリカ地域"),
+  .idsc_overseas("NCDC 感染症サーベイランス（Disease Situation Reports）", "ナイジェリア疾病予防管理センター（NCDC）",
+                 "https://ncdc.gov.ng/diseases/sitreps", "アフリカ地域"),
+  .idsc_overseas("IDSR（統合疾病サーベイランス・対応）ガイドライン・データ", "ケニア保健省",
+                 "http://guidelines.health.go.ke/", "アフリカ地域"),
   .idsc_overseas("NICD（感染症サーベイランス）", "国立感染症研究所（南アフリカ）",
-                 "https://www.nicd.ac.za/", "アフリカ"),
+                 "https://www.nicd.ac.za/", "アフリカ地域"),
+
+  # ── 米州地域（AMRO/PAHO）───────────────────────────────────
+  .idsc_overseas("PAHO Epidemiological Alerts and Updates", "汎米保健機構（PAHO/WHO）",
+                 "https://www.paho.org/en/epidemiological-alerts-and-updates", "米州地域"),
+  .idsc_overseas("CDC Outbreaks", "米国疾病予防管理センター（CDC）",
+                 "https://www.cdc.gov/outbreaks/index.html", "米州地域"),
+  .idsc_overseas("Canadian Notifiable Diseases Online", "カナダ公衆衛生庁（PHAC）",
+                 "https://diseases.canada.ca/notifiable/", "米州地域"),
+  .idsc_overseas("Boletim Epidemiológico（疫学速報）", "ブラジル保健省",
+                 "https://www.gov.br/saude/pt-br/centrais-de-conteudo/publicacoes/boletins/epidemiologicos/ultimos", "米州地域"),
+
+  # ── 東地中海地域（EMRO）─────────────────────────────────────
+  .idsc_overseas("WHO EMRO（東地中海地域事務局）", "世界保健機関 東地中海地域事務局",
+                 "https://www.emro.who.int/", "東地中海地域"),
+  .idsc_overseas("感染症に関する健康啓発情報", "サウジアラビア保健省",
+                 "https://www.moh.gov.sa/en/HealthAwareness/EducationalContent/Diseases/Infectious/Pages/default.aspx", "東地中海地域"),
+
+  # ── 欧州地域（EURO）─────────────────────────────────────────
+  .idsc_overseas("ECDC Surveillance and disease data", "欧州疾病予防管理センター（ECDC）",
+                 "https://www.ecdc.europa.eu/en/surveillance-and-disease-data", "欧州地域"),
+  .idsc_overseas("UK Health Security Agency", "英国健康安全保障庁（UKHSA）",
+                 "https://www.gov.uk/government/organisations/uk-health-security-agency", "欧州地域"),
+  .idsc_overseas("Robert Koch-Institut（感染症サーベイランス）", "ロベルト・コッホ研究所（ドイツ）",
+                 "https://www.rki.de/DE/Themen/Infektionskrankheiten/infektionskrankheiten_node.html", "欧州地域"),
+  .idsc_overseas("Santé publique France", "フランス公衆衛生局",
+                 "https://www.santepubliquefrance.fr/", "欧州地域"),
+
+  # ── 東南アジア地域（SEARO）──────────────────────────────────
+  .idsc_overseas("IDSP（統合疾病サーベイランスプログラム）", "インド国立疾病予防管理センター（NCDC）",
+                 "https://idsp.mohfw.gov.in/", "東南アジア地域"),
+  .idsc_overseas("Infeksi Emerging（新興感染症情報）", "インドネシア保健省",
+                 "https://infeksiemerging.kemkes.go.id/", "東南アジア地域"),
+  .idsc_overseas("Department of Disease Control（DDC）", "タイ保健省 疾病管理局",
+                 "https://ddc.moph.go.th/en/", "東南アジア地域"),
+
+  # ── 西太平洋地域（WPRO）─────────────────────────────────────
   .idsc_overseas("台湾 CDC（衛生福利部疾病管制署）", "台湾 衛生福利部疾病管制署",
-                 "https://www.cdc.gov.tw/", "東・東南アジア"),
+                 "https://www.cdc.gov.tw/", "西太平洋地域"),
   .idsc_overseas("中国 CDC（中国疾病預防控制中心）", "中国疾病預防控制中心",
-                 "https://www.chinacdc.cn/", "東・東南アジア"),
+                 "https://www.chinacdc.cn/", "西太平洋地域"),
   .idsc_overseas("香港 CHP（衛生防護中心）", "香港衛生署 衛生防護中心",
-                 "https://www.chp.gov.hk/", "東・東南アジア"),
-  # ── 西太平洋地域（WHO西太平洋事務局管轄、WPRO）─────────────
+                 "https://www.chp.gov.hk/", "西太平洋地域"),
   .idsc_overseas("Australian CDC — NNDSS（全国届出感染症サーベイランスシステム）", "オーストラリア疾病予防管理センター（CDC Australia）",
                  "https://www.cdc.gov.au/diseases/surveillance-systems-and-networks/national-notifiable-diseases-surveillance-system-nndss", "西太平洋地域"),
   .idsc_overseas("PHF Science（旧ESR）感染症サーベイランス", "ニュージーランド公衆衛生・法科学研究所（PHF Science）",
@@ -370,8 +404,9 @@ IDSC_OVERSEAS <- list(
 )
 
 .idsc_overseas_region_color <- function(region) {
-  c("国際機関"="#7f8c8d", "北米"="#2980b9", "欧州"="#8e44ad",
-    "アフリカ"="#d35400", "東・東南アジア"="#27ae60", "西太平洋地域"="#c0392b")[region]
+  c("国際機関"="#7f8c8d", "アフリカ地域"="#d35400", "米州地域"="#2980b9",
+    "東地中海地域"="#16a085", "欧州地域"="#8e44ad", "東南アジア地域"="#f39c12",
+    "西太平洋地域"="#c0392b")[region]
 }
 
 # タイプ別バッジ色
