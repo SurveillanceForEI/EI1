@@ -108,6 +108,11 @@ tryCatch({
     "data/cache_ari/ari_pathogen_data.rds"
   else character(0)
 
+  # 注意: app.Rにsource()を新規追加した場合は、必ずここにも同じファイルを
+  # 追加すること。追加を忘れると、このappFiles固定リストに載っていない
+  # ファイルがデプロイバンドルから漏れ、"cannot open file ... No such file
+  # or directory" でアプリがクラッシュする（実際に2026-07-21に発生した
+  # 障害の原因: R/idsc_links_data.Rの追加漏れ）
   app_files <- c(
     "app.R",
     "R/ebs_loader.R",
@@ -123,6 +128,7 @@ tryCatch({
     "R/correlation.R",
     "R/change_tracker.R",
     "R/forecast_ts.R",
+    "R/idsc_links_data.R",
     "www/custom.css",
     "data/japan_map.rds",
     "data/ebs_startup_cache.rds",
