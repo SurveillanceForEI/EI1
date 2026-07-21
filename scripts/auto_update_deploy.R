@@ -108,27 +108,25 @@ tryCatch({
     "data/cache_ari/ari_pathogen_data.rds"
   else character(0)
 
-  # 注意: app.Rにsource()を新規追加した場合は、必ずここにも同じファイルを
-  # 追加すること。追加を忘れると、このappFiles固定リストに載っていない
-  # ファイルがデプロイバンドルから漏れ、"cannot open file ... No such file
-  # or directory" でアプリがクラッシュする（実際に2026-07-21に発生した
-  # 障害の原因: R/idsc_links_data.Rの追加漏れ）
+  # app.R内のsource("R/....R")呼び出しを自動抽出してRファイル一覧を作る。
+  # 手動の固定リストだと新規追加ファイルの記載漏れでデプロイバンドルから
+  # 漏れ、"cannot open file ... No such file or directory" でアプリが
+  # クラッシュする事故が起きる（実際に2026-07-21、R/idsc_links_data.Rの
+  # 記載漏れで発生）。app.R側にsource()さえ書けば自動的に含まれるため、
+  # このスクリプトを更新し忘れるミスが起こらない
+  app_lines  <- readLines("app.R", warn = FALSE)
+  r_source_files <- unique(unlist(regmatches(
+    app_lines,
+    gregexpr('(?<=source\\(")R/[^"]+\\.R(?=")', app_lines, perl = TRUE)
+  )))
+  if (length(r_source_files) == 0) {
+    stop("app.R からsource()されるRファイルを検出できませんでした。正規表現を確認してください。")
+  }
+  log("デプロイに含めるRファイル: ", paste(r_source_files, collapse = ", "))
+
   app_files <- c(
     "app.R",
-    "R/ebs_loader.R",
-    "R/ebs_rule_screening.R",
-    "R/ebs_screening_module.R",
-    "R/data_loader.R",
-    "R/rt_estimation.R",
-    "R/zensu_loader.R",
-    "R/iasr_loader.R",
-    "R/hosp_loader.R",
-    "R/std_loader.R",
-    "R/ari_pathogen_loader.R",
-    "R/correlation.R",
-    "R/change_tracker.R",
-    "R/forecast_ts.R",
-    "R/idsc_links_data.R",
+    r_source_files,
     "www/custom.css",
     "data/japan_map.rds",
     "data/ebs_startup_cache.rds",
