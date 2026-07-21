@@ -320,7 +320,7 @@ IDSC_LINKS <- list(
 # ============================================================
 IDSC_NATIONAL <- list(
   list(name = "JIHS（国立健康危機管理研究機構）感染症情報提供サイト",
-       org  = "国立健康危機管理研究機構（JIHS、旧NIID国立感染症研究所）",
+       org  = "国立感染症研究所",
        url  = "https://id-info.jihs.go.jp/")
 )
 
@@ -337,26 +337,24 @@ IDSC_OVERSEAS <- list(
   # ── WHO本部・国際機関 ──────────────────────────────────────
   .idsc_overseas("WHO Disease Outbreak News", "世界保健機関（WHO）",
                  "https://www.who.int/emergencies/disease-outbreak-news", "国際機関"),
-  .idsc_overseas("WHO EIOS（疫学情報収集ツール）", "世界保健機関（WHO）",
-                 "https://www.who.int/initiatives/eios", "国際機関"),
-  .idsc_overseas("ReliefWeb（人道情報・アウトブレイク速報）", "国連人道問題調整事務所（OCHA）",
+  .idsc_overseas("ReliefWeb（人道情報・アウトブレイク速報）", "国連人道問題調整事務所（UN OCHA）",
                  "https://reliefweb.int/", "国際機関"),
 
   # ── アフリカ地域（AFRO）─────────────────────────────────────
-  .idsc_overseas("Africa CDC（大陸統括機関）", "アフリカ疾病予防管理センター（Africa CDC）",
+  .idsc_overseas("Weekly Bulletin on Outbreak and other Emergencies", "WHO アフリカ地域事務局（AFRO）",
+                 "https://www.afro.who.int/health-topics/disease-outbreaks/outbreaks-and-other-emergencies-updates", "アフリカ地域"),
+  .idsc_overseas("Africa CDC, Useful Resources(EBS Weekly Reports, SitRep)", "アフリカ疾病予防管理センター（Africa CDC）",
                  "https://africacdc.org/", "アフリカ地域"),
   .idsc_overseas("NCDC 感染症サーベイランス（Disease Situation Reports）", "ナイジェリア疾病予防管理センター（NCDC）",
                  "https://ncdc.gov.ng/diseases/sitreps", "アフリカ地域", country_en = "Nigeria"),
-  .idsc_overseas("IDSR（統合疾病サーベイランス・対応）ガイドライン・データ", "ケニア保健省",
-                 "http://guidelines.health.go.ke/", "アフリカ地域", country_en = "Kenya"),
   .idsc_overseas("NICD（感染症サーベイランス）", "国立感染症研究所（南アフリカ）",
                  "https://www.nicd.ac.za/", "アフリカ地域", country_en = "South Africa"),
-  .idsc_overseas("エチオピア公衆衛生研究所（公衆衛生緊急事態サーベイランス）", "エチオピア公衆衛生研究所（EPHI）",
-                 "https://ephi.gov.et/", "アフリカ地域", country_en = "Ethiopia"),
+  .idsc_overseas("Weekly Epidemiological Bulletin", "エチオピア公衆衛生研究所（EPHI）",
+                 "https://ephi.gov.et/download/weekly-epidemiological-bulletin/", "アフリカ地域", country_en = "Ethiopia"),
   .idsc_overseas("Disease Outbreak Monitoring", "ガーナ保健サービス（GHS）",
                  "https://ghs.gov.gh/disease-outbreaks", "アフリカ地域", country_en = "Ghana"),
-  .idsc_overseas("Ministère de la Santé Publique（感染症流行情報含む）", "コンゴ民主共和国保健省",
-                 "https://sante.gouv.cd/", "アフリカ地域", country_en = "Congo"),
+  .idsc_overseas("Surveillance épidémiologique（疫学サーベイランス）", "コンゴ民主共和国保健省",
+                 "https://sante.gouv.cd/epidemie", "アフリカ地域", country_en = "Congo"),
 
   # ── 米州地域（AMRO/PAHO）───────────────────────────────────
   .idsc_overseas("PAHO Epidemiological Alerts and Updates", "汎米保健機構（PAHO/WHO）",
