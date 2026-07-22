@@ -4543,25 +4543,40 @@ server <- function(input, output, session) {
   })
 
   # ── 複数疾患比較 ────────────────────────────────────────
+  # 都道府県選択時: 当該都道府県の値を使用。「全国」選択時は従来通り
+  # 全国公式値（SURV_DATA_NATIONAL）を優先し、欠測週のみ都道府県平均で補完する
   multi_data <- reactive({
     req(length(input$multi_diseases)>0)
     dr <- input$date_range
+    pref <- input$pref_filter
+
     avg_d <- SURV_DATA %>%
       filter(disease %in% input$multi_diseases,
-             date >= dr[1], date <= dr[2]) %>%
-      group_by(disease,date,year,week) %>%
-      summarise(avg_val=mean(reports_per_site,na.rm=TRUE),.groups="drop")
-    off_d <- if (is.null(SURV_DATA_NATIONAL) || nrow(SURV_DATA_NATIONAL) == 0) {
-      tibble(disease=character(), date=as.Date(character()), official_val=numeric())
+             date >= dr[1], date <= dr[2])
+
+    if (!is.null(pref) && pref != "全国") {
+      avg_d <- avg_d %>%
+        filter(pref_name == pref) %>%
+        group_by(disease,date,year,week) %>%
+        summarise(reports_per_site=mean(reports_per_site,na.rm=TRUE),.groups="drop")
     } else {
-      SURV_DATA_NATIONAL %>%
-        filter(disease %in% input$multi_diseases, date >= dr[1], date <= dr[2]) %>%
-        select(disease, date, official_val = reports_per_site)
+      avg_d <- avg_d %>%
+        group_by(disease,date,year,week) %>%
+        summarise(avg_val=mean(reports_per_site,na.rm=TRUE),.groups="drop")
+      off_d <- if (is.null(SURV_DATA_NATIONAL) || nrow(SURV_DATA_NATIONAL) == 0) {
+        tibble(disease=character(), date=as.Date(character()), official_val=numeric())
+      } else {
+        SURV_DATA_NATIONAL %>%
+          filter(disease %in% input$multi_diseases, date >= dr[1], date <= dr[2]) %>%
+          select(disease, date, official_val = reports_per_site)
+      }
+      avg_d <- avg_d %>%
+        left_join(off_d, by=c("disease","date")) %>%
+        mutate(reports_per_site = dplyr::coalesce(official_val, avg_val)) %>%
+        select(disease, date, year, week, reports_per_site)
     }
+
     avg_d %>%
-      left_join(off_d, by=c("disease","date")) %>%
-      mutate(reports_per_site = dplyr::coalesce(official_val, avg_val)) %>%
-      select(disease, date, year, week, reports_per_site) %>%
       mutate(disease_label=DISEASE_CONFIG[disease] %>%
                sapply(function(x) x$label))
   })
