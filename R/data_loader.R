@@ -207,6 +207,17 @@ SERIAL_INTERVALS <- list(
     source="推定値（ヒト潜伏期間5.9日[Chan & Johansson 2012 PLoS ONE] + Aedes蚊外因性潜伏期8-12日; ベクター媒介のため直接SI推定困難）")
 )
 
+# ── UTF-8 BOM付きCSV書き出しユーティリティ ────────────────────
+# write.csv(..., fileEncoding="UTF-8-BOM") はbase Rでは無効な接続
+# エンコーディングでエラーになるため、BOMバイトを手動で先頭に書き込んでから
+# UTF-8のままcsvを書き出す。Excel（日本語版）でCSVを開いた際の文字化けを防ぐ。
+write_csv_bom <- function(df, file) {
+  con <- file(file, "wb")
+  on.exit(close(con))
+  writeBin(as.raw(c(0xEF, 0xBB, 0xBF)), con)
+  write.csv(df, con, row.names = FALSE, fileEncoding = "UTF-8")
+}
+
 # ── CP932 テキスト読み込みユーティリティ ────────────────────
 read_jihs_csv <- function(url, timeout_sec = 20) {
   tryCatch({

@@ -3815,7 +3815,7 @@ server <- function(input, output, session) {
       out <- d %>%
         transmute(年 = year, 週 = week, 週開始日 = format(date, "%Y-%m-%d"),
                   インフルエンザ入院 = flu_hosp, 新型コロナ入院 = covid_hosp)
-      write.csv(out, file, row.names = FALSE, fileEncoding = "UTF-8-BOM")
+      write_csv_bom(out, file)
     }
   )
 
@@ -3982,7 +3982,7 @@ server <- function(input, output, session) {
                          format(label, "%Y/%m") else format(label, "%Y")) %>%
         pivot_wider(names_from = label, values_from = count, values_fill = 0L) %>%
         arrange(virus)
-      write.csv(d_wide, file, row.names=FALSE, fileEncoding="UTF-8-BOM")
+      write_csv_bom(d_wide, file)
     }
   )
 
@@ -4103,7 +4103,7 @@ server <- function(input, output, session) {
       out <- d %>%
         mutate(疾患名 = ARI_COUNT_LABELS[category]) %>%
         select(年 = year, 週 = week, 検体採取週 = date, 病原体 = 疾患名, 報告数 = reports)
-      write.csv(out, file, row.names = FALSE, fileEncoding = "UTF-8-BOM")
+      write_csv_bom(out, file)
     }
   )
 
@@ -5792,7 +5792,7 @@ server <- function(input, output, session) {
         paste0("idwr_", input$disease, "_", Sys.Date(), ".csv")
     },
     content = function(file) {
-      write.csv(data_tab_df(), file, row.names=FALSE, fileEncoding="UTF-8")
+      write_csv_bom(data_tab_df(), file)
     }
   )
 }
