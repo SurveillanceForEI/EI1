@@ -301,12 +301,19 @@ load_all_zensu_cached <- function() {
   files <- list.files(ZENSU_CACHE_DIR, pattern = "\\.rds$", full.names = TRUE)
   if (length(files) == 0) return(NULL)
   message("全数キャッシュ読み込み中 (", length(files), "週)...")
-  df <- bind_rows(lapply(files, readRDS))
+  raw_list <- lapply(files, readRDS)
+  df <- bind_rows(raw_list)
+  rm(raw_list); gc(FALSE)
   # メモリ削減: 低カーディナリティの文字列列をfactor化。
   # disease列はZENSU_DISEASE_CONFIG[[disease]]のリストキーとして使われるため
   # factor化しない（[[はfactorを整数コードで引いてしまうため）
+  # factor()は変換中に旧文字列列と新factor列が一時的に両方メモリ上に存在するため、
+  # 列ごとにgc()を挟んでピークメモリを抑える（メモリ逼迫環境でのOOM対策）
   for (col in c("pref_name", "region", "disease_label", "disease_class", "data_source")) {
-    if (col %in% names(df)) df[[col]] <- factor(df[[col]])
+    if (col %in% names(df)) {
+      df[[col]] <- factor(df[[col]])
+      gc(FALSE)
+    }
   }
   df
 }
