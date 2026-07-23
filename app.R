@@ -2601,7 +2601,11 @@ server <- function(input, output, session) {
                  paste0(if(rv>1)"▲ 流行拡大傾向 " else "▼ 流行縮小傾向 ",
                         sprintf("(%d年第%d週)", rd$year[1], rd$week[1]))))
     } else {
-      rd <- rt_series() %>% filter(!is.na(rt)) %>% slice_tail(n=1)
+      rd <- tryCatch(
+        rt_series() %>% filter(!is.na(rt)) %>% slice_tail(n=1),
+        error = function(e) tibble(date=as.Date(character()), rt=numeric(),
+                                    year=integer(), week=integer())
+      )
       if(nrow(rd)==0) return(tags$div(class="kpi-box",
         tags$div(style="background:#2980b9;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
         tags$div(class="kpi-value","―"),tags$div(class="kpi-label","実効再生産数 Rt（直近7週）"),
