@@ -15,8 +15,11 @@ dir.create(DOWNLOAD_DIR, showWarnings = FALSE)
 get_annual_url_base <- function(year) {
   if (year >= 2021) {
     sprintf("https://id-info.jihs.go.jp/surveillance/idwr/annual/%d/syulist/", year)
-  } else {
+  } else if (year >= 2011) {
     sprintf("https://id-info.jihs.go.jp/niid/images/idwr/ydata/%d/Syuukei/", year)
+  } else {
+    # 2001〜2010年: 旧CDROM期（表番号は10-2等の現行体系と共通）
+    sprintf("https://idsc.niid.go.jp/idwr/CDROM/Kako/H%d/Syuukei/", year - 1988)
   }
 }
 
