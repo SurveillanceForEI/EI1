@@ -442,6 +442,12 @@ load_all_cached <- function() {
     df$date <- as.Date(df$date)
   if ("year" %in% names(df))  df$year  <- as.integer(df$year)
   if ("week" %in% names(df))  df$week  <- as.integer(df$week)
+  # メモリ削減: 低カーディナリティの文字列列をfactor化（数百万行規模でメモリを大幅圧縮）。
+  # 注意: disease列は DISEASE_CONFIG[[disease]] のようにリストキーとして使われる箇所が
+  # 多数あり、[[ はfactorに対して文字ラベルではなく整数コードで引くため絶対にfactor化しない。
+  for (col in c("pref_name", "region", "disease_label", "data_source")) {
+    if (col %in% names(df)) df[[col]] <- factor(df[[col]])
+  }
   df
 }
 

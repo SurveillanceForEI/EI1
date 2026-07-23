@@ -301,7 +301,14 @@ load_all_zensu_cached <- function() {
   files <- list.files(ZENSU_CACHE_DIR, pattern = "\\.rds$", full.names = TRUE)
   if (length(files) == 0) return(NULL)
   message("全数キャッシュ読み込み中 (", length(files), "週)...")
-  bind_rows(lapply(files, readRDS))
+  df <- bind_rows(lapply(files, readRDS))
+  # メモリ削減: 低カーディナリティの文字列列をfactor化。
+  # disease列はZENSU_DISEASE_CONFIG[[disease]]のリストキーとして使われるため
+  # factor化しない（[[はfactorを整数コードで引いてしまうため）
+  for (col in c("pref_name", "region", "disease_label", "disease_class", "data_source")) {
+    if (col %in% names(df)) df[[col]] <- factor(df[[col]])
+  }
+  df
 }
 
 # ── メイン: 定点データと同じパターン（キャッシュ優先・差分のみ取得）──
