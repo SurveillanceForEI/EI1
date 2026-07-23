@@ -437,6 +437,12 @@ function ebsUntranslateCards(containerId) {
       '))
     ),
 
+    # Plotly.jsの依存読み込みを常に先読みさせるためのダミー出力（非表示）。
+    # 静的化したPlotly.reactベースのグラフ（EBSトレンド等）は、タブ内に
+    # plotlyOutputが1つも無いとPlotly.js自体が遅延ロードされず初回描画に
+    # 失敗するため、常にレンダリングされる位置にこれを置いて確実に読み込む
+    tags$div(style="display:none;", plotlyOutput("plotly_dep_loader", height="1px")),
+
     uiOutput("data_source_banner"),
 
     # ── KPIカード ──────────────────────────────────────────
@@ -915,7 +921,8 @@ function ebsUntranslateCards(containerId) {
             # ── Google Trends ──
             tags$div(class="data-source-bar",
               "Google Trends | 過去12ヶ月 | 100=最大関心度"),
-            plotlyOutput("gtrends_plot", height="400px")
+            tags$div(id = "gtrends-chart", style = "height:400px;"),
+            uiOutput("gtrends_data_script")
           )
         )
       ),
@@ -1669,6 +1676,12 @@ national_series_for <- function(did, dr = NULL) {
 }
 
 server <- function(input, output, session) {
+
+  # Plotly.js依存の先読み確保用（UI側の非表示div参照、詳細はUI定義部のコメント参照）。
+  # 非表示(display:none)のままだとShinyのデフォルト挙動(suspendWhenHidden)で
+  # このoutputが評価されず依存関係も読み込まれないため、明示的に無効化する
+  output$plotly_dep_loader <- renderPlotly({ plot_ly() })
+  outputOptions(output, "plotly_dep_loader", suspendWhenHidden = FALSE)
 
   # ── 初回アクセス時の注意事項ポップアップ ─────────────────
   showModal(modalDialog(
@@ -5174,61 +5187,47 @@ server <- function(input, output, session) {
     )))
   })
 
-  output$gtrends_plot <- renderPlotly({
+  # 静的化: gtrends_data()（都道府県切替・更新ボタン時のみ再取得される）が
+  # 含む全疾患分をまとめてJSONに変換し、疾患切替はクライアント側の
+  # Plotly.reactで完結させる（www/js/ebs_trend_chart.js のupdateGtrendsChart()）
+  GTRENDS_LABEL_MAP <- c(
+    flu="インフルエンザ", rsv="RSウイルス", covid="新型コロナ",
+    hfmd="手足口病", mycop="マイコプラズマ肺炎",
+    varicella="水痘", mumps="おたふくかぜ", gi="感染性胃腸炎",
+    measles="麻疹", rubella="風疹", pertussis="百日咳",
+    syphilis="梅毒", ehec="腸管出血性大腸菌", dengue="デング熱", mpox="エムポックス"
+  )
+  gtrends_json_data <- reactive({
     d <- gtrends_data()
-    # サイドバーの疾患選択に連動
-    sel <- if (!is.null(input$ts_mode) && input$ts_mode == "zensu") {
-      input$zensu_disease_ts
-    } else {
-      input$disease
-    }
-    if (is.null(d) || nrow(d) == 0) {
-      return(plot_ly() %>%
-        add_annotations(text = "データ取得中... 「Trends 更新」ボタンを押してください",
-                        showarrow = FALSE, font = list(size = 13)))
-    }
-    d <- d %>% filter(disease_id %in% sel)
-    if (length(sel) == 0 || nrow(d) == 0) return(plot_ly() %>%
-      add_annotations(text = "データなし", showarrow = FALSE,
-                      font = list(size = 14, color = "#aaa")) %>%
-      layout(paper_bgcolor = "transparent", plot_bgcolor = "transparent"))
+    if (is.null(d) || nrow(d) == 0) return(list(series = list(), geoLabel = NULL))
 
-    label_map <- c(
-      flu="インフルエンザ", rsv="RSウイルス", covid="新型コロナ",
-      hfmd="手足口病", mycop="マイコプラズマ肺炎",
-      varicella="水痘", mumps="おたふくかぜ", gi="感染性胃腸炎",
-      measles="麻疹", rubella="風疹", pertussis="百日咳",
-      syphilis="梅毒", ehec="腸管出血性大腸菌", dengue="デング熱", mpox="エムポックス"
-    )
-    all_ids <- names(label_map)
+    all_ids <- names(GTRENDS_LABEL_MAP)
     pal <- colorRampPalette(brewer.pal(8, "Set2"))(length(all_ids))
     colors <- setNames(pal, all_ids)
 
-    p <- plot_ly()
-    for (did in unique(d$disease_id)) {
-      dd  <- d %>% filter(disease_id == did) %>% arrange(date)
-      lbl <- if (!is.na(label_map[did])) label_map[did] else did
-      p <- p %>% add_lines(
-        data = dd, x = ~date, y = ~hits,
-        name = lbl,
-        line = list(color = colors[did], width = 2),
-        hovertemplate = paste0("%{x|%Y-%m-%d}　", lbl,
-                               "　関心度: %{y}<extra></extra>")
+    series <- lapply(unique(d$disease_id), function(did) {
+      dd <- d %>% filter(disease_id == did) %>% arrange(date)
+      list(
+        label = if (!is.na(GTRENDS_LABEL_MAP[did])) GTRENDS_LABEL_MAP[did] else did,
+        color = unname(if (!is.na(colors[did])) colors[did] else "#888888"),
+        points = lapply(seq_len(nrow(dd)), function(i) list(
+          date = format(dd$date[i], "%Y-%m-%d"), hits = dd$hits[i]
+        ))
       )
-    }
+    })
+    names(series) <- unique(d$disease_id)
+
     geo_label <- if (!is.null(input$pref_filter) && input$pref_filter != "全国")
       input$pref_filter else "日本全国"
-    p %>% layout(
-      title = list(text = paste0("Google Trends — ", geo_label),
-                   font = list(size = 13), x = 0),
-      xaxis = list(title = "", showgrid = FALSE),
-      yaxis = list(title = "検索関心度（最大=100）", gridcolor = "#eee",
-                   range = c(0, 105)),
-      legend = list(orientation = "h", y = -0.15),
-      hovermode = "x unified",
-      plot_bgcolor = "#fff", paper_bgcolor = "#fff",
-      margin = list(t = 30, b = 40, l = 55, r = 20)
-    )
+    list(series = series, geoLabel = geo_label)
+  })
+
+  output$gtrends_data_script <- renderUI({
+    tags$script(HTML(paste0(
+      "window.GTRENDS_DATA = ",
+      jsonlite::toJSON(gtrends_json_data(), auto_unbox = TRUE, null = "null"),
+      "; if (window.updateGtrendsChart) updateGtrendsChart();"
+    )))
   })
 
 

@@ -78,14 +78,73 @@
     Plotly.react(CONTAINER_ID, traces, layout, { displayModeBar: false, responsive: true });
   }
 
+  // ── Google Trendsチャート（gtrends-chart）──
+  // window.GTRENDS_DATA は都道府県切替・「Trends 更新」ボタン時のみR側から
+  // 再送信される（{series: {disease_id: {label,color,points:[{date,hits}]}}, geoLabel}）。
+  // 疾患切替はここでもクライアント側のみで完結する
+  var GTRENDS_CONTAINER_ID = "gtrends-chart";
+
+  function updateGtrendsChart() {
+    var el = document.getElementById(GTRENDS_CONTAINER_ID);
+    if (!el || !global.Plotly) return;
+    var payload = global.GTRENDS_DATA;
+    if (!payload || !payload.series) {
+      Plotly.react(GTRENDS_CONTAINER_ID, [], {
+        annotations: [{ text: "データ取得中... 「Trends 更新」ボタンを押してください",
+                         showarrow: false, font: { size: 13 } }],
+      }, { displayModeBar: false, responsive: true });
+      return;
+    }
+
+    var did = currentDiseaseId();
+    var series = did ? payload.series[did] : null;
+
+    if (!series || !series.points || series.points.length === 0) {
+      Plotly.react(
+        GTRENDS_CONTAINER_ID,
+        [],
+        {
+          annotations: [{ text: "データなし", showarrow: false, font: { size: 14, color: "#aaa" } }],
+          paper_bgcolor: "transparent", plot_bgcolor: "transparent",
+        },
+        { displayModeBar: false, responsive: true }
+      );
+      return;
+    }
+
+    var xs = series.points.map(function (p) { return p.date; });
+    var ys = series.points.map(function (p) { return p.hits; });
+    var lbl = series.label || did;
+
+    var trace = {
+      x: xs, y: ys, name: lbl, type: "scatter", mode: "lines",
+      line: { color: series.color, width: 2 },
+      hovertemplate: "%{x|%Y-%m-%d}　" + lbl + "　関心度: %{y}<extra></extra>",
+    };
+
+    var layout = {
+      title: { text: "Google Trends — " + (payload.geoLabel || "日本全国"), font: { size: 13 }, x: 0 },
+      xaxis: { title: "", showgrid: false },
+      yaxis: { title: "検索関心度（最大=100）", gridcolor: "#eee", range: [0, 105] },
+      legend: { orientation: "h", y: -0.15 },
+      hovermode: "x unified",
+      plot_bgcolor: "#fff", paper_bgcolor: "#fff",
+      margin: { t: 30, b: 40, l: 55, r: 20 },
+    };
+
+    Plotly.react(GTRENDS_CONTAINER_ID, [trace], layout, { displayModeBar: false, responsive: true });
+  }
+
   // 疾患セレクタ・表示モードの変更を検知して再描画（サーバー往復なし）
   $(document).on(
     "change",
     "#disease, #zensu_disease_ts, input[name=\"ts_mode\"]",
     function () {
       updateEbsTrendChart();
+      updateGtrendsChart();
     }
   );
 
   global.updateEbsTrendChart = updateEbsTrendChart;
+  global.updateGtrendsChart = updateGtrendsChart;
 })(window);
