@@ -4856,61 +4856,27 @@ server <- function(input, output, session) {
 
   output$pubmed_news_feed <- renderUI({
     d <- pubmed_filtered()
-    if (nrow(d) == 0) return(tags$div(class="demo-banner","該当なし。サイドバーの疾患を変更するか「すべて表示」を押してください。"))
+    if (nrow(d) == 0) {
+      return(tags$div(class="demo-banner", "該当なし。サイドバーの疾患を変更するか「すべて表示」を押してください。"))
+    }
     PAGE_SIZE <- as.integer(input$pubmed_page_size)
     total <- nrow(d)
     d <- head(d, PAGE_SIZE)
     dlabel <- EBS_DLABEL
     translate_mode_pm <- isTRUE(input$pubmed_translate == "on")
-    make_link_pm <- function(url) {
-      if (is.na(url) || nchar(trimws(url)) == 0) return(url)
-      if (translate_mode_pm)
-        paste0("https://translate.google.com/translate?hl=ja&sl=auto&tl=ja&u=",
-               utils::URLencode(url, repeated = TRUE))
-      else url
-    }
-    cards <- lapply(seq_len(nrow(d)), function(i) {
-      row <- d[i,]
-      sc <- signal_color(as.character(row$signal_level))
-      tgs <- strsplit(coalesce(row$disease_tags, ""), ",")[[1]]
-      tbdgs <- lapply(tgs, function(tg) {
-        tags$span(style=paste0(
-          "display:inline-block;background:#ecf0f1;color:#555;",
-          "border-radius:10px;padding:1px 8px;font-size:0.72em;margin:1px;"),
-          if (!is.na(dlabel[tg])) dlabel[tg] else tg)
-      })
-      tags$div(
-        style=paste0("background:#fff;border-radius:6px;padding:14px 16px;",
-          "box-shadow:0 1px 3px rgba(0,0,0,0.07);border-left:4px solid ", sc, ";"),
-        tags$div(style="display:flex;justify-content:space-between;align-items:flex-start;",
-          tags$div(style="flex:1;",
-            tags$a(href=make_link_pm(row$link), target="_blank",
-              class="ebs-tr",
-              style="font-weight:700;font-size:0.92em;color:#2c3e50;text-decoration:none;",
-              row$title)
-          ),
-          tags$div(style="white-space:nowrap;margin-left:10px;",
-            tags$span(style=paste0("background:",sc,";color:#fff;border-radius:10px;",
-              "padding:2px 10px;font-size:0.72em;font-weight:700;"),
-              as.character(row$signal_level)))
-        ),
-        tags$div(style="font-size:0.80em;color:#888;margin:4px 0;",
-          tags$span(style="font-weight:600;", row$source_name), " • ",
-          tags$span(if (is.na(row$pub_date)) tags$span(style="color:#e67e22;","日付不明")
-                    else format(row$pub_date, "%Y-%m-%d"))
-        ),
-        if (!is.na(row$summary) && nchar(row$summary) > 0)
-          tags$div(class="ebs-tr",
-            style="font-size:0.84em;color:#555;margin:6px 0;line-height:1.5;", row$summary),
-        tags$div(style="margin-top:6px;", tbdgs)
-      )
-    })
-    more_note <- if (total > PAGE_SIZE)
-      tags$div(style="text-align:center;color:#888;font-size:0.85em;padding:10px;",
-        paste0(PAGE_SIZE, " 件を表示中（全 ", total, " 件）"))
+
+    cards <- lapply(seq_len(nrow(d)), function(i) .ebs_row_to_card(d[i, ], dlabel, translate_mode_pm))
+    meta <- list(total = total, pageSize = PAGE_SIZE)
+
     tags$div(
-      tags$div(style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;", cards),
-      more_note
+      tags$div(id = "pubmed-cards-root"),
+      tags$script(HTML(paste0(
+        "renderEbsCards('pubmed-cards-root', ",
+        jsonlite::toJSON(cards, auto_unbox = TRUE, null = "null"),
+        ", ",
+        jsonlite::toJSON(meta, auto_unbox = TRUE),
+        ");"
+      )))
     )
   })
 
@@ -4978,7 +4944,8 @@ server <- function(input, output, session) {
       link <- paste0("https://translate.google.com/translate?hl=ja&sl=auto&tl=ja&u=",
                       utils::URLencode(link, repeated = TRUE))
     }
-    tgs <- strsplit(row$disease_tags, ",")[[1]]
+    tgs <- strsplit(coalesce(row$disease_tags, ""), ",")[[1]]
+    tgs <- tgs[nchar(trimws(tgs)) > 0]
     disease_labels <- vapply(tgs, function(tg) if (!is.na(dlabel[tg])) dlabel[tg] else tg,
                               character(1), USE.NAMES = FALSE)
 
