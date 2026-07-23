@@ -293,7 +293,7 @@ ui <- dashboardPage(
 
     tags$div(class="sidebar-section-title", style="padding-left:15px", "期間"),
     sliderInput("date_range", NULL,
-      min   = as.Date("2012-01-02"),
+      min   = as.Date("2001-01-01"),
       max   = as.Date(paste0(format(Sys.Date(), "%Y"), "-12-31")),
       value = c(Sys.Date() - 365*3, Sys.Date()),
       timeFormat = "%Y/%m", step = 7, width = "100%"),
@@ -1844,7 +1844,7 @@ server <- function(input, output, session) {
 
         # ① 定点把握データ
         tryCatch({
-          new_surv <- get_surveillance_data(years=2012:2026)
+          new_surv <- get_surveillance_data(years=2001:2026)
           SURV_DATA <<- new_surv
           record_data_change("ibs", compute_recent_signature(new_surv, "date", 90))
         }, error=function(e) message("自動更新 IBS エラー: ", e$message))
@@ -1852,7 +1852,7 @@ server <- function(input, output, session) {
         # ② 全数把握データ
         showNotification("自動更新中（全数データ）...", type="message", duration=NULL, id="auto_upd")
         tryCatch({
-          new_zensu <- get_zensu_data(years=2012:2026)
+          new_zensu <- get_zensu_data(years=2001:2026)
           ZENSU_DATA <<- new_zensu
           record_data_change("zensu", compute_recent_signature(new_zensu, "date", 90))
         }, error=function(e) message("自動更新 Zensu エラー: ", e$message))
@@ -1906,7 +1906,7 @@ server <- function(input, output, session) {
   observeEvent(input$surv_refresh, {
     showNotification("定点データ取得中...", type="message", duration=NULL, id="surv_upd")
     tryCatch({
-      new_surv <- get_surveillance_data(years=2012:2026)
+      new_surv <- get_surveillance_data(years=2001:2026)
       SURV_DATA <<- new_surv
       surv_updated(Sys.time())
       record_data_change("ibs", compute_recent_signature(new_surv, "date", 90))
@@ -1918,7 +1918,7 @@ server <- function(input, output, session) {
   observeEvent(input$zensu_refresh, {
     showNotification("全数データ取得中...", type="message", duration=NULL, id="zensu_upd")
     tryCatch({
-      new_zensu <- get_zensu_data(years=2012:2026)
+      new_zensu <- get_zensu_data(years=2001:2026)
       ZENSU_DATA <<- new_zensu
       surv_updated(Sys.time())
       record_data_change("zensu", compute_recent_signature(new_zensu, "date", 90))
