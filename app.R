@@ -1015,10 +1015,11 @@ function ebsUntranslateCards(containerId) {
           # ── IBS（定点把握）────────────────────────────────
           tags$h4(id="notes-ibs", "■定点把握疾患", style="border-bottom:2px solid #3498db;padding-bottom:4px;color:#2c3e50;"),
           tags$h5("データソース"),
-          tags$p("感染症発生動向調査週報（IDWR）速報　国立健康危機管理研究機構（JIHS）"),
+          tags$p("感染症発生動向調査週報（IDWR）速報／感染症発生動向調査事業年報　国立健康危機管理研究機構（JIHS）"),
           tags$ul(
             tags$li("定点医療機関からの週次報告データ（定点あたり報告数）"),
-            tags$li("速報値（暫定値）のため、確定値と異なる場合があります"),
+            tags$li("2001年〜概ね前年分までは事業年報の確定値、当年の未確定期間はIDWR週報の速報値（暫定値）を使用しています"),
+            tags$li("速報値は後日、事業年報の確定値で修正される場合があります（画面右上の「⚠ 速報値」「✓ 確定値」表示で判別できます）"),
             tags$li("集計週は月曜〜日曜、報告週は翌週月曜基準で公表"),
             tags$li("JIHSサイトでの公表: 原則毎週火曜日（祝祭日等の影響でずれる場合あり）"),
             tags$li("本ダッシュボードのデータ更新: 毎日午前3時に自動取得（新週が公表されていれば差分取得）")
@@ -1137,6 +1138,7 @@ function ebsUntranslateCards(containerId) {
             tags$li("全数把握対象疾患の医師による全例報告（感染症法届出）"),
             tags$li("報告は診断した医師が保健所経由で届け出"),
             tags$li("週次集計で公表"),
+            tags$li("2001年〜概ね前年分までは事業年報の確定値、当年の未確定期間はIDWR週報の速報値（暫定値）を使用しています"),
             tags$li("JIHSサイトでの公表: 原則毎週火曜日（祝祭日等の影響でずれる場合あり）"),
             tags$li("本ダッシュボードのデータ更新: 毎日午前3時に自動取得（新週が公表されていれば差分取得）")
           ),
@@ -1780,9 +1782,10 @@ server <- function(input, output, session) {
           "display:flex;justify-content:space-between;align-items:center;"
         ),
         tags$div(
-          tags$strong("⚠ 速報値（暫定値）: "),
-          "このダッシュボードは感染症発生動向調査週報（IDWR）の速報データを表示しています。",
-          "速報値は後日修正される場合があります。確定値は",
+          tags$strong("ℹ データについて: "),
+          "過去分（概ね2023年以前）は感染症発生動向調査事業年報の確定値、",
+          "直近分（当年の未確定期間）は感染症発生動向調査週報（IDWR）の速報値（暫定値）を使用しています。",
+          "速報値は後日修正される場合があります。詳細・確定値は",
           tags$a(href="https://id-info.jihs.go.jp/surveillance/idwr/",
                  target="_blank", style="color:#856404;",
                  "JIHS公式サイト"),
@@ -1979,15 +1982,22 @@ server <- function(input, output, session) {
   })
 
   # ── データソース表示ヘルパー ────────────────────────────
+  # is_provisional==FALSEは「確定値」「デモデータ」の両方であり得るため、
+  # data_sourceの文字列（"デモデータ"を含むか）で区別する
+  is_demo_source <- function(d) grepl("デモデータ", ifelse(is.na(d$data_source), "", d$data_source))
+
   provisional_label <- reactive({
     d <- filtered_data()
-    if (nrow(d) > 0 && any(d$is_provisional, na.rm = TRUE)) {
+    if (nrow(d) == 0) return(NULL)
+    if (any(d$is_provisional, na.rm = TRUE)) {
       tags$span(
         style = "color:#e67e22;font-weight:600;margin-left:8px;",
         "⚠ 速報値（暫定値）"
       )
-    } else if (nrow(d) > 0 && any(!d$is_provisional, na.rm = TRUE)) {
+    } else if (any(is_demo_source(d))) {
       tags$span(style = "color:#95a5a6;margin-left:8px;", "※デモデータ")
+    } else {
+      tags$span(style = "color:#27ae60;margin-left:8px;", "✓ 確定値")
     }
   })
 
@@ -1998,9 +2008,12 @@ server <- function(input, output, session) {
       label_text,
       tags$span(style = "float:right;font-size:0.85em;",
         "出典: ", tags$strong(src),
-        if (any(d$is_provisional, na.rm = TRUE))
+        if (nrow(d) > 0 && any(d$is_provisional, na.rm = TRUE))
           tags$span(style = "color:#e67e22;font-weight:600;margin-left:6px;",
                     "⚠ 速報値（暫定値）")
+        else if (nrow(d) > 0 && !any(is_demo_source(d)))
+          tags$span(style = "color:#27ae60;font-weight:600;margin-left:6px;",
+                    "✓ 確定値")
       )
     )
   }
