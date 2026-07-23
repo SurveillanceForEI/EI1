@@ -4441,7 +4441,8 @@ server <- function(input, output, session) {
         fillcolor=paste0(col,"33"), line=list(color="transparent"),
         name=paste0(main_label,"　過去5年平均±2SD"), hoverinfo="skip") %>%
       add_lines(data=nat, x=~date, y=~reports_per_site,
-        line=list(color=col, width=2.5), name=main_label)
+        line=list(color=col, width=2.5), name=main_label,
+        hovertemplate=paste0(main_label, "　%{x|%Y-W%W}: %{y:.2f}<extra></extra>"))
     # +2SD 超過点を赤丸でプロット
     exceed <- nat2 %>% filter(has_hist, reports_per_site > ymax)
     if (nrow(exceed) > 0) {
@@ -4503,7 +4504,8 @@ server <- function(input, output, session) {
     if (is_pref) {
       nd <- national_avg()
       p <- p %>% add_lines(data=nd,x=~date,y=~reports_per_site,
-        line=list(color="#2c3e50",dash="dot",width=2),name="全国平均（参考）")
+        line=list(color="#2c3e50",dash="dot",width=2),name="全国平均（参考）",
+        hovertemplate="全国平均（参考）　%{x|%Y-W%W}: %{y:.2f}<extra></extra>")
     }
     p %>% layout(xaxis=list(title="",showgrid=FALSE),
       yaxis=list(title="定点あたり報告数",gridcolor="#eee"),
