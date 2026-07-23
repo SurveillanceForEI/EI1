@@ -332,6 +332,7 @@ ui <- dashboardPage(
     tags$head(
       tags$link(rel="stylesheet", href="custom.css"),
       tags$script(src="js/ebs_cards.js"),
+      tags$script(src="js/ebs_trend_chart.js"),
       tags$link(href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap",
                 rel="stylesheet"),
       # Notes内の計算式を数式として表示するためのMathJax（\( \) と \[ \] のみをmath区切りとして使用し、
@@ -908,7 +909,8 @@ function ebsUntranslateCards(containerId) {
           column(12,
             # ── EBS 日別記事数チャート ──
             tags$div(class="data-source-bar", "国内EBSニュース 日別シグナル数（過去60日）"),
-            plotlyOutput("ebs_daily_chart", height="220px"),
+            tags$div(id = "ebs-trend-chart", style = "height:220px;"),
+            uiOutput("ebs_trend_data_script"),
             tags$hr(),
             # ── Google Trends ──
             tags$div(class="data-source-bar",
@@ -5127,72 +5129,49 @@ server <- function(input, output, session) {
     })
   })
 
-  output$ebs_daily_chart <- renderPlotly({
-    is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
-    did <- if (is_zensu) input$zensu_disease_ts else input$disease
+  # 静的化: 疾患ID毎の週次Signal High/Low件数をまとめて計算し、クライアント側の
+  # Plotly.reactで疾患切り替え（サーバー往復なし）に対応する
+  # (www/js/ebs_trend_chart.js のupdateEbsTrendChart()が消費する)
+  ebs_trend_data <- reactive({
     d <- ebs_data()
-    if (!is.null(d) && nrow(d) > 0) {
-      d <- d %>%
-        filter(is.na(source_id) | source_id != "pubmed") %>%
-        filter(!mapply(is_overseas_article,
-                       coalesce(title, ""), coalesce(summary, ""),
-                       if ("ebs_pref"   %in% names(.)) ebs_pref   else NA,
-                       if ("source_id"  %in% names(.)) source_id  else "",
-                       if ("source_name" %in% names(.)) source_name else ""))
-    }
-    if (is.null(d) || nrow(d) == 0 || is.null(did)) {
-      return(plot_ly() %>%
-        add_annotations(text = "データなし", showarrow = FALSE,
-          font = list(size = 14, color = "#aaa")) %>%
-        layout(paper_bgcolor = "transparent", plot_bgcolor = "transparent"))
-    }
-    today <- Sys.Date()
-    d14 <- d %>%
-      filter(
-        !is.na(pub_date),
-        pub_date >= today - 60,
-        source_id != "pubmed",
-        has_disease_tag(disease_tags, did),
-        as.character(signal_level) %in% c("Signal High", "Signal Low")
-      ) %>%
-      mutate(
-        pub_date = as.Date(pub_date),
-        week_start = pub_date - as.integer(format(pub_date, "%u")) %% 7,
-        level = factor(as.character(signal_level), levels = c("Signal High", "Signal Low"))
-      ) %>%
-      count(week_start, level, .drop = FALSE)
+    if (is.null(d) || nrow(d) == 0) return(list())
+    d <- d %>%
+      filter(is.na(source_id) | source_id != "pubmed") %>%
+      filter(!mapply(is_overseas_article,
+                     coalesce(title, ""), coalesce(summary, ""),
+                     if ("ebs_pref"   %in% names(.)) ebs_pref   else NA,
+                     if ("source_id"  %in% names(.)) source_id  else "",
+                     if ("source_name" %in% names(.)) source_name else "")) %>%
+      filter(!is.na(pub_date), pub_date >= Sys.Date() - 60,
+             as.character(signal_level) %in% c("Signal High", "Signal Low")) %>%
+      mutate(week_start = as.Date(pub_date) - as.integer(format(as.Date(pub_date), "%u")) %% 7)
 
-    if (nrow(d14) == 0) {
-      return(plot_ly() %>%
-        add_annotations(text = "過去60日間にSignal High/Lowなし", showarrow = FALSE,
-          font = list(size = 13, color = "#aaa")) %>%
-        layout(paper_bgcolor = "transparent", plot_bgcolor = "transparent"))
-    }
+    all_disease_ids <- union(names(DISEASE_CONFIG), names(ZENSU_DISEASE_CONFIG))
+    result <- lapply(all_disease_ids, function(did) {
+      dd <- d %>% filter(has_disease_tag(disease_tags, did))
+      if (nrow(dd) == 0) return(list())
+      wk <- dd %>%
+        count(week_start, signal_level, .drop = FALSE) %>%
+        tidyr::pivot_wider(names_from = signal_level, values_from = n, values_fill = 0)
+      if (!"Signal High" %in% names(wk)) wk$`Signal High` <- 0
+      if (!"Signal Low"  %in% names(wk)) wk$`Signal Low`  <- 0
+      wk <- wk %>% arrange(week_start)
+      lapply(seq_len(nrow(wk)), function(i) list(
+        week = format(wk$week_start[i], "%Y-%m-%d"),
+        high = wk$`Signal High`[i],
+        low  = wk$`Signal Low`[i]
+      ))
+    })
+    names(result) <- all_disease_ids
+    Filter(function(x) length(x) > 0, result)
+  })
 
-    colors <- c("Signal High" = "#e74c3c", "Signal Low" = "#f39c12")
-    dates_seq <- seq(today - 60, today, by = "day")
-
-    d_event  <- d14 %>% filter(level == "Signal High")
-    d_signal <- d14 %>% filter(level == "Signal Low")
-
-    plot_ly() %>%
-      add_bars(data = d_event,  x = ~week_start, y = ~n, name = "Signal High",
-               marker = list(color = colors["Signal High"]), width = 6 * 86400000) %>%
-      add_bars(data = d_signal, x = ~week_start, y = ~n, name = "Signal Low",
-               marker = list(color = colors["Signal Low"]), width = 6 * 86400000) %>%
-      layout(
-        barmode   = "stack",
-        xaxis     = list(title = "", type = "date",
-                         tickformat = "%m/%d", dtick = 7 * 86400000,
-                         range = c(today - 60, today + 0.5),
-                         gridcolor = "#eee"),
-        yaxis     = list(title = "記事数", dtick = 1, gridcolor = "#eee", rangemode = "nonnegative"),
-        legend    = list(orientation = "h", x = 0.5, xanchor = "center",
-                         y = 1.1, yanchor = "bottom"),
-        paper_bgcolor = "transparent",
-        plot_bgcolor  = "rgba(250,250,250,0.5)",
-        margin = list(t = 30, b = 30, l = 40, r = 10)
-      )
+  output$ebs_trend_data_script <- renderUI({
+    tags$script(HTML(paste0(
+      "window.EBS_TREND_DATA = ",
+      jsonlite::toJSON(ebs_trend_data(), auto_unbox = TRUE, null = "null"),
+      "; if (window.updateEbsTrendChart) updateEbsTrendChart();"
+    )))
   })
 
   output$gtrends_plot <- renderPlotly({
