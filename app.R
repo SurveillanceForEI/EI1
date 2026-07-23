@@ -5108,118 +5108,27 @@ server <- function(input, output, session) {
 
   output$ebs_ov_news_feed <- renderUI({
     d <- ebs_overseas()
-    if (nrow(d) == 0) return(tags$div(class="demo-banner","該当なし。サイドバーの疾患を変更するか「すべて表示」を押してください。"))
+    if (nrow(d) == 0) {
+      return(tags$div(class="demo-banner", "該当なし。サイドバーの疾患を変更するか「すべて表示」を押してください。"))
+    }
     PAGE_SIZE <- as.integer(input$ebs_ov_page_size)
     total <- nrow(d)
     d <- head(d, PAGE_SIZE)
     dlabel <- EBS_DLABEL
     translate_mode_ov <- isTRUE(input$ebs_ov_translate == "on")
-    make_link_ov <- function(url) {
-      if (is.na(url) || nchar(trimws(url)) == 0) return(url)
-      if (translate_mode_ov)
-        paste0("https://translate.google.com/translate?hl=ja&sl=auto&tl=ja&u=",
-               utils::URLencode(url, repeated = TRUE))
-      else url
-    }
-    cards <- lapply(seq_len(nrow(d)), function(i) {
-      row <- d[i,]
-      sc <- signal_color(as.character(row$signal_level))
-      tgs <- strsplit(row$disease_tags, ",")[[1]]
-      tbdgs <- lapply(tgs, function(tg) {
-        tags$span(style=paste0(
-          "display:inline-block;background:#ecf0f1;color:#555;",
-          "border-radius:10px;padding:1px 8px;font-size:0.72em;margin:1px;"),
-          if (!is.na(dlabel[tg])) dlabel[tg] else tg)
-      })
-      has_screen <- "ebs_unusual" %in% names(row)
-      criteria_badges <- if (has_screen) {
-        cols_map <- list(
-          ebs_unusual   = "Unusual",
-          ebs_serious_c = "Serious (country)",
-          ebs_serious_j = "Serious (Japan)",
-          ebs_epidemic  = "Epidemic-prone",
-          ebs_mass      = "Mass exposure",
-          ebs_high      = "High profile",
-          ebs_special   = "Special pathogen"
-        )
-        blist <- lapply(names(cols_map), function(col) {
-          val <- if (col %in% names(row)) row[[col]] else ""
-          if (!is.na(val) && val == "✓")
-            tags$span(style=paste0("display:inline-block;background:#27ae60;color:#fff;",
-              "border-radius:3px;padding:0 5px;font-size:0.65em;font-weight:700;margin:1px;"),
-              cols_map[[col]])
-        })
-        Filter(Negate(is.null), blist)
-      } else list()
-      location_badge <- if (has_screen && "ebs_location" %in% names(row) &&
-                            !is.na(row$ebs_location) && row$ebs_location != "Unknown") {
-        loc_text <- if ("ebs_region" %in% names(row) && !is.na(row$ebs_region) &&
-                        row$ebs_region != "不明")
-          paste0(row$ebs_location, " (", row$ebs_region, ")")
-        else row$ebs_location
-        tags$span(style=paste0("display:inline-block;background:#8e44ad;color:#fff;",
-          "border-radius:3px;padding:0 5px;font-size:0.65em;font-weight:600;margin:1px;"),
-          icon("map-marker-alt"), " ", loc_text)
-      }
-      # 地域タグに対応した参考リンク（記事の情報源ではない旨を明記）
-      idsc_ref <- tryCatch({
-        pref_val <- if ("ebs_pref" %in% names(row)) coalesce(row$ebs_pref, NA_character_) else NA_character_
-        loc_val  <- if ("ebs_location" %in% names(row)) coalesce(row$ebs_location, NA_character_) else NA_character_
-        r <- find_idsc_domestic_link(pref_val, loc_val)
-        if (is.null(r) && !is.na(loc_val) && loc_val != "Global") r <- find_idsc_overseas_link(loc_val)
-        r
-      }, error = function(e) NULL)
-      idsc_ref_line <- if (!is.null(idsc_ref)) {
-        tags$div(style="font-size:0.72em;color:#999;margin-top:4px;font-style:italic;",
-          icon("circle-info"), " 参考: 地域の公式情報 ",
-          tags$a(href=idsc_ref$url, target="_blank", rel="noopener noreferrer",
-                 style="color:#7f8c8d;text-decoration:underline;", idsc_ref$label),
-          "（記事の情報源とは限りません）")
-      }
-      tags$div(
-        style=paste0("background:#fff;border-radius:6px;padding:14px 16px;",
-          "margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.07);",
-          "border-left:4px solid ", sc, ";"),
-        tags$div(style="display:flex;justify-content:space-between;align-items:flex-start;",
-          tags$div(style="flex:1;",
-            tags$a(href=make_link_ov(row$link), target="_blank",
-              class="ebs-tr",
-              style="font-weight:700;font-size:0.92em;color:#2c3e50;text-decoration:none;",
-              row$title)
-          ),
-          tags$div(style="white-space:nowrap;margin-left:10px;",
-            tags$span(style=paste0("background:", sc, ";color:#fff;border-radius:10px;",
-              "padding:2px 10px;font-size:0.72em;font-weight:700;"),
-              as.character(row$signal_level)))
-        ),
-        tags$div(style="font-size:0.80em;color:#888;margin:4px 0;",
-          tags$span(style="font-weight:600;",
-            if (!is.na(row$source_id) && row$source_id == "who_eios") "Other Source" else row$source_name
-          ),
-          if (!is.na(row$source_id) && is_official_ebs_source(row$source_id))
-            tags$span(style=paste0("display:inline-block;background:#2980b9;color:#fff;",
-              "border-radius:3px;padding:0 5px;font-size:0.7em;font-weight:700;margin-left:5px;"),
-              icon("landmark"), " 公式"),
-          " • ",
-          tags$span(if (is.na(row$pub_date)) tags$span(style="color:#e67e22;","日付不明") else format(row$pub_date, "%Y-%m-%d"))
-        ),
-        if (!is.na(row$summary) && nchar(row$summary) > 0)
-          tags$div(class="ebs-tr", style="font-size:0.84em;color:#555;margin:6px 0;line-height:1.5;", row$summary),
-        tags$div(style="margin-top:6px;",
-          tbdgs,
-          if (length(criteria_badges) > 0)
-            tags$span(style="margin-left:8px;", criteria_badges),
-          location_badge
-        ),
-        idsc_ref_line
-      )
-    })
-    more_note <- if (total > PAGE_SIZE)
-      tags$div(style="text-align:center;color:#888;font-size:0.85em;padding:10px;",
-        paste0(PAGE_SIZE, " 件を表示中（全 ", total, " 件）"))
+
+    cards <- lapply(seq_len(nrow(d)), function(i) .ebs_row_to_card(d[i, ], dlabel, translate_mode_ov))
+    meta <- list(total = total, pageSize = PAGE_SIZE)
+
     tags$div(
-      tags$div(style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;", cards),
-      more_note
+      tags$div(id = "ebs-ov-cards-root"),
+      tags$script(HTML(paste0(
+        "renderEbsCards('ebs-ov-cards-root', ",
+        jsonlite::toJSON(cards, auto_unbox = TRUE, null = "null"),
+        ", ",
+        jsonlite::toJSON(meta, auto_unbox = TRUE),
+        ");"
+      )))
     )
   })
 
