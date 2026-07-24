@@ -260,9 +260,19 @@ ui <- dashboardPage(
 
   dashboardSidebar(width=240,
     tags$div(class="sidebar-section-title", style="padding-left:15px", "表示モード"),
-    radioButtons("ts_mode", NULL,
-      choices = c("定点把握疾患" = "teiten", "全数把握疾患" = "zensu"),
-      selected = "teiten", inline = TRUE),
+    # ── ts_mode（定点/全数の切り替え）を2箇所に分割配置 ──────────
+    # 通常のradioButtons()は1つの<div>にまとめて描画されるため2箇所に
+    # 分割できない。native radioはname属性が同じであればDOM上の位置に
+    # 関係なく1つのグループとして排他選択される性質を利用し、素の
+    # <input type="radio" name="ts_mode">を手書きして離れた場所に配置する。
+    # Shiny側へはonchangeでShiny.setInputValue()を呼んで反映する。
+    tags$div(style="padding-left:15px;",
+      tags$label(class="radio-inline",
+        tags$input(type="radio", name="ts_mode", value="teiten", checked=NA,
+          onchange="Shiny.setInputValue('ts_mode', this.value, {priority:'event'});"),
+        "定点把握疾患"
+      )
+    ),
 
     selectInput("disease", NULL,
       choices = list(
@@ -271,6 +281,16 @@ ui <- dashboardPage(
       ),
       selected="flu"),
 
+    tags$div(style="padding-left:15px;",
+      tags$label(class="radio-inline",
+        tags$input(type="radio", name="ts_mode", value="zensu",
+          onchange="Shiny.setInputValue('ts_mode', this.value, {priority:'event'});"),
+        "全数把握疾患"
+      )
+    ),
+    tags$script(HTML(
+      "$(document).one('shiny:sessioninitialized', function() { Shiny.setInputValue('ts_mode', 'teiten'); });"
+    )),
     tags$div(style="padding:2px 8px 4px;",
       radioButtons("zensu_class", NULL,
         choices = c("全て","1類","2類","3類","4類","5類"),
@@ -2556,7 +2576,7 @@ server <- function(input, output, session) {
 
   # ── 表示モードに応じてプルダウンを有効/無効化 ───────────────
   observe({
-    is_teiten <- input$ts_mode == "teiten"
+    is_teiten <- is.null(input$ts_mode) || input$ts_mode == "teiten"
     shinyjs::toggleState("disease",         condition = is_teiten)
     shinyjs::toggleState("zensu_disease_ts", condition = !is_teiten)
   })
