@@ -98,11 +98,17 @@ tryCatch({
     "data/data_change_log.rds"
   )
   data_paths <- data_paths[file.exists(data_paths)]
+  # タスクスケジューラ等の非対話実行環境ではgitのglobal設定(HOME解決)が
+  # 正しく引き継がれず"Author identity unknown"で失敗することがあるため、
+  # -cでuser.name/user.emailを明示的に指定する
+  git_id <- c("-c", "user.name=japan_surveillance auto-update",
+              "-c", "user.email=kobayashi.yus@jihs.go.jp")
   system2("git", c("add", "-f", shQuote(data_paths)))
   status_out <- system2("git", c("status", "--porcelain"), stdout = TRUE)
   if (length(status_out) > 0) {
     commit_msg <- paste0("自動データ更新 ", format(Sys.time(), "%Y-%m-%d %H:%M"))
-    system2("git", c("commit", "-m", shQuote(commit_msg)))
+    commit_result <- system2("git", c(git_id, "commit", "-m", shQuote(commit_msg)), stdout = TRUE, stderr = TRUE)
+    log("GitHub commit結果: ", paste(tail(commit_result, 2), collapse = " / "))
     push_result <- system2("git", c("push", "origin", "main"), stdout = TRUE, stderr = TRUE)
     log("GitHub push完了: ", paste(tail(push_result, 3), collapse = " / "))
     log("※ Posit Connect Cloud側は自動反映されません。ダッシュボードで手動Republishが必要です。")
