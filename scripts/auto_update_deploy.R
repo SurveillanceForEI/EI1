@@ -101,7 +101,7 @@ tryCatch({
   # タスクスケジューラ等の非対話実行環境ではgitのglobal設定(HOME解決)が
   # 正しく引き継がれず"Author identity unknown"で失敗することがあるため、
   # -cでuser.name/user.emailを明示的に指定する
-  git_id <- c("-c", "user.name=japan_surveillance auto-update",
+  git_id <- c("-c", "user.name=japan_surveillance-auto-update",
               "-c", "user.email=kobayashi.yus@jihs.go.jp")
   system2("git", c("add", "-f", shQuote(data_paths)))
   status_out <- system2("git", c("status", "--porcelain"), stdout = TRUE)
