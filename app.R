@@ -4963,9 +4963,17 @@ server <- function(input, output, session) {
                          dengue="デング熱", ebola="エボラ", general="感染症全般")
       paste0("（", coalesce(disease_names[input$ebs_disease_filter], input$ebs_disease_filter), " フィルタ中）")
     } else ""
+    period_txt <- {
+      pd <- d$pub_date[!is.na(d$pub_date)]
+      if (length(pd) > 0) sprintf("表示記事の期間: %s 〜 %s（%d件）", format(min(pd), "%Y/%m/%d"), format(max(pd), "%Y/%m/%d"), length(pd))
+      else "表示記事の期間: -"
+    }
     tags$div(
       tags$div(style="font-size:0.78em;color:#888;margin-bottom:6px;",
                paste0("EBS サマリー", filter_label)),
+      tags$div(style="font-size:0.75em;color:#999;margin-bottom:6px;",
+               period_txt, "　※古い記事はリンク切れの場合があります",
+               "　※シグナル判定は開発中のアルゴリズムのため精度が変動する場合があります"),
       tags$div(style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px;",
         tags$div(class="kpi-box", style="flex:1;min-width:90px;border-left:4px solid #e74c3c;",
           tags$div(class="kpi-value", style="color:#e74c3c;font-size:1.8em;", n_event),
@@ -5105,9 +5113,17 @@ server <- function(input, output, session) {
     n_signal <- gn("Signal Low")
     n_fyi    <- gn("FYI")
     n_total  <- nrow(d)
+    period_txt <- {
+      pd <- d$pub_date[!is.na(d$pub_date)]
+      if (length(pd) > 0) sprintf("表示記事の期間: %s 〜 %s（%d件）", format(min(pd), "%Y/%m/%d"), format(max(pd), "%Y/%m/%d"), length(pd))
+      else "表示記事の期間: -"
+    }
     tags$div(style="background:#f8f9fa;border-radius:8px;padding:12px 16px;margin-bottom:4px;",
       tags$div(style="font-size:0.78em;color:#888;margin-bottom:6px;",
                "EBS サマリー（海外）"),
+      tags$div(style="font-size:0.75em;color:#999;margin-bottom:6px;",
+               period_txt, "　※古い記事はリンク切れの場合があります",
+               "　※シグナル判定は開発中のアルゴリズムのため精度が変動する場合があります"),
       tags$div(style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px;",
         tags$div(class="kpi-box", style="flex:1;min-width:90px;border-left:4px solid #e74c3c;",
           tags$div(class="kpi-value", style="color:#e74c3c;font-size:1.8em;", n_event),
