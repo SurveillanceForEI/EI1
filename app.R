@@ -2968,8 +2968,12 @@ server <- function(input, output, session) {
                     else                 2L
           lbl <- switch(as.character(ebs_lv),
             "-1"="低調", "0"="横ばい", "1"="上昇", "2"="急上昇")
+          # 件数はFYI（重み0、地方自治体の定例的なお知らせ等）を除いたSignal High +
+          # Signal Lowのみ（4247行目付近のkpi_ebs_trendと同じ考え方）
+          n_high <- sum(as.character(d_this$signal_level)=="Signal High")
+          n_low  <- sum(as.character(d_this$signal_level)=="Signal Low")
           list(score=max(0L, ebs_lv), label=lbl,
-               n=nrow(d_this), high=sum(as.character(d_this$signal_level)=="Signal High"),
+               n=n_high + n_low, high=n_high,
                evaluable=TRUE)
         }
       } else {
@@ -4167,9 +4171,16 @@ server <- function(input, output, session) {
         d_prev   <- d %>% filter(pub_date >= ref_date - 14, pub_date < ref_date - 7)
         score_this <- if (nrow(d_this) > 0) sum(weights[as.character(d_this$signal_level)], na.rm=TRUE) else 0
         score_prev <- if (nrow(d_prev) > 0) sum(weights[as.character(d_prev$signal_level)], na.rm=TRUE) else 0
-        list(score=score_this, score_prev=score_prev, n=nrow(d_this),
-             n_event=sum(as.character(d_this$signal_level)=="Signal High"),
-             n_signal=sum(as.character(d_this$signal_level)=="Signal Low"))
+        n_event_this  <- sum(as.character(d_this$signal_level)=="Signal High")
+        n_signal_this <- sum(as.character(d_this$signal_level)=="Signal Low")
+        # 件数(n)はFYI（重み0、地方自治体の定例的なお知らせ等が多く含まれる）を除いた
+        # Signal High + Signal Lowのみで数える。地方の複数の感染症情報センターが
+        # 同じタイミングで一斉更新しても、内容が定例的（FYI）であれば件数・前週比の
+        # 判定双方に影響しないようにするため（2026-07-24 ユーザー指摘により変更。
+        # 以前は全件数(FYI込み)を使っており、表示上の「EBS今週:X件」だけが
+        # 一斉更新でぶれて見えることがあった）。
+        list(score=score_this, score_prev=score_prev, n=n_event_this + n_signal_this,
+             n_event=n_event_this, n_signal=n_signal_this)
       } else list(score=0, score_prev=0, n=0, n_event=0, n_signal=0)
     }, error=function(e) list(score=0, score_prev=0, n=0, n_event=0, n_signal=0))
 
