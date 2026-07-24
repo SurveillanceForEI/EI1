@@ -140,8 +140,30 @@ is_overseas_article <- function(title, summary, ebs_pref = NA, source_id = "", s
   # 国内シグナルとしては使わない。
   gnews_media   <- extract_gnews_media_name(title, source_id)
   media_low     <- tolower(paste(coalesce(source_name, ""), gnews_media))
-  media_has_overseas <- any(sapply(.OVERSEAS_KW_LOADER,
-    function(k) grepl(k, media_low, fixed = TRUE)))
+
+  # *.lg.jp（地方自治体）・*.go.jp（中央省庁）は日本の行政ドメインに限定して
+  # 発行されるため、ドメイン自体が国内発信の確実な根拠になる。これを見ないと、
+  # 「pref.fukuoka.lg.jp」「city.kawachinagano.lg.jp」等のローマ字表記に
+  # "uk"（UK＝英国の略称）や"china"（中国）が偶然部分一致し、国内自治体の
+  # お知らせが海外記事に誤分類される事故が起きる
+  # （実例: 2026-07-24 ユーザー報告で発覚）。
+  media_is_japan_gov_domain <- grepl("\\.(lg|go)\\.jp\\b", media_low)
+
+  # メディア名（ローマ字・欧文表記）に対する国名等キーワード判定は、部分一致
+  # (fixed=TRUE)だとドメイン名・地名ローマ字表記中に偶然キーワードが出現して
+  # 誤検出しやすい（上記の例）。単語境界(\\b)を要求することで、"uk"が
+  # "fukuoka"の一部として誤って一致するのを防ぐ。記号を含むキーワード
+  # （"dr congo:"等）は正規表現化に失敗し得るためtryCatchでfixed判定に
+  # フォールバックする。
+  .kw_matches_word_boundary <- function(k, text) {
+    tryCatch(
+      grepl(paste0("\\b", gsub("([.^$|()\\[\\]{}*+?\\\\])", "\\\\\\1", trimws(k), perl = TRUE), "\\b"),
+            text, perl = TRUE),
+      error = function(e) grepl(k, text, fixed = TRUE)
+    )
+  }
+  media_has_overseas <- !media_is_japan_gov_domain && any(sapply(.OVERSEAS_KW_LOADER,
+    function(k) .kw_matches_word_boundary(k, media_low)))
 
   # メディア名がキリル文字・ハングル・アラビア文字等、日本語圏で通常使われない文字体系
   # のみで構成される場合（例:「Межа. Новини України.」等、ウクライナ語の現地メディア名）は、
