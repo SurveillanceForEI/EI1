@@ -83,7 +83,37 @@ tryCatch({
   log("IASR 取得エラー: ", e$message)
 })
 
-# ── 4. デプロイ ──────────────────────────────────────────
+# ── 4. GitHubへpush（Connect Cloud側のデータ鮮度を保つため） ──
+# shinyapps.ioへは直接ファイル一式をデプロイするが、Posit Connect Cloud
+# 版はGitHubリポジトリの中身からデプロイする方式のため、pushしないと
+# Connect Cloud側のデータが更新されないまま取り残されてしまう
+# （2026-07-24、ユーザー指摘により追加）。
+log("GitHub push開始...")
+tryCatch({
+  data_paths <- c(
+    "data/cache", "data/cache_zensu", "data/cache_hosp",
+    "data/cache_iasr", "data/cache_ari",
+    "data/japan_map.rds", "data/last_update.txt",
+    "data/ebs_startup_cache.rds", "data/gtrends_cache_JP.rds",
+    "data/data_change_log.rds"
+  )
+  data_paths <- data_paths[file.exists(data_paths)]
+  system2("git", c("add", "-f", shQuote(data_paths)))
+  status_out <- system2("git", c("status", "--porcelain"), stdout = TRUE)
+  if (length(status_out) > 0) {
+    commit_msg <- paste0("自動データ更新 ", format(Sys.time(), "%Y-%m-%d %H:%M"))
+    system2("git", c("commit", "-m", shQuote(commit_msg)))
+    push_result <- system2("git", c("push", "origin", "main"), stdout = TRUE, stderr = TRUE)
+    log("GitHub push完了: ", paste(tail(push_result, 3), collapse = " / "))
+    log("※ Posit Connect Cloud側は自動反映されません。ダッシュボードで手動Republishが必要です。")
+  } else {
+    log("GitHub: コミット対象の変更なし")
+  }
+}, error = function(e) {
+  log("GitHub pushエラー: ", e$message)
+})
+
+# ── 5. デプロイ ──────────────────────────────────────────
 log("shinyapps.io デプロイ開始...")
 tryCatch({
   cache_files <- file.path("data/cache",
@@ -124,10 +154,15 @@ tryCatch({
   }
   log("デプロイに含めるRファイル: ", paste(r_source_files, collapse = ", "))
 
+  www_js_files <- if (dir.exists("www/js"))
+    file.path("www/js", list.files("www/js", pattern = "\\.js$"))
+  else character(0)
+
   app_files <- c(
     "app.R",
     r_source_files,
     "www/custom.css",
+    www_js_files,
     "data/japan_map.rds",
     "data/ebs_startup_cache.rds",
     "data/gtrends_cache_JP.rds",
