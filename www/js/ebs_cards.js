@@ -96,14 +96,20 @@
     );
   }
 
-  // 1ページに約10件収まる高さを目安にした1列・2行構成のコンパクト表示。
-  // 要約本文は表示せず、タイトルのtitle属性（ホバー時のブラウザ標準ツールチップ）
-  // に全文を保持するのみとする（ユーザー指示: 内容は全部見えなくてよい）
+  // 1ページに約10件収まる高さを目安にした1列・3行構成のコンパクト表示。
+  // 要約本文は1行だけ抜粋表示し（はみ出す分は省略）、全文はタイトルの
+  // title属性（ホバー時のブラウザ標準ツールチップ）で確認できるようにする
   function cardHtml(c) {
     var dateHtml = c.pubDate
       ? esc(c.pubDate)
       : '<span style="color:#e67e22;">日付不明</span>';
     var titleAttr = c.summary ? ' title="' + esc(c.summary) + '"' : "";
+    var summaryHtml = c.summary
+      ? '<div class="ebs-tr" style="font-size:0.76em;color:#666;white-space:nowrap;' +
+        'overflow:hidden;text-overflow:ellipsis;">' +
+        esc(c.summary) +
+        "</div>"
+      : "";
 
     return (
       '<div style="background:#fff;border-radius:5px;padding:6px 12px;' +
@@ -137,6 +143,7 @@
       criteriaBadgesHtml(c.criteriaLabels) +
       locationBadgeHtml(c.locationText) +
       "</div>" +
+      summaryHtml +
       "</div>"
     );
   }
