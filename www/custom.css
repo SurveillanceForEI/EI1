@@ -95,6 +95,12 @@ body {
   font-size: 0.88em;
 }
 
+/* EBSタブ（国内/国外/EBSトレンド/文献）は右寄せ表示 */
+ul#sub_ebs.nav-tabs {
+  display: flex;
+  justify-content: flex-end;
+}
+
 /* データ出典バー */
 .data-source-bar {
   background: #ecf0f1;

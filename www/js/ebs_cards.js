@@ -96,35 +96,35 @@
     );
   }
 
+  // 1ページに約10件収まる高さを目安にした1列・2行構成のコンパクト表示。
+  // 要約本文は表示せず、タイトルのtitle属性（ホバー時のブラウザ標準ツールチップ）
+  // に全文を保持するのみとする（ユーザー指示: 内容は全部見えなくてよい）
   function cardHtml(c) {
     var dateHtml = c.pubDate
       ? esc(c.pubDate)
       : '<span style="color:#e67e22;">日付不明</span>';
-    var summaryHtml = c.summary
-      ? '<div class="ebs-tr" style="font-size:0.84em;color:#555;margin:6px 0;line-height:1.5;">' +
-        esc(c.summary) +
-        "</div>"
-      : "";
+    var titleAttr = c.summary ? ' title="' + esc(c.summary) + '"' : "";
 
     return (
-      '<div style="background:#fff;border-radius:6px;padding:14px 16px;' +
-      "box-shadow:0 1px 3px rgba(0,0,0,0.07);border-left:4px solid " +
+      '<div style="background:#fff;border-radius:5px;padding:6px 12px;' +
+      "box-shadow:0 1px 2px rgba(0,0,0,0.06);border-left:4px solid " +
       esc(c.signalColor) +
       ';">' +
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
-      '<div style="flex:1;"><a href="' +
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">' +
+      '<a href="' +
       esc(c.link) +
-      '" target="_blank" class="ebs-tr" style="font-weight:700;font-size:0.92em;' +
-      'color:#2c3e50;text-decoration:none;">' +
+      '" target="_blank" class="ebs-tr"' + titleAttr + ' style="flex:1;min-width:0;font-weight:700;' +
+      "font-size:0.88em;color:#2c3e50;text-decoration:none;white-space:nowrap;" +
+      'overflow:hidden;text-overflow:ellipsis;">' +
       esc(c.title) +
-      "</a></div>" +
-      '<div style="white-space:nowrap;margin-left:10px;"><span style="background:' +
+      "</a>" +
+      '<span style="flex-shrink:0;background:' +
       esc(c.signalColor) +
-      ';color:#fff;border-radius:10px;padding:2px 10px;font-size:0.72em;font-weight:700;">' +
+      ';color:#fff;border-radius:10px;padding:1px 8px;font-size:0.68em;font-weight:700;">' +
       esc(c.signalLevel) +
-      "</span></div>" +
+      "</span>" +
       "</div>" +
-      '<div style="font-size:0.80em;color:#888;margin:4px 0;">' +
+      '<div style="font-size:0.74em;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
       '<span style="font-weight:600;">' +
       esc(c.sourceName) +
       "</span>" +
@@ -132,14 +132,11 @@
       " • " +
       dateHtml +
       snsInfoHtml(c.retweetCount, c.likeCount) +
-      "</div>" +
-      summaryHtml +
-      '<div style="margin-top:6px;">' +
+      " " +
       diseaseBadgesHtml(c.diseaseTags) +
       criteriaBadgesHtml(c.criteriaLabels) +
       locationBadgeHtml(c.locationText) +
       "</div>" +
-      idscRefHtml(c.idscRef) +
       "</div>"
     );
   }
@@ -158,7 +155,7 @@
     }
 
     var grid =
-      '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">' +
+      '<div style="display:flex;flex-direction:column;gap:4px;">' +
       cards.map(cardHtml).join("") +
       "</div>";
 
