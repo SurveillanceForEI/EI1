@@ -271,6 +271,11 @@ ui <- dashboardPage(
       ),
       selected="flu"),
 
+    tags$div(style="padding:2px 8px 4px;",
+      radioButtons("zensu_class", NULL,
+        choices = c("全て","1類","2類","3類","4類","5類"),
+        selected = "全て", inline = TRUE)
+    ),
     selectInput("zensu_disease_ts", NULL,
       choices = local({
         classes <- c("1類","2類","3類","4類","5類全数")
@@ -283,11 +288,6 @@ ui <- dashboardPage(
         grp
       }),
       selected="measles", width="100%"),
-    tags$div(style="padding:2px 8px 4px;",
-      radioButtons("zensu_class", NULL,
-        choices = c("全て","1類","2類","3類","4類","5類"),
-        selected = "全て", inline = TRUE)
-    ),
 
     tags$div(class="sidebar-section-title", style="padding-left:15px", "期間"),
     sliderInput("date_range", NULL,
