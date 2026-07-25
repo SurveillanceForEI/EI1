@@ -219,11 +219,14 @@ DISEASE_GROUPS <- lapply(DISEASE_GROUPS, function(g) {
 })
 
 # 定点把握 Rt 対象疾患（SIまたは潜伏期間推定値あり）
+# ARI（急性呼吸器感染症）は単一の病原体でなく多様な病原体を包含する症候群定義のため、
+# 単一のシリアルインターバル仮定に基づくRt推定は疫学的に妥当性が低く対象外とする
+# （2026-07-24 ユーザー指摘）
 RT_DISEASE_IDS <- c(
   "flu","rsv","gi","varicella","hfmd","mumps","mycop","covid",
   "phar_conj","strep","erythema","roseola","herp_ang",
   "hem_conj","epid_conj","bact_mening","asep_mening",
-  "chlamydia","gi_rota","ari"
+  "chlamydia","gi_rota"
 )
 RT_DISEASE_IDS <- RT_DISEASE_IDS[RT_DISEASE_IDS %in% names(DISEASE_CONFIG) &
                                    RT_DISEASE_IDS %in% names(SERIAL_INTERVALS)]
@@ -2566,6 +2569,8 @@ server <- function(input, output, session) {
   })
   rt_series <- reactive({
     req(nrow(filtered_data())>14)
+    # ARI（急性呼吸器感染症）等、RT_DISEASE_IDSに含まれない疾患はRt推定対象外
+    req(input$disease %in% RT_DISEASE_IDS)
     dr <- input$date_range
     all_d <- SURV_DATA %>% filter(disease==input$disease,
                                    date >= dr[1], date <= dr[2])
