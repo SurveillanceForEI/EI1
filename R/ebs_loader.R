@@ -4995,6 +4995,25 @@ rescreen_ebs_data <- function(df) {
   if (is.null(df) || nrow(df) == 0) return(df)
   if (!exists("screen_entry", mode = "function")) return(df)
 
+  # is_noise_article()のルール追加・修正が、フィード表示範囲外に出て再取得されなく
+  # なった過去記事（既にキャッシュに入っている記事）にも遡及的に反映されるよう、
+  # signal_levelの再判定と同様にここでもノイズ記事を除外する。
+  # 従来この関数はscreen_entry()（signal_levelの再判定）のみを行い、ノイズ除外は
+  # 新規取得時のfetch_all_ebs()側でしか適用されなかったため、is_noise_article()に
+  # ルールを追加してもキャッシュ済みの既存記事は除外されないままだった
+  # （実例: 2026-07-25 ユーザー指摘。研究開発資金・行政計画・追悼記事等が
+  # Signal High/Lowのまま残ってしまっていた）。PubMedは対象外（学術論文の
+  # タイトルにこれらのパターンが誤爆するリスクを避けるため従来通りスキップ）。
+  if (exists("is_noise_article", mode = "function")) {
+    is_noise <- vapply(seq_len(nrow(df)), function(i) {
+      if (coalesce(df$source_id[i], "") == "pubmed") return(FALSE)
+      tryCatch(isTRUE(is_noise_article(coalesce(df$title[i], ""), coalesce(df$summary[i], ""))),
+               error = function(e) FALSE)
+    }, logical(1))
+    if (any(is_noise)) df <- df[!is_noise, , drop = FALSE]
+    if (nrow(df) == 0) return(df)
+  }
+
   fyi_result <- list(
     unusual_unexpected="", serious_ph_country="", serious_ph_japan="",
     epidemic_prone="", mass_exposure="", high_profile="", special_pathogen="",
