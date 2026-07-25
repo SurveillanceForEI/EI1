@@ -4894,6 +4894,78 @@ tag_diseases <- function(text, hint = NA) {
   paste(unique(matched), collapse=",")
 }
 
+# ── アラート文言と無関係な疾患タグの誤結び付き対策 ──────────────────
+# 地方感染症情報センターの週報等は、多疾患の定点報告データを1記事にまとめて
+# 掲載することが多い。tag_diseases()は記事全文からキーワード一致した疾患を
+# 全部タグ付けするため、「○○病について注意報を発令」のように特定の1疾患への
+# 警戒文言が、同じ記事内で定期的に数値が併記されているだけの他疾患（インフル
+# エンザ等）にまで誤って結び付き、それらの疾患で絞り込んだ際にも警戒シグナル
+# として表示されてしまう問題があった（2026-07-24 ユーザー指摘）。
+# 対策として、シグナルがFYIでない かつ 3疾患以上がタグ付けされた記事（＝週報等の
+# 多疾患まとめ記事の可能性が高い）に限り、警戒を示す語（下記）の近傍
+# （前後ALERT_PROXIMITY_WINDOW文字）に疾患名キーワードが実際に出現する疾患だけを
+# 残す。近傍に該当する疾患が1つも無い場合は判定不能とみなし元のタグ一覧を保持する
+# （フェイルセーフ。誤って全疾患のタグを消してしまうより、従来通りの挙動に留める）。
+ALERT_PROXIMITY_KEYWORDS <- c(
+  "警報","注意報","急増","急拡大","流行","アウトブレイク","クラスター",
+  "集団感染","集団発生","拡大","異常","重症化","死亡","警戒",
+  "emergency","alert","warning","outbreak","surge","cluster"
+)
+ALERT_PROXIMITY_WINDOW <- 80L
+
+# 感染症法の一類感染症等、1例の発生自体が重大事象となる希少疾患は、記事中に
+# 「警報」「急増」等の定型的な警戒語が付随しないことが多い（1例の報告自体が
+# ニュース価値を持つため）。これらは近傍判定の対象から除外し、タグを必ず保持する
+# （2026-07-24 ユーザー指摘。エボラ関連記事でこの問題が実際に発生していた）
+RARE_SINGLE_CASE_DISEASE_IDS <- c(
+  "ebola", "crimean_congo", "smallpox", "south_am_hem", "plague",
+  "marburg", "lassa", "polio", "diphtheria", "anthrax", "botulism",
+  "tularemia", "glanders", "melioidosis"
+)
+
+restrict_disease_tags_to_alert_context <- function(text, disease_tags, signal_level) {
+  tags <- trimws(strsplit(as.character(disease_tags), ",", fixed = TRUE)[[1]])
+  real_tags <- tags[tags %in% names(DISEASE_KEYWORDS)]
+  # 実疾患タグが1つ以下なら取り違えようがないため対象外
+  if (length(real_tags) <= 1 || is.na(signal_level) ||
+      as.character(signal_level) == "FYI" || is.na(text)) {
+    return(disease_tags)
+  }
+  # 希少疾患タグが含まれる場合は、そのタグだけ無条件に保持対象へ先に確保しておく
+  rare_present <- tags[tags %in% RARE_SINGLE_CASE_DISEASE_IDS]
+
+  # tag_diseases()と同じくtolower()した上でマッチさせる（大文字小文字の違いで
+  # 英語の疾患名キーワードが一致しなくなるのを防ぐ。例:"Ebola"は小文字キーワード
+  # "ebola"と本来一致すべきだが、大文字小文字を区別すると一致しなくなる）
+  tl <- tolower(text)
+  find_positions <- function(keywords) {
+    unlist(lapply(keywords, function(k) {
+      m <- gregexpr(tolower(k), tl, fixed = TRUE)[[1]]
+      if (m[1] == -1L) integer(0) else as.integer(m)
+    }))
+  }
+
+  alert_pos <- find_positions(ALERT_PROXIMITY_KEYWORDS)
+  if (length(alert_pos) == 0) return(disease_tags)  # 警戒語が無ければ判定不能→元のまま
+
+  keep <- rare_present  # 希少疾患タグは近傍判定なしで無条件保持
+  for (d in tags) {
+    if (d %in% rare_present) next  # 既に保持済み
+    if (!(d %in% names(DISEASE_KEYWORDS))) { keep <- c(keep, d); next }  # other/general等はそのまま保持
+    disease_pos <- find_positions(DISEASE_KEYWORDS[[d]])
+    if (length(disease_pos) == 0) next
+    if (any(sapply(disease_pos, function(dp) any(abs(dp - alert_pos) <= ALERT_PROXIMITY_WINDOW)))) {
+      keep <- c(keep, d)
+    }
+  }
+  # フェイルセーフ: 近傍判定で実疾患タグが1つも残らなかった場合（テキストが長く
+  # 警戒語と疾患名が離れている等、判定が信頼できないケース）は、疾患タグを
+  # 誤って全滅させるより元の全タグを保持する方が安全なため、元のまま返す
+  kept_real <- keep[keep %in% names(DISEASE_KEYWORDS)]
+  if (length(kept_real) == 0) return(disease_tags)
+  paste(unique(keep), collapse = ",")
+}
+
 # disease_tags（カンマ区切りの疾患IDリスト、例:"gi,other"）に特定の疾患IDが
 # 含まれるかを判定する。grepl(did, disease_tags, fixed=TRUE)による単純な部分一致では
 # 例えば did="gi" が "legionella"（"le-gi-onella"の中に"gi"を含む）に誤ってマッチして
@@ -4971,6 +5043,16 @@ rescreen_ebs_data <- function(df) {
   df$ebs_location  <- sapply(screen_results, `[[`, "location")
   df$ebs_region    <- sapply(screen_results, `[[`, "region")
   df$signal_weight <- sapply(df$signal_level, signal_weight)
+
+  # 多疾患まとめ記事（地方感染症情報センターの週報等）で、特定1疾患への警戒文言が
+  # 他の定期報告疾患にまで誤ってタグ付けされるのを防ぐ（disease_tags列がある場合のみ）
+  if ("disease_tags" %in% names(df)) {
+    full_text <- paste(coalesce(df$title, ""), coalesce(df$summary, ""))
+    df$disease_tags <- mapply(function(txt, tags, sig) {
+      tryCatch(restrict_disease_tags_to_alert_context(txt, tags, sig),
+               error = function(e) tags)
+    }, full_text, df$disease_tags, df$signal_level)
+  }
 
   df
 }
