@@ -377,8 +377,8 @@ function survCollectState() {
   if (tsMode) s.ts_mode = tsMode.value;
   // セレクト
   ["disease","zensu_disease_ts","pref_filter",
-   "ebs_signal","ebs_disease_filter","ebs_page_size",
-   "ebs_ov_signal","ebs_ov_disease","ebs_ov_page_size",
+   "ebs_signal","ebs_disease_filter","ebs_period","ebs_page_size",
+   "ebs_ov_signal","ebs_ov_disease","ebs_ov_period","ebs_ov_page_size",
    "multi_group","multi_view","rt_disease","rt_zensu_disease"
   ].forEach(function(id) {
     var el = document.getElementById(id);
@@ -857,7 +857,11 @@ function ebsUntranslateCards(containerId) {
           column(3,
             tags$div(class="data-source-bar","EBSニュース（国内）"),
             tags$div(style="font-size:0.85em;color:#555;margin-bottom:6px;",
-              icon("info-circle"), " 疾患・都道府県はサイドバーで選択"),
+              icon("info-circle"), " 初期状態は全疾患を表示。疾患・都道府県で絞り込みたいときはサイドバーで選択"),
+            selectInput("ebs_period","表示期間",
+              choices=c("直近24時間"=1,"直近3日"=3,"直近1週間"=7,"直近1か月"=30,
+                        "直近3か月"=90,"直近6か月"=180,"直近1年"=365),
+              selected=1),
             selectInput("ebs_page_size","表示件数",
               choices=c("10件"=10,"50件"=50,"100件"=100,"全部"=9999), selected=50),
             radioButtons("ebs_sort", "並び順",
@@ -895,7 +899,11 @@ function ebsUntranslateCards(containerId) {
           column(3,
             tags$div(class="data-source-bar","EBSニュース（海外）"),
             tags$div(style="font-size:0.85em;color:#555;margin-bottom:6px;",
-              icon("info-circle"), " 疾患はサイドバーで選択"),
+              icon("info-circle"), " 初期状態は全疾患を表示。疾患で絞り込みたいときはサイドバーで選択"),
+            selectInput("ebs_ov_period","表示期間",
+              choices=c("直近24時間"=1,"直近3日"=3,"直近1週間"=7,"直近1か月"=30,
+                        "直近3か月"=90,"直近6か月"=180,"直近1年"=365),
+              selected=1),
             selectInput("ebs_ov_page_size","表示件数",
               choices=c("10件"=10,"50件"=50,"100件"=100,"全部"=9999), selected=50),
             radioButtons("ebs_ov_sort", "並び順",
@@ -1754,6 +1762,8 @@ server <- function(input, output, session) {
       updateCheckboxInput(session, "ebs_show_pubmed", value = isTRUE(s$ebs_show_pubmed))
     if (!is.null(s$ebs_official_only))
       updateCheckboxInput(session, "ebs_official_only", value = isTRUE(s$ebs_official_only))
+    if (!is.null(s$ebs_period))
+      updateSelectInput(session, "ebs_period", selected = s$ebs_period)
     if (!is.null(s$ebs_page_size))
       updateSelectInput(session, "ebs_page_size", selected = s$ebs_page_size)
     # EBSニュース（海外）
@@ -1765,6 +1775,8 @@ server <- function(input, output, session) {
       updateCheckboxInput(session, "ebs_ov_recent_only", value = isTRUE(s$ebs_ov_recent_only))
     if (!is.null(s$ebs_ov_official_only))
       updateCheckboxInput(session, "ebs_ov_official_only", value = isTRUE(s$ebs_ov_official_only))
+    if (!is.null(s$ebs_ov_period))
+      updateSelectInput(session, "ebs_ov_period", selected = s$ebs_ov_period)
     if (!is.null(s$ebs_ov_page_size))
       updateSelectInput(session, "ebs_ov_page_size", selected = s$ebs_ov_page_size)
     # 複数疾患比較
@@ -2073,6 +2085,37 @@ server <- function(input, output, session) {
     "mrsa"="メチシリン耐性黄色ブドウ球菌感染症","prsp"="ペニシリン耐性肺炎球菌感染症",
     "general"="感染症全般"
   )
+
+  # EBSニュース（国内・海外）の「表示期間」セレクタ用ラベル（値=日数）
+  EBS_PERIOD_LABELS <- c(
+    "1"="直近24時間","3"="直近3日","7"="直近1週間","30"="直近1か月",
+    "90"="直近3か月","180"="直近6か月","365"="直近1年"
+  )
+
+  # EBSニュース（国内・海外）の現在のフィルタ状態を一目で分かるバッジ表示で返す
+  ebs_filter_status_badge <- function(show_all, period_val) {
+    did <- sidebar_disease_id()
+    period_lbl <- coalesce(EBS_PERIOD_LABELS[as.character(period_val)], "")
+    if (isTRUE(show_all) || is.null(did) || did == "すべて") {
+      disease_badge <- tags$span(
+        style="display:inline-block;background:#2980b9;color:#fff;border-radius:10px;
+               padding:2px 10px;font-size:0.78em;font-weight:700;margin-right:6px;",
+        icon("check"), " 全疾患を表示中")
+    } else {
+      lbl <- coalesce(EBS_DISEASE_LABELS[did], did)
+      disease_badge <- tags$span(
+        style="display:inline-block;background:#e67e22;color:#fff;border-radius:10px;
+               padding:2px 10px;font-size:0.78em;font-weight:700;margin-right:6px;",
+        icon("filter"), " ", lbl, " で絞り込み中")
+    }
+    tags$div(style="margin-bottom:6px;",
+      disease_badge,
+      tags$span(
+        style="display:inline-block;background:#ecf0f1;color:#555;border-radius:10px;
+               padding:2px 10px;font-size:0.78em;",
+        icon("clock"), " ", period_lbl)
+    )
+  }
 
   make_filter_bar <- function(items) {
     chips <- Filter(Negate(is.null), lapply(names(items), function(label) {
@@ -4854,15 +4897,23 @@ server <- function(input, output, session) {
     if (!is.null(input$ts_mode) && input$ts_mode == "zensu") input$zensu_disease_ts else input$disease
   })
 
-  # すべて表示フラグ（ボタンで切替、疾患変更でリセット）
-  ebs_show_all_flag    <- reactiveVal(FALSE)
-  ebs_ov_show_all_flag <- reactiveVal(FALSE)
+  # すべて表示フラグ（EBSニュース国内・海外は「全疾患表示」がデフォルト。
+  # サイドバー（コントロールパネル）で疾患を選ぶと、そこで初めて絞り込みが有効になる。
+  # PubMed文献タブのみ従来通りサイドバー疾患での絞り込みがデフォルト）
+  ebs_show_all_flag    <- reactiveVal(TRUE)
+  ebs_ov_show_all_flag <- reactiveVal(TRUE)
   pubmed_show_all_flag <- reactiveVal(FALSE)
 
   observeEvent(input$ebs_show_all,    { ebs_show_all_flag(TRUE) })
   observeEvent(input$ebs_ov_show_all, { ebs_ov_show_all_flag(TRUE) })
   observeEvent(input$pubmed_show_all, { pubmed_show_all_flag(TRUE) })
-  observeEvent(sidebar_disease_id(),  {
+  # サイドバーの疾患セレクタ（input$disease / input$zensu_disease_ts）を
+  # ユーザーが実際に操作したときだけ絞り込みを有効化する。
+  # sidebar_disease_id() は input$ts_mode にも依存するが、ts_modeは起動直後に
+  # JS側から自動セットされる（app.R冒頭のラジオボタン分割の仕組み）ため、
+  # これに反応すると「起動しただけ」で意図せず絞り込みが有効になってしまう。
+  # そのため疾患セレクタ自体の変更のみを監視する。
+  observeEvent(list(input$disease, input$zensu_disease_ts), {
     ebs_show_all_flag(FALSE)
     ebs_ov_show_all_flag(FALSE)
     pubmed_show_all_flag(FALSE)
@@ -4878,6 +4929,11 @@ server <- function(input, output, session) {
     d <- d %>% filter(is.na(source_id) | source_id != "pubmed")
     if (isTRUE(input$ebs_official_only)) {
       d <- d %>% filter(is_official_ebs_source(source_id))
+    }
+    period_days <- suppressWarnings(as.numeric(input$ebs_period))
+    if (!is.null(period_days) && !is.na(period_days)) {
+      cutoff_dt <- Sys.time() - as.difftime(period_days, units = "days")
+      d <- d %>% filter(is.na(pub_date) | pub_date >= cutoff_dt)
     }
     if (!ebs_show_all_flag()) {
       did <- sidebar_disease_id()
@@ -4978,20 +5034,14 @@ server <- function(input, output, session) {
     n_signal <- gn("Signal Low")
     n_fyi    <- gn("FYI")
     n_total  <- nrow(d)
-    filter_label <- if (!is.null(input$ebs_disease_filter) && input$ebs_disease_filter != "すべて") {
-      disease_names <- c(flu="インフルエンザ", covid="COVID-19", rsv="RSウイルス",
-                         ari="ARI", mpox="エムポックス", measles="麻疹",
-                         dengue="デング熱", ebola="エボラ", general="感染症全般")
-      paste0("（", coalesce(disease_names[input$ebs_disease_filter], input$ebs_disease_filter), " フィルタ中）")
-    } else ""
     period_txt <- {
       pd <- d$pub_date[!is.na(d$pub_date)]
       if (length(pd) > 0) sprintf("表示記事の期間: %s 〜 %s（%d件）", format(min(pd), "%Y/%m/%d"), format(max(pd), "%Y/%m/%d"), length(pd))
       else "表示記事の期間: -"
     }
     tags$div(
-      tags$div(style="font-size:0.78em;color:#888;margin-bottom:6px;",
-               paste0("EBS サマリー", filter_label)),
+      tags$div(style="font-size:0.78em;color:#888;margin-bottom:6px;", "EBS サマリー（国内）"),
+      ebs_filter_status_badge(ebs_show_all_flag(), input$ebs_period),
       tags$div(style="font-size:0.75em;color:#999;margin-bottom:6px;",
                period_txt, "　※古い記事はリンク切れの場合があります",
                "　※シグナル判定は開発中のアルゴリズムのため精度が変動する場合があります"),
@@ -5077,7 +5127,8 @@ server <- function(input, output, session) {
   output$ebs_news_feed <- renderUI({
     d <- filtered_ebs()
     if (nrow(d) == 0) {
-      return(tags$div(class="demo-banner", "該当なし。サイドバーの疾患を変更するか「すべて表示」を押してください。"))
+      return(tags$div(class="demo-banner",
+        "該当なし。表示期間を長くするか、「すべて表示」を押して疾患フィルタを解除してください。"))
     }
     PAGE_SIZE <- as.integer(input$ebs_page_size)
     total <- nrow(d)
@@ -5114,6 +5165,11 @@ server <- function(input, output, session) {
     if (isTRUE(input$ebs_ov_official_only)) {
       d <- d %>% filter(is_official_ebs_source(source_id))
     }
+    period_days <- suppressWarnings(as.numeric(input$ebs_ov_period))
+    if (!is.null(period_days) && !is.na(period_days)) {
+      cutoff_dt <- Sys.time() - as.difftime(period_days, units = "days")
+      d <- d %>% filter(is.na(pub_date) | pub_date >= cutoff_dt)
+    }
     if (!ebs_ov_show_all_flag()) {
       did <- sidebar_disease_id()
       if (!is.null(did) && did != "すべて")
@@ -5142,6 +5198,7 @@ server <- function(input, output, session) {
     tags$div(style="background:#f8f9fa;border-radius:8px;padding:12px 16px;margin-bottom:4px;",
       tags$div(style="font-size:0.78em;color:#888;margin-bottom:6px;",
                "EBS サマリー（海外）"),
+      ebs_filter_status_badge(ebs_ov_show_all_flag(), input$ebs_ov_period),
       tags$div(style="font-size:0.75em;color:#999;margin-bottom:6px;",
                period_txt, "　※古い記事はリンク切れの場合があります",
                "　※シグナル判定は開発中のアルゴリズムのため精度が変動する場合があります"),
@@ -5165,7 +5222,8 @@ server <- function(input, output, session) {
   output$ebs_ov_news_feed <- renderUI({
     d <- ebs_overseas()
     if (nrow(d) == 0) {
-      return(tags$div(class="demo-banner", "該当なし。サイドバーの疾患を変更するか「すべて表示」を押してください。"))
+      return(tags$div(class="demo-banner",
+        "該当なし。表示期間を長くするか、「すべて表示」を押して疾患フィルタを解除してください。"))
     }
     PAGE_SIZE <- as.integer(input$ebs_ov_page_size)
     total <- nrow(d)
