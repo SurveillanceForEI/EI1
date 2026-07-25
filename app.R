@@ -3964,7 +3964,11 @@ server <- function(input, output, session) {
       xaxis  = list(title = xlab, showgrid = FALSE, tickangle = -45),
       yaxis  = list(title = "検出数（件）", gridcolor = "#eee"),
       legend = list(orientation = "v", x = 1.01, y = 1, font = list(size = 10)),
-      hovermode  = "x unified",
+      # ウイルス種類が多いカテゴリでは、hovermode="x unified"だと同一x位置の
+      # 全ウイルスの値が1つの吹き出しに積み上がって表示しきれず見切れてしまう
+      # ため、カーソルに最も近い1系列だけを表示する"closest"に変更
+      # （2026-07-24 ユーザー指摘）
+      hovermode  = "closest",
       plot_bgcolor  = "#fff",
       paper_bgcolor = "#fff",
       shapes = recent_shapes,
