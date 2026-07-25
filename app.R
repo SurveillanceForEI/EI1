@@ -153,9 +153,10 @@ merge_ebs_cache <- function(new_data, cache_path = EBS_STARTUP_CACHE, keep_days 
   combined <- combined %>%
     dplyr::filter(is.na(pub_date) | pub_date >= cutoff) %>%
     dplyr::distinct(title, source_id, .keep_all = TRUE)
-  # フィード表示範囲外に出て再取得されなくなった過去記事にも、screen_entry() の
-  # ロジック修正が反映されるよう、マージ後の全件を再スクリーニングする
-  combined <- rescreen_ebs_data(combined)
+  # new_data は fetch_all_ebs() 内で既にスクリーニング済み、old はキャッシュ保存時点の
+  # 判定を保持しているため、ここでの全件再スクリーニングは行わない（コスト増を避けるため）。
+  # screen_entry() 等のルール変更を過去記事にも遡及適用したい場合は
+  # scripts/rescreen_ebs_full.R を手動実行すること。
   combined %>% dplyr::arrange(signal_level, dplyr::desc(pub_date))
 }
 

@@ -56,9 +56,10 @@ tryCatch({
     } else {
       merged <- new_data
     }
-    # フィード表示範囲外に出て再取得されなくなった過去記事も含め、
-    # マージ後の全件を再スクリーニング（screen_entry修正の遡及反映）
-    merged <- rescreen_ebs_data(merged)
+    # new_dataはfetch_all_ebs()内で既にスクリーニング済み、oldは保存時点の判定を
+    # 保持しているため、ここでの全件再スクリーニングは行わない（コスト増を避けるため）。
+    # screen_entry()等のルール変更を過去記事にも遡及適用したい場合は
+    # scripts/rescreen_ebs_full.R を手動実行すること。
     saveRDS(merged, cache_path)
     log("EBS キャッシュ更新完了: ", nrow(merged), " 件")
   } else {
