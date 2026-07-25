@@ -67,8 +67,9 @@
   function idscRefHtml(idscRef) {
     if (!idscRef) return "";
     return (
-      '<div style="font-size:0.72em;color:#999;margin-top:4px;font-style:italic;">' +
-      '<i class="fas fa-circle-info"></i> 参考: 地域の公式情報 ' +
+      '<div style="font-size:0.68em;color:#999;font-style:italic;white-space:nowrap;' +
+      'overflow:hidden;text-overflow:ellipsis;">' +
+      '<i class="fas fa-circle-info"></i> 参考: ' +
       '<a href="' + esc(idscRef.url) + '" target="_blank" rel="noopener noreferrer" ' +
       'style="color:#7f8c8d;text-decoration:underline;">' + esc(idscRef.label) + "</a>" +
       "（記事の情報源とは限りません）" +
@@ -144,6 +145,7 @@
       locationBadgeHtml(c.locationText) +
       "</div>" +
       summaryHtml +
+      idscRefHtml(c.idscRef) +
       "</div>"
     );
   }
