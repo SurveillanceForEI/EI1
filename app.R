@@ -1623,7 +1623,7 @@ function ebsUntranslateCards(containerId) {
     # ── フッター ────────────────────────────────────────────
     tags$div(
       style = "background:#2c3e50;color:#bdc3c7;font-size:0.78em;text-align:center;padding:10px 20px;width:100%;margin-top:4px;",
-      "文部科学省科学研究費助成事業「IBSとEBSの統合解析によるEpidemic Intelligence活動支援モデル構築（研究代表：小林祐介）」により開発し、試行運用しています。",
+      "日本学術振興会科学研究費助成事業「IBSとEBSの統合解析によるEpidemic Intelligence活動支援モデル構築」（研究代表：小林祐介）により開発し、試行運用しています。",
       tags$br(),
       "本ダッシュボードは公開情報のみを使用しています。"
     )
@@ -1720,7 +1720,7 @@ server <- function(input, output, session) {
     title = "ご利用にあたっての注意事項",
     tags$div(style="line-height:1.8;font-size:0.95em;",
       tags$p(
-        "本サイトは、文部科学省科学研究費助成事業「IBSとEBSの統合解析によるEpidemic Intelligence活動支援モデル構築（研究代表：小林祐介）」により開発し、試行運用しています。"
+        "本サイトは、日本学術振興会科学研究費助成事業「IBSとEBSの統合解析によるEpidemic Intelligence活動支援モデル構築（研究代表：小林祐介）」により開発し、試行運用しています。"
       ),
       tags$p(
         "試験運用中のため、サイト内の内容、レイアウト、データソース等は変更される可能性があります。"
@@ -4990,7 +4990,7 @@ server <- function(input, output, session) {
     dlabel <- EBS_DLABEL
     translate_mode_pm <- isTRUE(input$pubmed_translate == "on")
 
-    cards <- lapply(seq_len(nrow(d)), function(i) .ebs_row_to_card(d[i, ], dlabel, translate_mode_pm))
+    cards <- lapply(seq_len(nrow(d)), function(i) .ebs_row_to_card(d, i, dlabel, translate_mode_pm))
     meta <- list(total = total, pageSize = PAGE_SIZE)
 
     tags$div(
@@ -5065,18 +5065,21 @@ server <- function(input, output, session) {
   # EBSカード1行分をJSレンダラー(www/js/ebs_cards.js)向けのプレーンなリストに変換する。
   # 静的サイト化の第一段階として、DOM構築（tags$div/tags$aのツリー生成）をサーバー側の
   # R処理からクライアント側JSへ移す。ここではフィルタ済みデータをJSON化するだけに留める
-  .ebs_row_to_card <- function(row, dlabel, translate_mode) {
-    link <- row$link
+  # d[i, ]（tibbleの1行サブセット）をカード件数分繰り返すとオーバーヘッドが大きく
+  # 表示が遅くなるため、data.frame全体とインデックスiを受け取りベクトル参照だけで
+  # 済ませる（tibbleの行サブセットを一切発生させない）
+  .ebs_row_to_card <- function(d, i, dlabel, translate_mode) {
+    link <- d$link[i]
     if (!is.na(link) && nchar(trimws(link)) > 0 && translate_mode) {
       link <- paste0("https://translate.google.com/translate?hl=ja&sl=auto&tl=ja&u=",
                       utils::URLencode(link, repeated = TRUE))
     }
-    tgs <- strsplit(coalesce(row$disease_tags, ""), ",")[[1]]
+    tgs <- strsplit(coalesce(d$disease_tags[i], ""), ",")[[1]]
     tgs <- tgs[nchar(trimws(tgs)) > 0]
     disease_labels <- vapply(tgs, function(tg) if (!is.na(dlabel[tg])) dlabel[tg] else tg,
                               character(1), USE.NAMES = FALSE)
 
-    has_screen <- "ebs_unusual" %in% names(row)
+    has_screen <- "ebs_unusual" %in% names(d)
     criteria_labels <- character(0)
     if (has_screen) {
       cols_map <- c(ebs_unusual="Unusual", ebs_serious_c="Serious (country)",
@@ -5084,43 +5087,43 @@ server <- function(input, output, session) {
                     ebs_mass="Mass exposure", ebs_high="High profile",
                     ebs_special="Special pathogen")
       for (col in names(cols_map)) {
-        val <- if (col %in% names(row)) row[[col]] else ""
+        val <- if (col %in% names(d)) d[[col]][i] else ""
         if (!is.na(val) && val == "✓") criteria_labels <- c(criteria_labels, cols_map[[col]])
       }
     }
 
     location_text <- NULL
-    if (has_screen && "ebs_location" %in% names(row) &&
-        !is.na(row$ebs_location) && row$ebs_location != "Unknown") {
-      location_text <- if ("ebs_region" %in% names(row) && !is.na(row$ebs_region) &&
-                            row$ebs_region != "不明")
-        paste0(row$ebs_location, " (", row$ebs_region, ")")
-      else row$ebs_location
+    if (has_screen && "ebs_location" %in% names(d) &&
+        !is.na(d$ebs_location[i]) && d$ebs_location[i] != "Unknown") {
+      location_text <- if ("ebs_region" %in% names(d) && !is.na(d$ebs_region[i]) &&
+                            d$ebs_region[i] != "不明")
+        paste0(d$ebs_location[i], " (", d$ebs_region[i], ")")
+      else d$ebs_location[i]
     }
 
     idsc_ref <- tryCatch({
-      pref_val <- if ("ebs_pref" %in% names(row)) coalesce(row$ebs_pref, NA_character_) else NA_character_
-      loc_val  <- if ("ebs_location" %in% names(row)) coalesce(row$ebs_location, NA_character_) else NA_character_
+      pref_val <- if ("ebs_pref" %in% names(d)) coalesce(d$ebs_pref[i], NA_character_) else NA_character_
+      loc_val  <- if ("ebs_location" %in% names(d)) coalesce(d$ebs_location[i], NA_character_) else NA_character_
       r <- find_idsc_domestic_link(pref_val, loc_val)
       if (is.null(r) && !is.na(loc_val) && loc_val != "Global") r <- find_idsc_overseas_link(loc_val)
       r
     }, error = function(e) NULL)
 
     list(
-      title        = row$title,
+      title        = d$title[i],
       link         = link,
-      sourceName   = if (!is.na(row$source_id) && row$source_id == "who_eios") "Other Source" else row$source_name,
-      isOfficial   = !is.na(row$source_id) && is_official_ebs_source(row$source_id),
-      pubDate      = if (is.na(row$pub_date)) NULL else format(row$pub_date, "%Y-%m-%d"),
-      signalLevel  = as.character(row$signal_level),
-      signalColor  = signal_color(as.character(row$signal_level)),
-      summary      = if (!is.na(row$summary) && nchar(row$summary) > 0) row$summary else NULL,
+      sourceName   = if (!is.na(d$source_id[i]) && d$source_id[i] == "who_eios") "Other Source" else d$source_name[i],
+      isOfficial   = !is.na(d$source_id[i]) && is_official_ebs_source(d$source_id[i]),
+      pubDate      = if (is.na(d$pub_date[i])) NULL else format(d$pub_date[i], "%Y-%m-%d"),
+      signalLevel  = as.character(d$signal_level[i]),
+      signalColor  = signal_color(as.character(d$signal_level[i])),
+      summary      = if (!is.na(d$summary[i]) && nchar(d$summary[i]) > 0) d$summary[i] else NULL,
       diseaseTags  = as.list(disease_labels),
       criteriaLabels = as.list(criteria_labels),
       locationText = location_text,
       idscRef      = if (!is.null(idsc_ref)) list(label = idsc_ref$label, url = idsc_ref$url) else NULL,
-      retweetCount = if (!is.na(row$retweet_count) && !is.null(row$retweet_count)) row$retweet_count else NULL,
-      likeCount    = coalesce(row$like_count, 0L)
+      retweetCount = if (!is.na(d$retweet_count[i]) && !is.null(d$retweet_count[i])) d$retweet_count[i] else NULL,
+      likeCount    = coalesce(d$like_count[i], 0L)
     )
   }
 
@@ -5136,7 +5139,7 @@ server <- function(input, output, session) {
     dlabel <- EBS_DLABEL
     translate_mode <- isTRUE(input$ebs_translate == "on")
 
-    cards <- lapply(seq_len(nrow(d)), function(i) .ebs_row_to_card(d[i, ], dlabel, translate_mode))
+    cards <- lapply(seq_len(nrow(d)), function(i) .ebs_row_to_card(d, i, dlabel, translate_mode))
     meta <- list(total = total, pageSize = PAGE_SIZE)
 
     tags$div(
@@ -5231,7 +5234,7 @@ server <- function(input, output, session) {
     dlabel <- EBS_DLABEL
     translate_mode_ov <- isTRUE(input$ebs_ov_translate == "on")
 
-    cards <- lapply(seq_len(nrow(d)), function(i) .ebs_row_to_card(d[i, ], dlabel, translate_mode_ov))
+    cards <- lapply(seq_len(nrow(d)), function(i) .ebs_row_to_card(d, i, dlabel, translate_mode_ov))
     meta <- list(total = total, pageSize = PAGE_SIZE)
 
     tags$div(
