@@ -2994,9 +2994,8 @@ server <- function(input, output, session) {
           pref_short <- sub("(都|道|府|県)$", "", pref)
           d <- d %>% filter(
             (!is.na(ebs_pref) & ebs_pref == pref) |
-            vapply(paste(coalesce(title,""), coalesce(summary,"")), function(txt)
-              grepl(pref, txt, fixed=TRUE) | grepl(pref_short, txt, fixed=TRUE),
-              FUN.VALUE = logical(1))
+            grepl(pref, paste(coalesce(title,""), coalesce(summary,"")), fixed=TRUE) |
+            grepl(pref_short, paste(coalesce(title,""), coalesce(summary,"")), fixed=TRUE)
           )
         }
         ref_date <- if (exists("cur") && !is.null(cur) && nrow(cur) > 0 && !is.na(cur$date[1]))
@@ -3126,9 +3125,8 @@ server <- function(input, output, session) {
           ps <- sub("(都|道|府|県)$", "", pref)
           de <- de %>% filter(
             (!is.na(ebs_pref) & ebs_pref == pref) |
-            vapply(paste(coalesce(title,""), coalesce(summary,"")),
-                   function(t) grepl(pref, t, fixed=TRUE) | grepl(ps, t, fixed=TRUE),
-                   FUN.VALUE = logical(1)))
+            grepl(pref, paste(coalesce(title,""), coalesce(summary,"")), fixed=TRUE) |
+            grepl(ps, paste(coalesce(title,""), coalesce(summary,"")), fixed=TRUE))
         }
         s_this <- sum(weights[as.character(
           de %>% filter(pub_date >= ref_date - 7, pub_date <= ref_date) %>% pull(signal_level))], na.rm=TRUE)
@@ -3431,9 +3429,8 @@ server <- function(input, output, session) {
         ps <- sub("(都|道|府|県)$", "", pref_name_i)
         de <- de %>% filter(
           (!is.na(ebs_pref) & ebs_pref == pref_name_i) |
-          vapply(paste(coalesce(title,""), coalesce(summary,"")),
-                 function(t) grepl(pref_name_i, t, fixed=TRUE) | grepl(ps, t, fixed=TRUE),
-                 FUN.VALUE = logical(1)))
+          grepl(pref_name_i, paste(coalesce(title,""), coalesce(summary,"")), fixed=TRUE) |
+          grepl(ps, paste(coalesce(title,""), coalesce(summary,"")), fixed=TRUE))
         s_this <- sum(weights[as.character(
           de %>% filter(pub_date >= ref_date - 7, pub_date <= ref_date) %>% pull(signal_level))], na.rm=TRUE)
         s_prev <- sum(weights[as.character(
@@ -4210,14 +4207,14 @@ server <- function(input, output, session) {
           if ("ebs_pref" %in% names(d)) {
             d <- d %>% filter(
               (!is.na(ebs_pref) & ebs_pref == pref) |
-              vapply(paste(coalesce(title,""), coalesce(summary,"")), function(txt)
-                grepl(pref, txt, fixed=TRUE) | grepl(pref_short, txt, fixed=TRUE),
-                FUN.VALUE = logical(1))
+              grepl(pref, paste(coalesce(title,""), coalesce(summary,"")), fixed=TRUE) |
+              grepl(pref_short, paste(coalesce(title,""), coalesce(summary,"")), fixed=TRUE)
             )
           } else {
-            d <- d %>% filter(vapply(paste(coalesce(title,""), coalesce(summary,"")), function(txt)
-              grepl(pref, txt, fixed=TRUE) | grepl(pref_short, txt, fixed=TRUE),
-              FUN.VALUE = logical(1)))
+            d <- d %>% filter(
+              grepl(pref, paste(coalesce(title,""), coalesce(summary,"")), fixed=TRUE) |
+              grepl(pref_short, paste(coalesce(title,""), coalesce(summary,"")), fixed=TRUE)
+            )
           }
         }
         d_this   <- d %>% filter(pub_date >= ref_date - 7, pub_date <= ref_date)
@@ -4946,15 +4943,13 @@ server <- function(input, output, session) {
       if ("ebs_pref" %in% names(d)) {
         d <- d %>% filter(
           (!is.na(ebs_pref) & ebs_pref == pf) |
-          vapply(paste(coalesce(title,""), coalesce(summary,"")), function(txt)
-            grepl(pf, txt, fixed = TRUE) | grepl(pref_short, txt, fixed = TRUE),
-            FUN.VALUE = logical(1))
+          grepl(pf, paste(coalesce(title,""), coalesce(summary,"")), fixed = TRUE) |
+          grepl(pref_short, paste(coalesce(title,""), coalesce(summary,"")), fixed = TRUE)
         )
       } else {
         d <- d %>% filter(
-          vapply(paste(coalesce(title,""), coalesce(summary,"")), function(txt)
-            grepl(pf, txt, fixed = TRUE) | grepl(pref_short, txt, fixed = TRUE),
-            FUN.VALUE = logical(1))
+          grepl(pf, paste(coalesce(title,""), coalesce(summary,"")), fixed = TRUE) |
+          grepl(pref_short, paste(coalesce(title,""), coalesce(summary,"")), fixed = TRUE)
         )
       }
     }
