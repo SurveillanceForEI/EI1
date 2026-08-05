@@ -65,6 +65,22 @@ if (exists("COUNTRY_DB")) {
   .OVERSEAS_KW_LOADER <- unique(c(.OVERSEAS_KW_LOADER, .country_db_kw))
 }
 
+# is_overseas_article()は記事1件ごとにキーワードリスト（数百件）をsapplyで
+# 1件ずつgreplしていたため、記事件数×キーワード数のR関数呼び出しが発生し
+# 著しく遅かった（実測: 2859件で75秒）。キーワードリストはこの時点（ソース
+# 読み込み時）で固定なので、あらかじめ「(?:kw1|kw2|...)」形式の1本の正規表現に
+# まとめておき、判定時は行ごとに1回のgreplで済ませる（判定結果は従来の
+# fixed=TRUE照合のOR条件と等価）。
+.escape_regex_lit <- function(x) gsub("([.^$|()\\[\\]{}*+?\\\\])", "\\\\\\1", x, perl = TRUE)
+.build_kw_pattern <- function(kws) paste0("(?:", paste(.escape_regex_lit(kws), collapse = "|"), ")")
+.build_kw_boundary_pattern <- function(kws) paste0("\\b(?:", paste(.escape_regex_lit(trimws(kws)), collapse = "|"), ")\\b")
+
+.JAPAN_KW_PATTERN            <- .build_kw_pattern(.JAPAN_KW_LOADER)
+.OVERSEAS_KW_PATTERN         <- .build_kw_pattern(.OVERSEAS_KW_LOADER)
+.OVERSEAS_KW_BOUNDARY_PATTERN <- .build_kw_boundary_pattern(.OVERSEAS_KW_LOADER)
+.FP_WORDS_PATTERN <- if (exists(".COUNTRY_MATCH_FALSE_POSITIVE_WORDS"))
+  .build_kw_pattern(.COUNTRY_MATCH_FALSE_POSITIVE_WORDS) else NULL
+
 # 国際ソース：日本キーワードがなければ原則海外
 # （台湾CDCの中国語記事等、記事本文が「國內」等の現地語表現を使うため地名キーワード判定
 # だけでは海外記事と検出できず、誤って国内タブに表示されてしまう問題があった。
@@ -121,16 +137,15 @@ is_overseas_article <- function(title, summary, ebs_pref = NA, source_id = "", s
   # 「サーベイランス」等、国名マッチングと衝突しうる頻出語を除去してから判定する
   # （classify_locationと同じ考え方。例:「サーベイランス」→「イラン」を誤検出する）
   strip_fp <- function(s) {
-    for (w in .COUNTRY_MATCH_FALSE_POSITIVE_WORDS) s <- gsub(w, "", s, fixed = TRUE)
-    s
+    if (is.null(.FP_WORDS_PATTERN)) return(s)
+    gsub(.FP_WORDS_PATTERN, "", s, perl = TRUE)
   }
   title_low <- strip_fp(tolower(title_body))
-  title_has_overseas <- any(sapply(.OVERSEAS_KW_LOADER,
-    function(k) grepl(k, title_low, fixed = TRUE)))
+  title_has_overseas <- grepl(.OVERSEAS_KW_PATTERN, title_low, perl = TRUE)
   txt <- if (title_has_overseas) title_low else strip_fp(tolower(paste(title_body, summary_body)))
 
-  has_japan    <- any(sapply(.JAPAN_KW_LOADER,    function(k) grepl(k, txt, fixed = TRUE)))
-  has_overseas <- any(sapply(.OVERSEAS_KW_LOADER, function(k) grepl(k, txt, fixed = TRUE)))
+  has_japan    <- grepl(.JAPAN_KW_PATTERN,    txt, perl = TRUE)
+  has_overseas <- grepl(.OVERSEAS_KW_PATTERN, txt, perl = TRUE)
 
   # メディア名自体が海外を示す場合（例:「Vietnam.vn」「CGTN」等）も海外シグナルとして扱う。
   # 記事本文が現地語の翻訳等で国名に言及しないケース（Vietnam.vn等の現地メディアがベトナム
@@ -162,8 +177,13 @@ is_overseas_article <- function(title, summary, ebs_pref = NA, source_id = "", s
       error = function(e) grepl(k, text, fixed = TRUE)
     )
   }
-  media_has_overseas <- !media_is_japan_gov_domain && any(sapply(.OVERSEAS_KW_LOADER,
-    function(k) .kw_matches_word_boundary(k, media_low)))
+  media_has_overseas <- !media_is_japan_gov_domain && tryCatch(
+    grepl(.OVERSEAS_KW_BOUNDARY_PATTERN, media_low, perl = TRUE),
+    # 何らかの理由でまとめた正規表現が不正になった場合のみ、従来通り
+    # キーワードを1件ずつ照合するフォールバックにする
+    error = function(e) any(sapply(.OVERSEAS_KW_LOADER,
+      function(k) .kw_matches_word_boundary(k, media_low)))
+  )
 
   # メディア名がキリル文字・ハングル・アラビア文字等、日本語圏で通常使われない文字体系
   # のみで構成される場合（例:「Межа. Новини України.」等、ウクライナ語の現地メディア名）は、
@@ -4772,8 +4792,7 @@ detect_pref <- function(title = "", summary = "", source_name = "", link = "") {
   # 記事本題と無関係な地名を含みうるため、地名検索の対象をタイトルのみに限定する
   # （例: 「コンゴでエボラ流行」という記事の要約に「京都府京都市」のNPO本部住所や
   # 「東京都」の求人広告が含まれていても、国内記事として誤判定しない）。
-  title_has_overseas <- any(sapply(.OVERSEAS_KW_LOADER,
-    function(k) grepl(k, tolower(title), fixed = TRUE)))
+  title_has_overseas <- grepl(.OVERSEAS_KW_PATTERN, tolower(title), perl = TRUE)
 
   # 2) ソース名・タイトル・本文から都道府県名（完全形）を検索
   full_text <- if (title_has_overseas) paste(source_name, title) else paste(source_name, title, summary)
@@ -4971,9 +4990,12 @@ restrict_disease_tags_to_alert_context <- function(text, disease_tags, signal_le
 # 例えば did="gi" が "legionella"（"le-gi-onella"の中に"gi"を含む）に誤ってマッチして
 # しまうため、カンマで分割した完全一致で判定する。
 has_disease_tag <- function(disease_tags, did) {
-  vapply(strsplit(as.character(disease_tags), ",", fixed = TRUE), function(tags) {
-    did %in% trimws(tags)
-  }, logical(1))
+  # strsplit()+vapply()で1行ずつ判定していたのをやめ、カンマ区切りタグを
+  # 前後カンマ付きの正規化文字列にしてgrepl(fixed=TRUE)で一括判定する
+  # （grepl自体がベクトル化されているため、行数が多いほど効果が大きい）。
+  x <- ifelse(is.na(disease_tags), "", as.character(disease_tags))
+  x <- paste0(",", gsub("\\s*,\\s*", ",", trimws(x)), ",")
+  grepl(paste0(",", did, ","), x, fixed = TRUE)
 }
 
 signal_weight <- function(level) {

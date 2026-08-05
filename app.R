@@ -2599,7 +2599,11 @@ server <- function(input, output, session) {
     if (is.infinite(latest_dt)) latest_dt <- Sys.Date()
     yr <- as.integer(format(latest_dt, "%Y"))
     wk <- if (nrow(d) > 0) { w <- max(d$week, na.rm=TRUE); if (is.infinite(w)) NA_integer_ else as.integer(w) } else NA_integer_
-    date_txt <- if (!is.na(wk)) paste0(yr, "年 第", wk, "週（", format(latest_dt, "%m/%d"), "）") else format(latest_dt, "%Y/%m/%d")
+    date_txt <- if (!is.na(wk)) {
+      wk_start <- lubridate::floor_date(latest_dt, unit = "week", week_start = 1)
+      wk_end   <- wk_start + 6
+      paste0(yr, "年 第", wk, "週（", format(wk_start, "%m/%d"), "〜", format(wk_end, "%m/%d"), "）")
+    } else format(latest_dt, "%Y/%m/%d")
     disease_label <- tryCatch(
       get_disease_label(input$ts_mode, input$disease, input$zensu_disease_ts),
       error = function(e) "")
