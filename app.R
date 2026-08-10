@@ -4920,13 +4920,24 @@ server <- function(input, output, session) {
     pubmed_show_all_flag(FALSE)
   }, ignoreInit = TRUE)
 
+  # 国内・海外判定（is_overseas_article_vec）はEBSキャッシュ全件に対して行う
+  # 重い処理のため、filtered_ebs/ebs_overseas/ebs_trend_dataがそれぞれ個別に
+  # 再計算すると同じ判定を3回繰り返すことになり無駄に遅い。ここで1回だけ
+  # 計算した列を付与し、各reactiveはこの結果を再利用する。
+  ebs_classified <- reactive({
+    d <- ebs_data()
+    if (is.null(d) || nrow(d) == 0) return(d)
+    d$.is_overseas <- is_overseas_article_vec(d$title, d$summary,
+                              if ("ebs_pref" %in% names(d)) d$ebs_pref else NA,
+                              if ("source_id" %in% names(d)) d$source_id else "",
+                              if ("source_name" %in% names(d)) d$source_name else "")
+    d
+  })
+
   # ── EBS フィード（国内）────────────────────────────────────
   filtered_ebs <- reactive({
-    d <- ebs_data()
-    d <- d %>% filter(!mapply(is_overseas_article, title, summary,
-                              if ("ebs_pref" %in% names(.)) ebs_pref else NA,
-                              if ("source_id" %in% names(.)) source_id else "",
-                              if ("source_name" %in% names(.)) source_name else ""))
+    d <- ebs_classified()
+    d <- d %>% filter(!.is_overseas)
     d <- d %>% filter(is.na(source_id) | source_id != "pubmed")
     if (isTRUE(input$ebs_official_only)) {
       d <- d %>% filter(is_official_ebs_source(source_id))
@@ -5155,14 +5166,9 @@ server <- function(input, output, session) {
 
   # ── EBSニュース（海外）─────────────────────────────────────
   ebs_overseas <- reactive({
-    d <- ebs_data()
+    d <- ebs_classified()
     if (is.null(d) || nrow(d) == 0) return(d)
-    d <- d %>% filter(
-      mapply(is_overseas_article, title, summary,
-             if ("ebs_pref" %in% names(.)) ebs_pref else NA,
-             if ("source_id" %in% names(.)) source_id else "",
-             if ("source_name" %in% names(.)) source_name else "")
-    )
+    d <- d %>% filter(.is_overseas)
     d <- d %>% filter(is.na(source_id) | source_id != "pubmed")
     if (isTRUE(input$ebs_ov_official_only)) {
       d <- d %>% filter(is_official_ebs_source(source_id))
@@ -5276,15 +5282,11 @@ server <- function(input, output, session) {
   # Plotly.reactで疾患切り替え（サーバー往復なし）に対応する
   # (www/js/ebs_trend_chart.js のupdateEbsTrendChart()が消費する)
   ebs_trend_data <- reactive({
-    d <- ebs_data()
+    d <- ebs_classified()
     if (is.null(d) || nrow(d) == 0) return(list())
     d <- d %>%
       filter(is.na(source_id) | source_id != "pubmed") %>%
-      filter(!mapply(is_overseas_article,
-                     coalesce(title, ""), coalesce(summary, ""),
-                     if ("ebs_pref"   %in% names(.)) ebs_pref   else NA,
-                     if ("source_id"  %in% names(.)) source_id  else "",
-                     if ("source_name" %in% names(.)) source_name else "")) %>%
+      filter(!.is_overseas) %>%
       filter(!is.na(pub_date), pub_date >= Sys.Date() - 60,
              as.character(signal_level) %in% c("Signal High", "Signal Low")) %>%
       mutate(week_start = as.Date(pub_date) - as.integer(format(as.Date(pub_date), "%u")) %% 7)

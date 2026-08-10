@@ -197,6 +197,62 @@ is_overseas_article <- function(title, summary, ebs_pref = NA, source_id = "", s
   !has_japan && (has_overseas || media_has_overseas || media_non_japanese_script)
 }
 
+# ベクトル版 is_overseas_article()。mapply(is_overseas_article, ...)で記事
+# 1件ごとに呼び出すと、内部で使うdetect_pref()のCITY_PREF_MAP走査等が
+# 「記事数 × 候補数」のR関数呼び出しになり遅い（実測: 2859件で約75秒、
+# detect_pref_vec化前で約17秒）。判定ロジックはis_overseas_article()と
+# 完全に同一（分岐・優先順位とも変更なし）で、内部の重い判定（都道府県特定・
+# キーワード一致）だけをベクトル化している。国内/海外タブの一覧表示・
+# トレンド集計等、記事件数分をまとめて判定する箇所ではこちらを使う。
+is_overseas_article_vec <- function(titles, summaries, ebs_prefs = NA, source_ids = "", source_names = "") {
+  n <- length(titles)
+  titles    <- ifelse(is.na(titles), "", titles)
+  summaries <- ifelse(is.na(summaries), "", summaries)
+  if (length(ebs_prefs) == 1) ebs_prefs <- rep(ebs_prefs, n)
+  if (length(source_ids) == 1) source_ids <- rep(source_ids, n)
+  if (length(source_names) == 1) source_names <- rep(source_names, n)
+  sids <- tolower(trimws(as.character(source_ids)))
+
+  title_body   <- mapply(strip_gnews_suffix, titles, source_ids, USE.NAMES = FALSE)
+  summary_body <- mapply(strip_gnews_suffix, summaries, source_ids, USE.NAMES = FALSE)
+
+  detected <- tryCatch(
+    detect_pref_vec(title_body, summary_body),
+    error = function(e) rep(NA_character_, n)
+  )
+
+  strip_fp <- function(s) {
+    if (is.null(.FP_WORDS_PATTERN)) return(s)
+    gsub(.FP_WORDS_PATTERN, "", s, perl = TRUE)
+  }
+  title_low <- strip_fp(tolower(title_body))
+  title_has_overseas <- grepl(.OVERSEAS_KW_PATTERN, title_low, perl = TRUE)
+  txt <- ifelse(title_has_overseas, title_low, strip_fp(tolower(paste(title_body, summary_body))))
+
+  has_japan    <- grepl(.JAPAN_KW_PATTERN,    txt, perl = TRUE)
+  has_overseas <- grepl(.OVERSEAS_KW_PATTERN, txt, perl = TRUE)
+
+  gnews_media <- mapply(extract_gnews_media_name, titles, source_ids, USE.NAMES = FALSE)
+  media_low   <- tolower(paste(coalesce(source_names, ""), gnews_media))
+  media_is_japan_gov_domain <- grepl("\\.(lg|go)\\.jp\\b", media_low)
+
+  media_has_overseas <- !media_is_japan_gov_domain & tryCatch(
+    grepl(.OVERSEAS_KW_BOUNDARY_PATTERN, media_low, perl = TRUE),
+    error = function(e) rep(FALSE, n)
+  )
+
+  media_non_japanese_script <- nchar(gsub("[^Ѐ-ӿ가-힣؀-ۿ]", "", gnews_media)) > 0
+
+  base_result <- ifelse(
+    sids %in% .OVERSEAS_SOURCE_IDS_LOADER | sids == "jptimes",
+    !has_japan,
+    !has_japan & (has_overseas | media_has_overseas | media_non_japanese_script)
+  )
+
+  known_pref <- !is.na(ebs_prefs) & nchar(ebs_prefs) > 0
+  ifelse(known_pref | !is.na(detected), FALSE, base_result)
+}
+
 # ── 公式情報源判定 ────────────────────────────────────────
 # 都道府県(pref_*)・政令指定都市/中核市等の自治体(city_*)は全て自治体公式サイトからの
 # 直接取得のため一律公式扱いとする。それ以外は行政機関・国際機関・国際保健機関の
@@ -4822,6 +4878,77 @@ detect_pref <- function(title = "", summary = "", source_name = "", link = "") {
   }
 
   NA_character_
+}
+
+# ベクトル版 detect_pref()。CITY_PREF_MAP（約1,700件）等を記事1件ごとに
+# 線形走査すると件数の多いEBSキャッシュでは非常に遅くなる（実測: 2859件で
+# detect_pref単体が約13秒）ため、「候補（都道府県名・市区町村名等）ごとに、
+# まだ判定が確定していない行だけをベクトルgreplでまとめて判定する」方式に
+# 変更したもの。判定順序・各tierでの短絡（先に確定した行はそれ以降を評価
+# しない）はdetect_pref()と完全に同じになるよう実装している。
+# 呼び出し側はmapply(detect_pref, ...)の代わりにこちらを使うことで、
+# 「記事数 × 候補数」だったR関数呼び出しを「候補数」回のベクトル演算に
+# 削減できる。
+detect_pref_vec <- function(titles, summaries, source_names = "", links = "") {
+  n <- length(titles)
+  titles    <- ifelse(is.na(titles), "", titles)
+  summaries <- ifelse(is.na(summaries), "", summaries)
+  if (length(source_names) == 1) source_names <- rep(source_names, n)
+  if (length(links) == 1) links <- rep(links, n)
+  source_names <- ifelse(is.na(source_names), "", source_names)
+  links        <- ifelse(is.na(links), "", links)
+
+  result    <- rep(NA_character_, n)
+  remaining <- rep(TRUE, n)
+
+  # 1) リンクURL・ソース名からメディアマッピング
+  combined_meta <- paste(tolower(source_names), tolower(links))
+  for (pat in names(MEDIA_PREF_MAP)) {
+    if (!any(remaining)) break
+    hit <- remaining & grepl(pat, combined_meta, perl = TRUE, ignore.case = TRUE)
+    if (any(hit)) { result[hit] <- MEDIA_PREF_MAP[[pat]]; remaining[hit] <- FALSE }
+  }
+  if (!any(remaining)) return(result)
+
+  title_has_overseas <- grepl(.OVERSEAS_KW_PATTERN, tolower(titles), perl = TRUE)
+  full_text <- ifelse(title_has_overseas,
+                       paste(source_names, titles),
+                       paste(source_names, titles, summaries))
+
+  # 2) 都道府県名（完全形）
+  for (i in seq_along(PREF_NAMES_JA)) {
+    if (!any(remaining)) break
+    hit <- remaining & grepl(PREF_NAMES_JA[i], full_text, fixed = TRUE)
+    if (any(hit)) { result[hit] <- PREF_NAMES_JA[i]; remaining[hit] <- FALSE }
+  }
+  if (!any(remaining)) return(result)
+
+  # 3) 主要市町村名
+  for (city in names(CITY_PREF_MAP)) {
+    if (!any(remaining)) break
+    hit <- remaining & grepl(city, full_text, fixed = TRUE)
+    if (any(hit)) { result[hit] <- CITY_PREF_MAP[[city]]; remaining[hit] <- FALSE }
+  }
+  if (!any(remaining)) return(result)
+
+  # 4) 保健所名パターン
+  for (area in names(HOKENJO_PREF_MAP)) {
+    if (!any(remaining)) break
+    pat <- paste0(area, "(保健所|保健センター|市保健|区保健|町保健|圏域)")
+    hit <- remaining & grepl(pat, full_text, perl = TRUE)
+    if (any(hit)) { result[hit] <- HOKENJO_PREF_MAP[[area]]; remaining[hit] <- FALSE }
+  }
+  if (!any(remaining)) return(result)
+
+  # 5) 短縮形
+  for (i in seq_along(PREF_SHORT_JA)) {
+    if (!any(remaining)) break
+    nm <- PREF_SHORT_JA[i]
+    if (nchar(nm) < 2) next
+    hit <- remaining & grepl(nm, full_text, fixed = TRUE)
+    if (any(hit)) { result[hit] <- PREF_NAMES_JA[i]; remaining[hit] <- FALSE }
+  }
+  result
 }
 
 # ============================================================
