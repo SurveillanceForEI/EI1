@@ -1,6 +1,7 @@
-scripts/
+scripts
 install_packages.R
 deploy.R
-*.log
-.git/
-data/cache_zensu/
+startup.log
+startup-err.log
+startup2.log
+.RData
