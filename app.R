@@ -1817,8 +1817,8 @@ server <- function(input, output, session) {
         ),
         tags$div(
           tags$strong("ℹ データについて: "),
-          "過去分（概ね2023年以前）は感染症発生動向調査事業年報の確定値、",
-          "直近分（当年の未確定期間）は感染症発生動向調査週報（IDWR）の速報値（暫定値）を使用しています。",
+          "2023年以前は感染症発生動向調査事業年報の確定値、",
+          "直近分は感染症発生動向調査週報（IDWR）の速報値（暫定値）を使用しています。",
           "速報値は後日修正される場合があります。詳細・確定値は",
           tags$a(href="https://id-info.jihs.go.jp/surveillance/idwr/",
                  target="_blank", style="color:#856404;",
@@ -4998,9 +4998,8 @@ server <- function(input, output, session) {
     total <- nrow(d)
     d <- head(d, PAGE_SIZE)
     dlabel <- EBS_DLABEL
-    translate_mode_pm <- isTRUE(input$pubmed_translate == "on")
 
-    cards <- lapply(seq_len(nrow(d)), function(i) .ebs_row_to_card(d, i, dlabel, translate_mode_pm))
+    cards <- lapply(seq_len(nrow(d)), function(i) .ebs_row_to_card(d, i, dlabel))
     meta <- list(total = total, pageSize = PAGE_SIZE)
 
     tags$div(
@@ -5078,12 +5077,8 @@ server <- function(input, output, session) {
   # d[i, ]（tibbleの1行サブセット）をカード件数分繰り返すとオーバーヘッドが大きく
   # 表示が遅くなるため、data.frame全体とインデックスiを受け取りベクトル参照だけで
   # 済ませる（tibbleの行サブセットを一切発生させない）
-  .ebs_row_to_card <- function(d, i, dlabel, translate_mode) {
+  .ebs_row_to_card <- function(d, i, dlabel) {
     link <- d$link[i]
-    if (!is.na(link) && nchar(trimws(link)) > 0 && translate_mode) {
-      link <- paste0("https://translate.google.com/translate?hl=ja&sl=auto&tl=ja&u=",
-                      utils::URLencode(link, repeated = TRUE))
-    }
     tgs <- strsplit(coalesce(d$disease_tags[i], ""), ",")[[1]]
     tgs <- tgs[nchar(trimws(tgs)) > 0]
     disease_labels <- vapply(tgs, function(tg) if (!is.na(dlabel[tg])) dlabel[tg] else tg,
@@ -5147,9 +5142,8 @@ server <- function(input, output, session) {
     total <- nrow(d)
     d <- head(d, PAGE_SIZE)
     dlabel <- EBS_DLABEL
-    translate_mode <- isTRUE(input$ebs_translate == "on")
 
-    cards <- lapply(seq_len(nrow(d)), function(i) .ebs_row_to_card(d, i, dlabel, translate_mode))
+    cards <- lapply(seq_len(nrow(d)), function(i) .ebs_row_to_card(d, i, dlabel))
     meta <- list(total = total, pageSize = PAGE_SIZE)
 
     tags$div(
@@ -5237,9 +5231,8 @@ server <- function(input, output, session) {
     total <- nrow(d)
     d <- head(d, PAGE_SIZE)
     dlabel <- EBS_DLABEL
-    translate_mode_ov <- isTRUE(input$ebs_ov_translate == "on")
 
-    cards <- lapply(seq_len(nrow(d)), function(i) .ebs_row_to_card(d, i, dlabel, translate_mode_ov))
+    cards <- lapply(seq_len(nrow(d)), function(i) .ebs_row_to_card(d, i, dlabel))
     meta <- list(total = total, pageSize = PAGE_SIZE)
 
     tags$div(
