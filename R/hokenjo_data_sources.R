@@ -145,7 +145,7 @@ HOKENJO_DATA_SOURCES <- list(
 
   .hj("山梨県", "◎", "表（PDF）", 5,
       hokenjo_names = c("中北", "峡東", "峡南", "富士東部", "甲府市"),
-      sample_url = "https://www.pref.yamanashi.jp/documents/101494/202631w.pdf",
+      sample_url = "https://www.pref.yamanashi.jp/documents/101494/202632w.pdf",
       archive_from = "要確認",
       notes = ""),
 
@@ -158,7 +158,7 @@ HOKENJO_DATA_SOURCES <- list(
 
   .hj("岐阜県", "◎", "表（PDF）", 8,
       hokenjo_names = c("岐阜市", "岐阜", "西濃", "関", "可茂", "東濃", "恵那", "飛騨"),
-      sample_url = "https://www.pref.gifu.lg.jp/uploaded/attachment/509493.pdf",
+      sample_url = "https://www.pref.gifu.lg.jp/uploaded/attachment/510301.pdf",
       archive_from = "要確認（GIDWRアーカイブページあり）",
       notes = ""),
 
@@ -170,7 +170,7 @@ HOKENJO_DATA_SOURCES <- list(
       notes = "月報版の保健所別集計表も別途あり"),
 
   .hj("愛知県", "◎", "表（PDF）", NA,
-      sample_url = "https://www.pref.aichi.jp/eiseiken/kansen/2026/202631.pdf",
+      sample_url = "https://www.pref.aichi.jp/eiseiken/kansen/2026/202632.pdf",
       url_pattern = "https://www.pref.aichi.jp/eiseiken/kansen/{YEAR}/{YEAR}{WEEK}.pdf",
       archive_from = "要確認",
       notes = "名古屋市含む保健所別、年齢別表もあり"),
@@ -183,7 +183,7 @@ HOKENJO_DATA_SOURCES <- list(
 
   .hj("滋賀県", "◎", "地図＋表（PDF）", 7,
       hokenjo_names = c("大津市", "草津", "甲賀", "東近江", "彦根", "長浜", "高島"),
-      sample_url = "https://www.pref.shiga.lg.jp/file/attachment/5628246.pdf",
+      sample_url = "https://www.pref.shiga.lg.jp/file/attachment/5628767.pdf",
       archive_from = "要確認",
       notes = "手足口病等の圏域別マップ（色分け）＋全数・定点の累積患者数表（人口10万人当たり換算あり）。Map機能の参考実装として最優良"),
 
@@ -229,7 +229,7 @@ HOKENJO_DATA_SOURCES <- list(
       notes = "ユーザー確認済み：地域区分（3地区）で妥当とのこと。全国比較値も掲載"),
 
   .hj("島根県", "◎", "専用システム（DIDSS）", NA,
-      sample_url = "https://pref.shimane.didss.dsvc.jp/report/reportweekly",
+      sample_url = "https://pref.shimane.didss.dsvc.jp/files/report/week/weeklyreport_y2026w32.pdf",
       archive_from = "2006",
       notes = "保健所別集計表＋分布マップ。山口県と同系統のシステム"),
 
@@ -247,7 +247,7 @@ HOKENJO_DATA_SOURCES <- list(
 
   .hj("山口県", "◎", "専用システム（DIDSS）", 9,
       hokenjo_names = c("下関", "岩国", "柳井", "周南", "防府", "山口", "宇部", "長門", "萩"),
-      sample_url = "https://pref.yamaguchi.didss.dsvc.jp/nesid/weekly?tab=4",
+      sample_url = "https://pref.yamaguchi.didss.dsvc.jp/files/report/week/weeklyreport_y2026w32.pdf",
       archive_from = "2006",
       notes = "PDF/CSVダウンロード可、島根県と同系統システム"),
 

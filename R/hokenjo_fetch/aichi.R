@@ -54,7 +54,9 @@ fetch_aichi <- function(pdf_url = NULL, year = NULL, week = NULL, page = NULL) {
   # ページ番号未指定なら「定点数」を含むページを自動検出
   if (is.null(page)) {
     tmp <- tempfile(fileext = ".pdf")
-    download.file(pdf_url, tmp, mode = "wb", quiet = TRUE)
+    # 愛知県のサーバーはUser-Agent未指定のリクエストを403で拒否するため付与する
+    download.file(pdf_url, tmp, mode = "wb", quiet = TRUE,
+                  headers = c(`User-Agent` = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
     txt <- pdftools::pdf_text(tmp)
     cand <- which(grepl("定点数", txt) & grepl("愛知県全体", txt))
     if (length(cand) == 0) cand <- which(grepl("定点数", txt))
