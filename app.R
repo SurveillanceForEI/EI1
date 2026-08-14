@@ -29,6 +29,9 @@ source("R/std_loader.R")
 source("R/change_tracker.R")
 source("R/forecast_ts.R")
 source("R/idsc_links_data.R")
+source("R/hokenjo_boundary_pipeline.R")
+source("R/hokenjo_data_sources.R")
+source("R/hokenjo_map_module.R")
 
 # shinyapps.io 上での実行かどうかを判定
 # R_CONFIG_ACTIVE, HOME パス, またはアプリIDのいずれかで判定
@@ -65,6 +68,9 @@ JAPAN_MAP <- tryCatch({
     m %>% mutate(pref_name=name_ja) %>% select(pref_name, geometry)
   }
 }, error = function(e) NULL)
+cat("保健所別データ読み込み中（キャッシュ）...\n")
+HOKENJO_CURRENT <- load_hokenjo_current()
+HOKENJO_NAME_MAP <- load_hokenjo_name_map()
 cat("EBS データ読み込み中（キャッシュ）...\n")
 EBS_STARTUP_CACHE <- "data/ebs_startup_cache.rds"
 EBS_CACHE <- local({
@@ -554,6 +560,29 @@ function ebsUntranslateCards(containerId) {
                    plotlyOutput("zensu_heatmap_plot", height="340px")),
             column(6, tags$h5("地域別比較",style="font-weight:700;margin-top:16px"),
                    plotlyOutput("zensu_region_plot", height="340px"))
+          )
+        )
+      ),
+
+      # ── 保健所別マップ（メインの都道府県・疾患選択と連動）──
+      tabPanel("保健所別マップ", icon=icon("map-location-dot"),
+        tags$div(style="padding:10px 6px 4px;",
+          tags$p(style="color:#666;font-size:0.85em;",
+            "画面上部で選択中の都道府県・疾患について、その都道府県の週報から取得した",
+            "保健所（または報告区分）単位のデータを表示します。",
+            "都道府県ごとに集計単位・報告数(count)/定点当たり報告数(rate)の有無が異なります。"),
+          fluidRow(
+            column(4, uiOutput("hokenjo_metric_selector_ui"))
+          ),
+          uiOutput("hokenjo_status_ui"),
+          fluidRow(
+            column(7,
+              leafletOutput("hokenjo_map", height="520px")
+            ),
+            column(5,
+              tags$h5("保健所別比較", style="font-weight:700;margin-top:6px;"),
+              plotlyOutput("hokenjo_bar_plot", height="480px")
+            )
           )
         )
       ),
@@ -5907,6 +5936,114 @@ server <- function(input, output, session) {
       write_csv_bom(data_tab_df(), file)
     }
   )
+
+  # ── 保健所別マップ（都道府県・疾患はメインのコントロールパネルと連動）──
+  output$hokenjo_metric_selector_ui <- renderUI({
+    selectInput("hokenjo_metric", "表示指標",
+                choices = c("定点当たり報告数(rate)" = "rate", "報告数(count)" = "count"),
+                selected = "rate")
+  })
+
+  # 現在の都道府県・疾患選択に対する状態を判定する
+  # status: "no_pref"(全国選択中) / "not_teiten"(全数モード) /
+  #         "pref_unavailable"(その県のデータ未取得) / "disease_unmatched"(疾患が突合できない) /
+  #         "no_rows"(突合できたが行が無い) / "ok"
+  hokenjo_status <- reactive({
+    pref <- input$pref_filter
+    if (is.null(pref) || pref == "" || pref == "全国") {
+      return(list(status = "no_pref"))
+    }
+    if (!is.null(input$ts_mode) && input$ts_mode == "zensu") {
+      return(list(status = "not_teiten", pref = pref))
+    }
+    if (is.null(HOKENJO_CURRENT) || !(pref %in% unique(as.character(HOKENJO_CURRENT$pref)))) {
+      return(list(status = "pref_unavailable", pref = pref))
+    }
+    disease_id <- input$disease
+    label <- if (!is.null(disease_id) && disease_id %in% names(DISEASE_CONFIG)) {
+      DISEASE_CONFIG[[disease_id]]$label
+    } else if (!is.null(disease_id) && disease_id %in% names(STD_DISEASE_CONFIG)) {
+      STD_DISEASE_CONFIG[[disease_id]]$label
+    } else NA_character_
+
+    matched <- resolve_hokenjo_disease(HOKENJO_CURRENT, pref, label)
+    if (is.null(matched)) {
+      return(list(status = "disease_unmatched", pref = pref, label = label))
+    }
+    list(status = "ok", pref = pref, label = label, disease = matched)
+  })
+
+  hokenjo_map_data <- reactive({
+    st <- hokenjo_status()
+    if (st$status != "ok") return(NULL)
+    build_hokenjo_map_data(HOKENJO_CURRENT, st$pref, st$disease, HOKENJO_NAME_MAP)
+  })
+
+  output$hokenjo_status_ui <- renderUI({
+    st <- hokenjo_status()
+    d <- if (st$status == "ok") hokenjo_map_data() else NULL
+    wk <- if (!is.null(d)) { w <- unique(d$week_label); w[!is.na(w)] } else character(0)
+
+    msg <- switch(st$status,
+      no_pref = "画面上部で都道府県を選択すると、保健所別マップが表示されます（現在「全国」選択中）。",
+      not_teiten = "保健所別マップは「定点把握」の週次疾患のみ対応しています（現在は全数把握モードです）。",
+      pref_unavailable = sprintf("%sの週報からは保健所別データを取得できていません。", st$pref),
+      disease_unmatched = sprintf("%sの週報には「%s」の保健所別内訳が見当たりませんでした。", st$pref, st$label),
+      ok = if (is.null(d) || nrow(d) == 0 || all(is.na(d$rate) & is.na(d$count))) {
+        sprintf("%sの「%s」に該当する保健所別データが見つかりませんでした。", st$pref, st$label)
+      } else NULL
+    )
+
+    tagList(
+      if (length(wk) > 0) {
+        tags$div(style="display:inline-block;background:#eef4ff;color:#345;border-radius:4px;padding:3px 10px;font-size:0.85em;font-weight:600;margin-bottom:6px;",
+          paste0("表示中データ: ", wk[1]))
+      },
+      if (!is.null(msg)) {
+        tags$div(style="color:#a55;background:#fff6f6;border:1px solid #f0d0d0;border-radius:4px;padding:8px 12px;font-size:0.88em;margin-bottom:8px;",
+          msg)
+      }
+    )
+  })
+
+  output$hokenjo_map <- renderLeaflet({
+    d <- hokenjo_map_data()
+    metric <- if (!is.null(input$hokenjo_metric)) input$hokenjo_metric else "rate"
+    if (is.null(d) || nrow(d) == 0 || !(metric %in% names(d))) {
+      return(leaflet() %>% addTiles() %>% fitBounds(lng1 = 123, lat1 = 24, lng2 = 146, lat2 = 46))
+    }
+    vals <- d[[metric]]
+    max_val <- suppressWarnings(max(vals, na.rm = TRUE))
+    if (!is.finite(max_val) || max_val <= 0) max_val <- 1
+    pal <- colorNumeric(c("#ffffcc", "#fd8d3c", "#800026"), c(0, max_val * 1.1), na.color = "#cccccc")
+    metric_label <- if (metric == "rate") "定点当たり報告数" else "報告数"
+
+    leaflet(d) %>% addTiles(options = tileOptions(opacity = 0.5)) %>%
+      addPolygons(
+        fillColor = ~pal(get(metric)), fillOpacity = 0.8,
+        color = "#fff", weight = 1,
+        highlight = highlightOptions(weight = 2, color = "#333", bringToFront = TRUE),
+        label = ~paste0(hokenjo, ": ", ifelse(is.na(get(metric)), "データなし", round(get(metric), 2))),
+        labelOptions = labelOptions(style = list("font-size" = "12px"))
+      ) %>%
+      addLegend(pal = pal, values = c(0, max_val), title = metric_label, position = "bottomright")
+  })
+
+  output$hokenjo_bar_plot <- renderPlotly({
+    d <- hokenjo_map_data()
+    metric <- if (!is.null(input$hokenjo_metric)) input$hokenjo_metric else "rate"
+    if (is.null(d) || nrow(d) == 0 || !(metric %in% names(d))) return(NULL)
+    df <- sf::st_drop_geometry(d)
+    df <- df[order(-df[[metric]]), ]
+    df$hokenjo <- factor(df$hokenjo, levels = rev(df$hokenjo))
+    metric_label <- if (metric == "rate") "定点当たり報告数" else "報告数"
+    p <- ggplot(df, aes(x = hokenjo, y = .data[[metric]], text = paste0(hokenjo, ": ", .data[[metric]]))) +
+      geom_col(fill = "#fd8d3c") +
+      coord_flip() +
+      labs(x = NULL, y = metric_label) +
+      theme_minimal(base_size = 12)
+    ggplotly(p, tooltip = "text")
+  })
 }
 
 shinyApp(ui, server)
