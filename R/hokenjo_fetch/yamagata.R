@@ -80,6 +80,79 @@ header_row_week_col <- function(mat, header_row) {
   which(mat[header_row, ] == "週数")[1]
 }
 
+# .yamagata_parse_one()は「最新の埋まっている週」1行だけを返すが、
+# CSV自体はシーズン内の全週データを含んでいるため、全週分を返す
+# バックフィル用のバリアント
+.yamagata_parse_one_allweeks <- function(url, category_label, year) {
+  lines <- .yamagata_read_csv(url)
+  n_col <- max(sapply(lines, length))
+  pad <- function(v) { length(v) <- n_col; v }
+  mat <- do.call(rbind, lapply(lines, pad))
+
+  header_row <- which(apply(mat, 1, function(r) any(grepl("週数", r), na.rm = TRUE)))[1]
+  if (is.na(header_row)) stop("週数見出しが見つかりません: ", url)
+
+  disease_row <- header_row - 2
+  region_row  <- header_row - 1
+  report_cols <- which(mat[header_row, ] == "報告")
+  week_col <- header_row_week_col(mat, header_row)
+
+  data_rows <- (header_row + 1):nrow(mat)
+  data_rows <- data_rows[data_rows <= nrow(mat)]
+  data_rows <- data_rows[grepl("^[0-9]+$", trimws(mat[data_rows, week_col]))]
+
+  results <- list()
+  for (rc in report_cols) {
+    rate_col <- rc + 1
+    region <- trimws(mat[region_row, rc])
+    if (is.na(region) || nchar(region) == 0) next
+    region <- if (region == "山形県") "山形県計" else region
+
+    dcol <- rc
+    while (dcol > 1 && (is.na(mat[disease_row, dcol]) || nchar(trimws(mat[disease_row, dcol])) == 0)) dcol <- dcol - 1
+    disease <- trimws(mat[disease_row, dcol])
+    if (nchar(disease) == 0) disease <- category_label
+
+    for (dr in data_rows) {
+      cnt <- mat[dr, rc]
+      if (is.na(cnt) || !nzchar(trimws(cnt))) next
+      week_num <- trimws(mat[dr, week_col])
+      results[[length(results) + 1]] <- data.frame(
+        pref = "山形県", week_label = sprintf("%d年第%s週", year, week_num),
+        week_num = as.integer(week_num), hokenjo = region, disease = disease,
+        count = parse_hokenjo_number(cnt),
+        rate  = parse_hokenjo_number(mat[dr, rate_col]),
+        stringsAsFactors = FALSE
+      )
+    }
+  }
+  do.call(rbind, results)
+}
+
+fetch_yamagata_history <- function(year = 2026) {
+  urls <- .yamagata_csv_urls(year)
+  cats <- list(ped = "小児科定点", covid = "新型コロナウイルス感染症",
+               flu = "インフルエンザ", kikan = "基幹定点", eye = "眼科定点")
+  out <- list()
+  for (nm in names(cats)) {
+    res <- tryCatch(.yamagata_parse_one_allweeks(urls[[nm]], cats[[nm]], year),
+                     error = function(e) { message("[NG] ", cats[[nm]], ": ", conditionMessage(e)); NULL })
+    if (!is.null(res)) out[[length(out) + 1]] <- res
+  }
+  df <- do.call(rbind, out)
+  df <- df[df$hokenjo != "山形県計", ]
+
+  ari_out <- list()
+  for (w in seq_len(53)) {
+    url <- sprintf("https://www.eiken.yamagata.yamagata.jp/pdfshuho/%d/%d%02d.pdf", year, year, w)
+    res <- tryCatch(.yamagata_parse_ari(url, week_label = sprintf("%d年第%02d週", year, w)),
+                     error = function(e) NULL)
+    if (!is.null(res)) { res$week_num <- w; ari_out[[length(ari_out) + 1]] <- res }
+  }
+  if (length(ari_out) > 0) df <- rbind(df, do.call(rbind, ari_out)[, names(df)])
+  df
+}
+
 # ARI（急性呼吸器感染症）は上記CSV群に含まれず、週報PDF3ページ目の
 # 「＜定点把握感染症＞」表にのみ掲載されている。
 # 列順は 全国(先週) 山形県(先週,今週) 山形市(先週,今週) 村山(先週,今週)

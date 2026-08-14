@@ -6,12 +6,7 @@
 # （数値の無いセルも "－"/"…" で埋められているため pdf_text() の空白区切りでも
 # 列ズレが起きない）。疾患名は「累積」行の直前の行にある。
 
-fetch_yamanashi <- function(pdf_url = "https://www.pref.yamanashi.jp/documents/101494/202631w.pdf") {
-  if (!requireNamespace("pdftools", quietly = TRUE)) stop("pdftools パッケージが必要です")
-
-  tmp <- tempfile(fileext = ".pdf")
-  download.file(pdf_url, tmp, mode = "wb", quiet = TRUE)
-  page_txt <- pdftools::pdf_text(tmp)[1]
+.yamanashi_parse_page <- function(page_txt) {
   lines <- strsplit(page_txt, "\n")[[1]]
   # ページ末尾の「上位５疾患」サマリー欄にも"定当"の文字列が出るため、
   # 主表の終わり（急性呼吸器感染症の直後、コメント欄の手前）で打ち切る
@@ -49,5 +44,24 @@ fetch_yamanashi <- function(pdf_url = "https://www.pref.yamanashi.jp/documents/1
       )
     }
   }
+  do.call(rbind, out)
+}
+
+fetch_yamanashi <- function(pdf_url = "https://www.pref.yamanashi.jp/documents/101494/202631w.pdf") {
+  if (!requireNamespace("pdftools", quietly = TRUE)) stop("pdftools パッケージが必要です")
+  tmp <- tempfile(fileext = ".pdf")
+  download.file(pdf_url, tmp, mode = "wb", quiet = TRUE)
+  .yamanashi_parse_page(pdftools::pdf_text(tmp)[1])
+}
+
+# 過去分は10週まとめて1つのPDFに収録されており（1ページ=1週）、
+# 個別週のPDFとしては公表されていない
+# 例: https://www.pref.yamanashi.jp/documents/92710/202601w-202610w.pdf
+fetch_yamanashi_bundle <- function(pdf_url) {
+  if (!requireNamespace("pdftools", quietly = TRUE)) stop("pdftools パッケージが必要です")
+  tmp <- tempfile(fileext = ".pdf")
+  download.file(pdf_url, tmp, mode = "wb", quiet = TRUE)
+  pages <- pdftools::pdf_text(tmp)
+  out <- lapply(pages, function(pg) tryCatch(.yamanashi_parse_page(pg), error = function(e) NULL))
   do.call(rbind, out)
 }
