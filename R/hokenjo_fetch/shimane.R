@@ -15,8 +15,18 @@ fetch_shimane <- function(pdf_url) {
   txt <- pdftools::pdf_text(path)
   if (length(txt) < 3) stop("島根県: ページ数が想定と異なります(3ページ以上を想定)")
 
-  page_rate  <- txt[[2]]
-  page_count <- txt[[3]]
+  # 定点あたり報告数/報告実数の表は常に2,3ページ目とは限らない
+  # （概況ページが挟まり後ろにずれることがある）ため、タイトル文言で
+  # ページを探す
+  # 概況ページの本文にも「定点あたり報告数」という語句が出現することが
+  # あるため、実際の集計表ページであることを示す「感染症発生動向調査
+  # 情報」というタイトル文言も併せて要求する
+  rate_page_idx <- which(grepl("感染症発生動向調査情報", txt) & grepl("定点あたり報告数", txt) & !grepl("報告実数", txt))[1]
+  count_page_idx <- which(grepl("感染症発生動向調査情報", txt) & grepl("報告実数", txt))[1]
+  if (is.na(rate_page_idx) || is.na(count_page_idx)) stop("島根県: 定点あたり報告数/報告実数のページが見つかりません")
+
+  page_rate  <- txt[[rate_page_idx]]
+  page_count <- txt[[count_page_idx]]
 
   week_label <- NA_character_
   wl <- regmatches(page_rate, regexpr("[0-9]{4}年\\s*第[0-9]+週", page_rate))
