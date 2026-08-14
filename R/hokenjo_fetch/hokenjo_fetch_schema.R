@@ -62,12 +62,14 @@ validate_hokenjo_fetch <- function(df, pref_expected = NULL) {
 }
 
 # 全角数字・カンマ・ダッシュ等を含む文字列を数値に変換する共通ヘルパー
-# 「－」「-」「―」「なし」等は NA（報告なし/非公表）として扱う
+# 「－」「-」「―」は「報告数0」を表す記法として0に、
+# 「なし」「…」「*」「空欄」等は非公表/対象外としてNAに変換する
 parse_hokenjo_number <- function(x) {
   x <- as.character(x)
   x <- chartr("０１２３４５６７８９．", "0123456789.", x)
   x <- gsub(",", "", x)
   x <- trimws(x)
-  x[x %in% c("-", "―", "－", "…", "*", "", "なし", "NA")] <- NA
+  x[x %in% c("-", "―", "－")] <- "0"
+  x[x %in% c("…", "*", "", "なし", "NA")] <- NA
   suppressWarnings(as.numeric(x))
 }

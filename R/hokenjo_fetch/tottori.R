@@ -34,7 +34,9 @@ TOTTORI_DISEASE_CATEGORY <- c(
 
 .tottori_num_tokens <- function(line) {
   toks <- strsplit(trimws(line), "\\s+")[[1]]
-  toks <- toks[!grepl("%$", toks) & toks != "－" & toks != "-"]
+  toks <- toks[!grepl("%$", toks)]
+  # 「－」「-」は報告数0を表すため、列位置を保つためにトークンとして残したまま0に置換する
+  toks[toks %in% c("－", "-")] <- "0"
   toks <- gsub(",", "", toks)
   suppressWarnings(as.numeric(toks[grepl("^[0-9]+(\\.[0-9]+)?$", toks)]))
 }
