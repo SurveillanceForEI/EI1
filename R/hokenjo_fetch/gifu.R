@@ -1,0 +1,80 @@
+# 岐阜県「感染症発生動向調査週報（GIDWR） データ・グラフ編」PDF
+# https://www.pref.gifu.lg.jp/uploaded/attachment/<id>.pdf
+# （URLは週ごとに変わる添付ファイルIDのため、呼び出し側で最新PDFのURLを解決すること）
+#
+# レイアウト: 1ページに疾患ブロックが2列×2段（最大4疾患）で並び、各ブロックは
+# 「◆ 疾患名」見出し→「定点当たり報告数」→「保健所別」表（県全体+岐阜市/岐阜/
+# 西濃/関/可茂/東濃/恵那/飛騨の3週間分）という構成。count（報告数）は掲載されて
+# おらず rate（定点当たり報告数）のみ。「医療圏別」（岐阜/西濃/中濃/東濃/飛騨の
+# 5区分）表は保健所境界と一致しないため対象外とする。
+# ブロックが横に2つ並ぶため pdf_text() の単純な行分割では左右の数値が同一行に
+# 混在してしまう。pdf_data() の座標(x,y)を使い、◆マーカーごとにブロックのx範囲を
+# 決定してから抽出する。
+
+fetch_gifu <- function(pdf_url = "https://www.pref.gifu.lg.jp/uploaded/attachment/509493.pdf") {
+  if (!exists("pdf_words")) stop("pdf_table_utils.R を先に source してください")
+
+  tmp <- tempfile(fileext = ".pdf")
+  download.file(pdf_url, tmp, mode = "wb", quiet = TRUE)
+  pages_txt <- pdftools::pdf_text(tmp)
+  npages <- length(pages_txt)
+
+  hokenjo_order <- c("岐阜市", "岐阜", "西濃", "関", "可茂", "東濃", "恵那", "飛騨")
+
+  # 週ラベル（ページ1のタイトルから取得）
+  wm <- regmatches(pages_txt[1], regexec("(20[0-9]{2})年第([0-9]+)週", pages_txt[1]))[[1]]
+  week_label <- if (length(wm) == 3) sprintf("%s年第%s週", wm[2], wm[3]) else NA_character_
+
+  out <- list()
+
+  for (page in seq_len(npages)) {
+    if (!grepl("保健所別", pages_txt[page])) next
+    words <- pdf_words(tmp, page = page)
+
+    diamonds <- words[words$text == "◆", ]
+    if (nrow(diamonds) == 0) next
+
+    for (di in seq_len(nrow(diamonds))) {
+      x0 <- diamonds$x[di]; y0 <- diamonds$y[di]
+      others_right <- diamonds$x[abs(diamonds$y - y0) <= 3 & diamonds$x > x0]
+      block_x_max <- if (length(others_right) > 0) min(others_right) - 5 else x0 + 300
+
+      # 疾患名（◆と同じy、xが◆より右）
+      name_toks <- words[abs(words$y - y0) <= 3 & words$x > x0 & words$x < block_x_max & words$text != "◆", ]
+      disease <- paste(name_toks$text[order(name_toks$x)], collapse = "")
+      if (!nzchar(disease)) next
+
+      # 週ラベル行（"29週","30週","31週"等）で最新（最大週）を採用
+      wk <- words[grepl("^[0-9]+週$", words$text) & words$x >= x0 - 5 & words$x < x0 + 30 & words$y > y0, ]
+      if (nrow(wk) == 0) next
+      wk$num <- as.integer(gsub("週$", "", wk$text))
+      target <- wk[which.max(wk$num), ]
+      y_target <- target$y
+
+      # 保健所ヘッダー（8保健所名）をこのブロックのx範囲内・yがdiamondより下・週行より上で探す
+      hdr <- words[words$text %in% hokenjo_order & words$x >= x0 & words$x < block_x_max &
+                     words$y > y0 & words$y < y_target, ]
+      hdr <- hdr[!duplicated(hdr$text), ]
+      if (nrow(hdr) != length(hokenjo_order)) next  # 医療圏別など列構成が違うブロックはスキップ
+      hdr <- hdr[match(hokenjo_order, hdr$text), ]
+      xs <- hdr$x
+      bounds <- c(xs[1] - (xs[2] - xs[1]) / 2, (xs[1:(length(xs) - 1)] + xs[2:length(xs)]) / 2,
+                  xs[length(xs)] + (xs[length(xs)] - xs[length(xs) - 1]) / 2)
+
+      data_toks <- words[abs(words$y - y_target) <= 3 & words$x >= bounds[1] & words$x < bounds[length(bounds)], ]
+      if (nrow(data_toks) == 0) next
+
+      for (k in seq_along(hokenjo_order)) {
+        lo <- bounds[k]; hi <- bounds[k + 1]
+        v <- data_toks$text[data_toks$x >= lo & data_toks$x < hi]
+        rate_val <- if (length(v) > 0) parse_hokenjo_number(v[1]) else NA_real_
+        out[[length(out) + 1]] <- data.frame(
+          pref = "岐阜県", week_label = week_label, hokenjo = hokenjo_order[k],
+          disease = disease, count = NA_real_, rate = rate_val,
+          stringsAsFactors = FALSE
+        )
+      }
+    }
+  }
+  do.call(rbind, out)
+}

@@ -1,0 +1,76 @@
+# 沖縄県「週報 保健所毎集計」Excel（シート「令和{N}年各保健所毎集計」）
+# https://www.pref.okinawa.jp/_res/projects/default_project/_page_/001/006/484/syuuho{MMDD}.xlsx
+#
+# シート構成: 疾患ごとに「報告数」8行ブロック＋「定点あたり報告数」8行
+# ブロックが連続して並ぶ。各ブロックの8行は 北部/中部/那覇市/南部/宮古/
+# 八重山/沖縄県(計)/全国。列は週番号（4行目ヘッダー）で、右端の非空
+# 列が最新週。
+
+OKINAWA_HOKENJO_ORDER <- c("北部", "中部", "那覇市", "南部", "宮古", "八重山")
+
+fetch_okinawa <- function(url, sheet = NULL) {
+  if (!requireNamespace("readxl", quietly = TRUE)) stop("readxl パッケージが必要です")
+  tmp <- tempfile(fileext = ".xlsx")
+  download.file(url, tmp, mode = "wb", quiet = TRUE)
+
+  if (is.null(sheet)) {
+    sheets <- readxl::excel_sheets(tmp)
+    sheet <- sheets[grepl("各保健所毎集計", sheets)][1]
+    if (is.na(sheet)) stop("「各保健所毎集計」シートが見つかりません")
+  }
+  d <- suppressMessages(as.data.frame(readxl::read_excel(tmp, sheet = sheet, col_names = FALSE)))
+
+  # 疾患名の行（col1が非NAで、"報告数"/"警報"/"注意報"を含まない行）
+  is_label <- !is.na(d[[1]]) & grepl("報告数|警報|注意報", d[[1]])
+  disease_name_rows <- which(!is.na(d[[1]]) & !is_label & !grepl("週別疾病別|疾病名", d[[1]]))
+
+  if (length(disease_name_rows) %% 2 != 0) {
+    warning("疾患ブロックの行数が偶数になっていません。データがずれている可能性があります")
+  }
+
+  # 週ヘッダー行（4行目）から最新の非NA週列を特定
+  week_hdr <- suppressWarnings(as.numeric(d[4, 3:ncol(d)]))
+  valid_cols <- which(!is.na(week_hdr)) + 2  # 元のd内の列番号に戻す
+
+  out <- list()
+  n_pairs <- length(disease_name_rows) %/% 2
+  for (p in seq_len(n_pairs)) {
+    count_start <- disease_name_rows[(p - 1) * 2 + 1]
+    rate_start  <- disease_name_rows[(p - 1) * 2 + 2]
+    disease <- trimws(as.character(d[count_start, 1]))
+
+    for (blk_start in c(count_start, rate_start)) {
+      is_rate_block <- (blk_start == rate_start)
+      for (k in seq_along(OKINAWA_HOKENJO_ORDER)) {
+        row_i <- blk_start + k - 1
+        if (row_i > nrow(d)) next
+        hokenjo_label <- trimws(as.character(d[row_i, 2]))
+        if (!identical(hokenjo_label, OKINAWA_HOKENJO_ORDER[k])) next  # 行ズレ検知
+        # 最新週＝valid_colsの中で最後に値が入っている列
+        vals <- suppressWarnings(as.numeric(d[row_i, valid_cols]))
+        filled <- which(!is.na(vals))
+        if (length(filled) == 0) next
+        last_col <- valid_cols[max(filled)]
+        val <- suppressWarnings(as.numeric(d[row_i, last_col]))
+        week_num <- suppressWarnings(as.numeric(d[4, last_col]))
+
+        key <- paste(disease, OKINAWA_HOKENJO_ORDER[k])
+        idx <- Find(function(i) identical(attr(out[[i]], "key"), key), seq_along(out))
+        if (is.null(idx)) {
+          row_df <- data.frame(
+            pref = "沖縄県", week_label = paste0("第", week_num, "週"),
+            hokenjo = OKINAWA_HOKENJO_ORDER[k], disease = disease,
+            count = if (is_rate_block) NA_real_ else val,
+            rate  = if (is_rate_block) val else NA_real_,
+            stringsAsFactors = FALSE
+          )
+          attr(row_df, "key") <- key
+          out[[length(out) + 1]] <- row_df
+        } else {
+          if (is_rate_block) out[[idx]]$rate <- val else out[[idx]]$count <- val
+        }
+      }
+    }
+  }
+  do.call(rbind, lapply(out, function(x) { attr(x, "key") <- NULL; x }))
+}
