@@ -31,10 +31,33 @@ CURRENT_YEAR <- 2026
 # 実行時点で何週まで発行されていそうか（安全側に最新既知週+1まで試す）
 MAX_WEEK <- 33
 
+# week_label文字列から週番号を抜き出す。県によって表記が異なるため
+# 複数パターンを順に試す（例: "2026年第32週", "令和８年第 32 週",
+# "令和８年第３１週"(全角数字), "2026年31週", "32 (R. 8. 8. 3 ～ R. 8. 8. 9)"）。
+# "2026年7/27～8/2"のように週番号自体が書かれていない県はNAのままとする
+# （4桁の年を週番号と誤認しないよう、週候補は1〜2桁に限定する）。
+extract_week_num <- function(week_label) {
+  if (is.na(week_label)) return(NA_integer_)
+  # 全角数字はASCIIに正規化してから照合する
+  wl <- chartr("０１２３４５６７８９", "0123456789", week_label)
+  patterns <- c("第\\s*([0-9]{1,2})\\s*週", "[0-9]{4}年\\s*([0-9]{1,2})\\s*週", "^\\s*([0-9]{1,2})\\s*[年(（]")
+  for (pat in patterns) {
+    m <- regmatches(wl, regexec(pat, wl))[[1]]
+    if (length(m) >= 2) return(as.integer(m[2]))
+  }
+  NA_integer_
+}
+
+# 週番号が判別できない場合のフォールバックキー（週ラベル文字列そのもの
+# を使うことで、次回実行時も同じ行を正しく「取得済み」として判定できる）
+make_key <- function(pref, week_num, week_label) {
+  if (!is.na(week_num)) paste(pref, week_num) else paste(pref, "label:", week_label)
+}
+
 # ---- 既存の履歴を読み込み、(pref, week_num) の取得済みキーを把握 ----
 history <- if (file.exists(HISTORY_PATH)) readRDS(HISTORY_PATH) else NULL
 existing_keys <- if (!is.null(history) && nrow(history) > 0) {
-  paste(history$pref, history$week_num)
+  mapply(make_key, history$pref, history$week_num, history$week_label)
 } else character(0)
 
 # ---- ①週ごとのURLパターンが既知で、遡及取得を試みる9県 ----
@@ -58,6 +81,27 @@ PATTERN_DISPATCH <- list(
 
 new_rows <- list()
 status_log <- character(0)
+
+# ---- 北海道: 保健所別ページの年間バックナンバーCSV
+#      （weekunitdata{YEAR}.csv、1999年〜）は1回の呼び出しでその年の
+#      全週が返るため、週ループではなく年単位で呼び、未取得の週だけ追加する ----
+hokkaido_res <- tryCatch(fetch_hokkaido_history(year = CURRENT_YEAR), error = function(e) {
+  status_log <<- c(status_log, sprintf("[NG] 北海道: %s", conditionMessage(e)))
+  NULL
+})
+if (!is.null(hokkaido_res) && nrow(hokkaido_res) > 0) {
+  hokkaido_res$key <- paste(hokkaido_res$pref, hokkaido_res$week_num)
+  new_hokkaido <- hokkaido_res[!(hokkaido_res$key %in% existing_keys), setdiff(names(hokkaido_res), "key")]
+  if (nrow(new_hokkaido) > 0) {
+    new_hokkaido$fetched_at <- as.character(Sys.time())
+    new_rows[[length(new_rows) + 1]] <- new_hokkaido
+    for (wk in sort(unique(new_hokkaido$week_num))) {
+      status_log <- c(status_log, sprintf("[OK] 北海道 第%d週 (%d行)", wk, sum(new_hokkaido$week_num == wk)))
+    }
+  } else {
+    status_log <- c(status_log, "[==] 北海道 (新規週なし、取得済み)")
+  }
+}
 
 for (pref in names(PATTERN_DISPATCH)) {
   for (week in 1:MAX_WEEK) {
@@ -83,7 +127,6 @@ for (pref in names(PATTERN_DISPATCH)) {
 }
 
 OTHER_DISPATCH <- list(
-  "北海道"   = function() fetch_hokkaido(),
   "秋田県"   = function() fetch_akita(),
   "山形県"   = function() fetch_yamagata(ari_pdf_url = "https://www.eiken.yamagata.yamagata.jp/pdfshuho/2026/202632.pdf"),
   "福島県"   = function() fetch_fukushima(.sample_url("福島県")),
@@ -121,19 +164,6 @@ OTHER_DISPATCH <- list(
   "沖縄県"   = function() fetch_okinawa("https://www.pref.okinawa.jp/_res/projects/default_project/_page_/001/006/484/syuuho0831.xlsx")
 )
 
-# week_label文字列から週番号を抜き出す。県によって表記が異なるため
-# 複数パターンを順に試す（例: "2026年第32週", "令和８年第 32 週",
-# "2026年31週", "32 (R. 8. 8. 3 ～ R. 8. 8. 9)"）
-extract_week_num <- function(week_label) {
-  if (is.na(week_label)) return(NA_integer_)
-  patterns <- c("第\\s*([0-9]+)\\s*週", "[0-9]+年\\s*([0-9]+)\\s*週", "^\\s*([0-9]+)\\s*[年(（]")
-  for (pat in patterns) {
-    m <- regmatches(week_label, regexec(pat, week_label))[[1]]
-    if (length(m) >= 2) return(as.integer(m[2]))
-  }
-  NA_integer_
-}
-
 for (pref in names(OTHER_DISPATCH)) {
   res <- tryCatch(OTHER_DISPATCH[[pref]](), error = function(e) {
     status_log <<- c(status_log, sprintf("[NG] %s: %s", pref, conditionMessage(e)))
@@ -141,9 +171,9 @@ for (pref in names(OTHER_DISPATCH)) {
   })
   if (is.null(res) || !is.data.frame(res) || nrow(res) == 0) next
   wk <- extract_week_num(unique(res$week_label)[1])
-  key <- paste(pref, wk)
-  if (!is.na(wk) && key %in% existing_keys) {
-    status_log <- c(status_log, sprintf("[==] %s 第%d週 (取得済みのためスキップ)", pref, wk))
+  key <- make_key(pref, wk, unique(res$week_label)[1])
+  if (key %in% existing_keys) {
+    status_log <- c(status_log, sprintf("[==] %s 第%s週 (取得済みのためスキップ)", pref, ifelse(is.na(wk), "?", wk)))
     next
   }
   res$week_num <- wk

@@ -53,3 +53,90 @@ fetch_hokkaido <- function(csv_url = "https://www.iph.pref.hokkaido.jp/kansen/we
   }
   do.call(rbind, out)
 }
+
+# ============================================================
+# 北海道 保健所別 年間バックナンバーCSV
+# https://www.iph.pref.hokkaido.jp/kansen/{slug}/weekunitdata{YEAR}.csv
+# 保健所ごとのページ（例: otaru/index.html）に「定点把握感染症(週単位報告)」
+# セクションがあり、年別のCSVリンクがある（1999年〜現在まで遡及可能）。
+# 1ファイルに対象年の全週（定点当たり報告数の表＋報告数の表）が
+# 含まれるため、年を指定すればその年の全週を一度に取得できる。
+# ============================================================
+
+.HOKKAIDO_HOKENJO_SLUGS <- c(
+  sapporo = "札幌市", otaru = "小樽市", hakodate = "市立函館", asahikawa = "旭川市",
+  ebetsu = "江別", chitose = "千歳", iwamizawa = "岩見沢", takikawa = "滝川",
+  fukagawa = "深川", furano = "富良野", nayoro = "名寄", iwanai = "岩内",
+  kucchan = "倶知安", esashi = "江差", oshima = "渡島", yakumo = "八雲",
+  muroran = "室蘭", tomakomai = "苫小牧", urakawa = "浦河", shizunai = "静内",
+  obihiro = "帯広", kushiro = "釧路", nemuro = "根室", nakashibetsu = "中標津",
+  abashiri = "網走", kitami = "北見", monbetsu = "紋別", wakkanai = "稚内",
+  rumoi = "留萌", kamikawa = "上川"
+)
+
+.hokkaido_parse_weekunit_csv <- function(lines, hokenjo, year) {
+  block_starts <- grep("^(定点当たり報告数|報告数)-", lines)
+  if (length(block_starts) < 2) return(NULL)
+
+  parse_block <- function(start_idx, metric) {
+    header <- strsplit(lines[start_idx + 1], ",", fixed = TRUE)[[1]]
+    week_cols <- header[-1]
+    week_cols <- week_cols[grepl("第[0-9]+週", week_cols)]
+    n_week <- length(week_cols)
+    week_nums <- as.integer(gsub(".*第([0-9]+)週.*", "\\1", week_cols))
+
+    out <- list()
+    i <- start_idx + 2
+    while (i <= length(lines) && nzchar(lines[i]) && !grepl("^(定点当たり報告数|報告数)-", lines[i])) {
+      toks <- strsplit(lines[i], ",", fixed = TRUE)[[1]]
+      disease <- trimws(toks[1])
+      if (nzchar(disease)) {
+        vals <- toks[2:(1 + n_week)]
+        for (w in seq_len(n_week)) {
+          out[[length(out) + 1]] <- data.frame(
+            pref = "北海道", week_label = sprintf("%d年第%02d週", year, week_nums[w]),
+            week_num = week_nums[w], hokenjo = hokenjo, disease = disease,
+            metric = metric, value = parse_hokenjo_number(vals[w]),
+            stringsAsFactors = FALSE
+          )
+        }
+      }
+      i <- i + 1
+    }
+    do.call(rbind, out)
+  }
+
+  rate_df <- parse_block(block_starts[1], "rate")
+  count_df <- parse_block(block_starts[2], "count")
+  merged <- merge(count_df[, c("week_num", "hokenjo", "disease", "value")],
+                   rate_df[, c("week_num", "hokenjo", "disease", "value")],
+                   by = c("week_num", "hokenjo", "disease"), suffixes = c("_count", "_rate"))
+  wl <- unique(rate_df[, c("week_num", "week_label")])
+  merged <- merge(merged, wl, by = "week_num")
+  data.frame(
+    pref = "北海道", week_label = merged$week_label, week_num = merged$week_num,
+    hokenjo = merged$hokenjo, disease = merged$disease,
+    count = merged$value_count, rate = merged$value_rate,
+    stringsAsFactors = FALSE
+  )
+}
+
+fetch_hokkaido_history <- function(year = 2026, slugs = names(.HOKKAIDO_HOKENJO_SLUGS)) {
+  out <- list()
+  for (slug in slugs) {
+    hokenjo <- .HOKKAIDO_HOKENJO_SLUGS[[slug]]
+    url <- sprintf("https://www.iph.pref.hokkaido.jp/kansen/%s/weekunitdata%d.csv", slug, year)
+    res <- tryCatch({
+      tmp <- tempfile(fileext = ".csv")
+      download.file(url, tmp, mode = "wb", quiet = TRUE)
+      raw_lines <- readLines(tmp, encoding = "CP932", warn = FALSE)
+      raw_lines <- iconv(raw_lines, from = "CP932", to = "UTF-8")
+      .hokkaido_parse_weekunit_csv(raw_lines, hokenjo, year)
+    }, error = function(e) {
+      message(sprintf("[NG] 北海道 %s(%s) %d年: %s", hokenjo, slug, year, conditionMessage(e)))
+      NULL
+    })
+    if (!is.null(res) && nrow(res) > 0) out[[length(out) + 1]] <- res
+  }
+  do.call(rbind, out)
+}
