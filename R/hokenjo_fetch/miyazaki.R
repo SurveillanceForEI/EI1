@@ -27,9 +27,14 @@ fetch_miyazaki <- function(pdf_url) {
     local_path <- tempfile(fileext = ".pdf")
     download.file(pdf_url, local_path, mode = "wb", quiet = TRUE)
   }
-  npages <- length(pdftools::pdf_text(local_path))
+  # 保健所別表のページは常に最終ページとは限らない（年始等はインフル特集
+  # ページ等が追加され、ページ数・順序が変動する）ため、
+  # 「報告数」「定点当り」を両方含むページを探す
+  txt <- pdftools::pdf_text(local_path)
+  cand <- which(grepl("報告数", txt) & grepl("定点当り", txt))
+  target_page <- if (length(cand) > 0) max(cand) else length(txt)
 
-  words <- pdf_words(pdf_url, page = npages)
+  words <- pdf_words(pdf_url, page = target_page)
   rows <- group_words_into_rows(words, y_tol = 3)
 
   wk_m <- regmatches(row_text(rows[[1]]), regexpr("第[0-9]+週", row_text(rows[[1]])))

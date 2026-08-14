@@ -17,10 +17,13 @@ fetch_ibaraki <- function(pdf_url = NULL) {
   download.file(pdf_url, path, mode = "wb", quiet = TRUE)
   n_pages <- length(pdftools::pdf_data(path))
 
+  # ヘッダーの表記は「疾患名/保健所」「疾 病/保健所」など年によって
+  # 微妙に異なるため、より安定した「定点当たり報告数・報告件数（保健所別）」
+  # のタイトル文言で判定する
   target_page <- NA_integer_
   for (p in seq_len(n_pages)) {
     w <- pdftools::pdf_data(path)[[p]]
-    if (any(grepl("疾患名/保健所", w$text)) && any(grepl("定点当たり報告数", w$text))) {
+    if (any(grepl("定点当たり報告数", w$text)) && any(grepl("保健所別", w$text)) && any(w$text == "定点当")) {
       target_page <- p
       break
     }
@@ -119,10 +122,9 @@ fetch_ibaraki <- function(pdf_url = NULL) {
   df <- do.call(rbind, out)
 
   # 「ひたちなか」を「日立」へ合算（境界データに存在しないため）
-  if ("ひたちなか" %in% df$hokenjo) {
+  if ("ひたちなか" %in% df$hokenjo && "日立" %in% df$hokenjo) {
     hn_rows <- df[df$hokenjo == "ひたちなか", ]
     hd_rows <- df[df$hokenjo == "日立", ]
-    key <- paste(hd_rows$disease)
     for (k in seq_len(nrow(hn_rows))) {
       idx <- which(hd_rows$disease == hn_rows$disease[k])
       if (length(idx) == 1) {
@@ -131,7 +133,10 @@ fetch_ibaraki <- function(pdf_url = NULL) {
       }
     }
     df <- df[df$hokenjo != "ひたちなか", ]
-    df[df$hokenjo == "日立", ] <- hd_rows[match(df$disease[df$hokenjo == "日立"], hd_rows$disease), ]
+    matched <- hd_rows[match(df$disease[df$hokenjo == "日立"], hd_rows$disease), ]
+    if (nrow(matched) == sum(df$hokenjo == "日立")) {
+      df[df$hokenjo == "日立", ] <- matched
+    }
   }
 
   df <- df[df$hokenjo != "計", ]

@@ -65,10 +65,24 @@ existing_keys <- if (!is.null(history) && nrow(history) > 0) {
 PATTERN_DISPATCH <- list(
   "青森県" = function(week) fetch_aomori(
     sprintf("https://www.pref.aomori.lg.jp/soshiki/kenko/hoken/files/wr%dw%02d.pdf", CURRENT_YEAR, week)),
-  "茨城県" = function(week) fetch_ibaraki(
-    sprintf("https://www.pref.ibaraki.jp/hokenfukushi/eiken/idwr/weekly/documents/%didwr%02d.pdf", CURRENT_YEAR, week)),
+  "茨城県" = function(week) {
+    # 通常は2桁ゼロ埋め（idwr02.pdf等）だが、第1週のみ非ゼロ埋め（idwr1.pdf）、
+    # 第26週のみ"_ver2"サフィックス付きだったりと、週によってURLの細部が
+    # 異なることがあるため、候補を順に試す
+    candidates <- c(
+      sprintf("https://www.pref.ibaraki.jp/hokenfukushi/eiken/idwr/weekly/documents/%didwr%02d.pdf", CURRENT_YEAR, week),
+      sprintf("https://www.pref.ibaraki.jp/hokenfukushi/eiken/idwr/weekly/documents/%didwr%d.pdf", CURRENT_YEAR, week),
+      sprintf("https://www.pref.ibaraki.jp/hokenfukushi/eiken/idwr/weekly/documents/%didwr%02d_ver2.pdf", CURRENT_YEAR, week)
+    )
+    last_err <- NULL
+    for (u in candidates) {
+      res <- tryCatch(fetch_ibaraki(u), error = function(e) { last_err <<- e; NULL })
+      if (!is.null(res)) return(res)
+    }
+    stop(conditionMessage(last_err))
+  },
   "東京都" = function(week) fetch_tokyo(
-    sprintf("https://idsc.tmiph.metro.tokyo.lg.jp/assets/weekly/%d/%d.pdf", CURRENT_YEAR, week)),
+    sprintf("https://idsc.tmiph.metro.tokyo.lg.jp/assets/weekly/%d/%02d.pdf", CURRENT_YEAR, week)),
   "愛知県" = function(week) fetch_aichi(year = CURRENT_YEAR, week = week),
   "京都府" = function(week) fetch_kyoto(year = CURRENT_YEAR, week = week),
   "大阪府" = function(week) fetch_osaka(
