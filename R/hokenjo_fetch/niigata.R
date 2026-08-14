@@ -17,7 +17,8 @@ fetch_niigata <- function(pdf_url = NULL) {
   }
 
   path <- tempfile(fileext = ".pdf")
-  download.file(pdf_url, path, mode = "wb", quiet = TRUE)
+  download.file(pdf_url, path, mode = "wb", quiet = TRUE,
+                headers = c(`User-Agent` = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
   n_pages <- length(pdftools::pdf_data(path))
 
   target_page <- NA_integer_

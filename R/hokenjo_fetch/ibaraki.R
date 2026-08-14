@@ -38,7 +38,7 @@ fetch_ibaraki <- function(pdf_url = NULL) {
   # --- 列順（保健所名）をヘッダー部のx座標から検出 ---
   known_names <- c("中央", "日立", "潮来", "土浦", "つくば", "筑西", "古河",
                     "水戸市", "竜ケ崎", "ひたち", "なか", "計")
-  hdr <- w[w$y >= 75 & w$y <= 100 & w$text %in% known_names, ]
+  hdr <- w[w$y >= 75 & w$y <= 130 & w$text %in% known_names, ]
   hdr <- hdr[order(hdr$x), ]
   # 「ひたち」+「なか」を1列に統合
   hn <- hdr[hdr$text %in% c("ひたち", "なか"), ]
@@ -122,21 +122,16 @@ fetch_ibaraki <- function(pdf_url = NULL) {
   df <- do.call(rbind, out)
 
   # 「ひたちなか」を「日立」へ合算（境界データに存在しないため）
-  if ("ひたちなか" %in% df$hokenjo && "日立" %in% df$hokenjo) {
+  if (!is.null(df) && nrow(df) > 0 && "ひたちなか" %in% df$hokenjo && "日立" %in% df$hokenjo) {
     hn_rows <- df[df$hokenjo == "ひたちなか", ]
-    hd_rows <- df[df$hokenjo == "日立", ]
     for (k in seq_len(nrow(hn_rows))) {
-      idx <- which(hd_rows$disease == hn_rows$disease[k])
+      idx <- which(df$hokenjo == "日立" & df$disease == hn_rows$disease[k])
       if (length(idx) == 1) {
-        hd_rows$count[idx] <- sum(hd_rows$count[idx], hn_rows$count[k], na.rm = TRUE)
-        hd_rows$rate[idx] <- sum(hd_rows$rate[idx], hn_rows$rate[k], na.rm = TRUE)
+        df$count[idx] <- sum(df$count[idx], hn_rows$count[k], na.rm = TRUE)
+        df$rate[idx] <- sum(df$rate[idx], hn_rows$rate[k], na.rm = TRUE)
       }
     }
     df <- df[df$hokenjo != "ひたちなか", ]
-    matched <- hd_rows[match(df$disease[df$hokenjo == "日立"], hd_rows$disease), ]
-    if (nrow(matched) == sum(df$hokenjo == "日立")) {
-      df[df$hokenjo == "日立", ] <- matched
-    }
   }
 
   df <- df[df$hokenjo != "計", ]

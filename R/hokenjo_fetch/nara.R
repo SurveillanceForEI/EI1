@@ -103,7 +103,7 @@ fetch_nara <- function(pdf_url, page = 2) {
           if (is.na(col)) next
           rv <- parse_hokenjo_number(gsub("[()]", "", rate_row$text[k]))
           # 既存のcount行に対応する行があればrateを埋める。なければ新規行(count=NA)
-          idx <- which(sapply(out, function(o) o$hokenjo == col && o$disease == dname))
+          idx <- which(vapply(out, function(o) isTRUE(o$hokenjo == col) && isTRUE(o$disease == dname), logical(1)))
           if (length(idx) > 0) {
             out[[idx[length(idx)]]]$rate <- rv
           } else {

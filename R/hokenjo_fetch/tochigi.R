@@ -38,7 +38,7 @@ fetch_tochigi <- function(pdf_url = NULL) {
   x_min <- min(hdr$x) - 20
   x_max <- max(hdr$x) + 30  # 「計」列の右端まで（基準値列は除外）
 
-  rows <- group_words_into_rows(w, y_tol = 2)
+  rows <- group_words_into_rows(w, y_tol = 3)
 
   strip_mark <- function(s) gsub("^[●▲]", "", s)
 
