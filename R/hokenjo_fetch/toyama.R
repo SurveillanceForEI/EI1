@@ -24,7 +24,9 @@ fetch_toyama <- function(pdf_url = "https://www.pref.toyama.jp/documents/32640/t
     header_idx <- grep("集計区分.*第[0-9]+週", lines)
     for (h in header_idx) {
       weeks <- regmatches(lines[h], gregexpr("第[0-9]+週", lines[h]))[[1]]
-      week_nums <- as.integer(gsub("[^0-9]", "", weeks))
+      # ヘッダー行には[定点当たり報告数]/[報告数]/[定点数]の3ブロック分、
+      # 同じ週番号が繰り返し出現するため重複を除く
+      week_nums <- unique(as.integer(gsub("[^0-9]", "", weeks)))
       if (length(week_nums) == 0) next
       latest_week <- max(week_nums)
       week_label <- sprintf("2026年第%d週", latest_week)
@@ -63,6 +65,70 @@ fetch_toyama <- function(pdf_url = "https://www.pref.toyama.jp/documents/32640/t
             disease = disease, count = latest_count, rate = latest_rate,
             stringsAsFactors = FALSE
           )
+        }
+        j <- j + 1
+      }
+    }
+  }
+  do.call(rbind, out)
+}
+
+# fetch_toyama()は表内の最新週（右端列）のみを採用するが、実際には
+# 表に直近6週間分（同ページ内に横並び）が掲載されているため、
+# 過去分バックフィル用にその6週すべてを返すバリアント
+fetch_toyama_history <- function(pdf_url = "https://www.pref.toyama.jp/documents/32640/teiten_hc_2632w.pdf", year = 2026) {
+  if (!requireNamespace("pdftools", quietly = TRUE)) stop("pdftools パッケージが必要です")
+  tmp <- tempfile(fileext = ".pdf")
+  download.file(pdf_url, tmp, mode = "wb", quiet = TRUE)
+  pages <- pdftools::pdf_text(tmp)
+
+  exclude_regions <- c("富山県")
+  out <- list()
+
+  for (page_txt in pages) {
+    lines <- strsplit(page_txt, "\n")[[1]]
+    header_idx <- grep("集計区分.*第[0-9]+週", lines)
+    for (h in header_idx) {
+      weeks <- regmatches(lines[h], gregexpr("第[0-9]+週", lines[h]))[[1]]
+      # ヘッダー行には[定点当たり報告数]/[報告数]/[定点数]の3ブロック分、
+      # 同じ週番号が繰り返し出現するため重複を除く
+      week_nums <- unique(as.integer(gsub("[^0-9]", "", weeks)))
+      n_wk <- length(week_nums)
+      if (n_wk == 0) next
+
+      disease <- NA_character_
+      k <- h - 1
+      while (k >= 1) {
+        t <- trimws(lines[k])
+        if (nzchar(t) && !grepl("\\[|公開日|定点$|定点当たり報告数|報告数|定点数", t)) {
+          disease <- strsplit(t, "\\s{2,}")[[1]][1]
+          break
+        }
+        k <- k - 1
+      }
+      if (is.na(disease)) next
+
+      j <- h + 1
+      while (j <= length(lines)) {
+        ln <- lines[j]
+        if (!nzchar(trimws(ln))) { j <- j + 1; next }
+        m <- regmatches(ln, regexec("^\\s*([0-9]+)\\s+(\\S+)\\s+(.*)$", ln))[[1]]
+        if (length(m) == 0) break
+        region <- m[3]
+        rest <- trimws(m[4])
+        nums <- strsplit(rest, "\\s+")[[1]]
+        if (length(nums) < n_wk * 2 + 1) { j <- j + 1; next }
+        if (!(region %in% exclude_regions)) {
+          rates  <- parse_hokenjo_number(nums[1:n_wk])
+          counts <- parse_hokenjo_number(nums[(n_wk + 2):(n_wk * 2 + 1)])
+          for (wi in seq_len(n_wk)) {
+            out[[length(out) + 1]] <- data.frame(
+              pref = "富山県", week_label = sprintf("%d年第%d週", year, week_nums[wi]),
+              week_num = week_nums[wi], hokenjo = region,
+              disease = disease, count = counts[wi], rate = rates[wi],
+              stringsAsFactors = FALSE
+            )
+          }
         }
         j <- j + 1
       }
