@@ -580,7 +580,7 @@ function ebsUntranslateCards(containerId) {
               leafletOutput("hokenjo_map", height="520px")
             ),
             column(5,
-              tags$h5("保健所別比較", style="font-weight:700;margin-top:6px;"),
+              tags$h5("保健所別（あるいは報告地域別）比較", style="font-weight:700;margin-top:6px;"),
               plotlyOutput("hokenjo_bar_plot", height="480px")
             )
           )

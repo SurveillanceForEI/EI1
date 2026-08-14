@@ -70,9 +70,17 @@ load_hokenjo_boundary <- function(pref) {
 # そのままの名前を返す＝境界側の名称と週報側の名称が元々一致している
 # 大多数の県はこれで問題ない）
 normalize_hokenjo_names <- function(df, pref, name_map) {
-  if (is.null(name_map) || nrow(name_map) == 0) return(df)
+  # マッピング対象が無い（＝境界側と週報側の名称がそのまま一致する）県でも
+  # 後続のjoinで使うhokenjo_boundary_name列は常に用意する
+  if (is.null(name_map) || nrow(name_map) == 0) {
+    df$hokenjo_boundary_name <- df$hokenjo
+    return(df)
+  }
   sub <- name_map[name_map$pref == pref & !is.na(name_map$report_name), ]
-  if (nrow(sub) == 0) return(df)
+  if (nrow(sub) == 0) {
+    df$hokenjo_boundary_name <- df$hokenjo
+    return(df)
+  }
   # report_name（週報側）→ cw_name（境界側）の対応表
   lut <- setNames(sub$cw_name, sub$report_name)
   matched <- lut[df$hokenjo]
