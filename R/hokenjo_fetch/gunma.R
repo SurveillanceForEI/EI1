@@ -10,7 +10,15 @@ fetch_gunma <- function(pdf_url) {
   source_dir <- dirname(sys.frame(1)$ofile %||% "R/hokenjo_fetch/gunma.R")
   if (!exists("pdf_words")) stop("pdf_table_utils.R を先に source してください")
 
-  words <- pdf_words(pdf_url, page = 1)
+  # 保健所別の主表は通常1ページ目だが、お知らせ文が長い週は2ページ目に
+  # ずれることがあるため、「保健所」と「管轄」を両方含むページを探す
+  tmp <- tempfile(fileext = ".pdf")
+  download.file(pdf_url, tmp, mode = "wb", quiet = TRUE)
+  txt <- pdftools::pdf_text(tmp)
+  cand <- which(grepl("保健所", txt) & grepl("管轄", txt))
+  target_page <- if (length(cand) > 0) cand[1] else 1
+
+  words <- pdf_words(pdf_url, page = target_page)
   rows <- group_words_into_rows(words, y_tol = 3)
 
   week_line <- Filter(function(r) grepl("20[0-9]{2}年第[0-9]+週", row_text(r)), rows)
