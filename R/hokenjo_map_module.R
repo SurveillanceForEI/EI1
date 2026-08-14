@@ -95,6 +95,8 @@ normalize_hokenjo_names <- function(df, pref, name_map) {
     "ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ０１２３４５６７８９（）",
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789()", x)
   x <- gsub("[ 　]", "", x)
+  # 「COVID-19」と「新型コロナウイルス感染症」は同一疾患の別表記のため統一する
+  x <- gsub("新型コロナウイルス感染症", "COVID-19", x, fixed = TRUE)
   trimws(x)
 }
 
@@ -118,7 +120,7 @@ resolve_hokenjo_disease <- function(current_data, pref, target_label) {
   strip_paren <- function(x) trimws(gsub("\\(.*?\\)", "", x))
   target_core <- strip_paren(target_norm)
   avail_core <- strip_paren(avail_norm)
-  guard_words <- c("ロタ", "オウム", "ARI")
+  guard_words <- c("ロタ", "オウム", "ARI", "入院")
   target_guards <- guard_words[sapply(guard_words, function(g) grepl(g, target_norm, fixed = TRUE))]
 
   cand <- avail[avail_core == target_core]
