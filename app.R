@@ -570,7 +570,7 @@ function ebsUntranslateCards(containerId) {
           tags$p(style="color:#666;font-size:0.85em;",
             "画面上部で選択中の都道府県・疾患について、その都道府県の週報から取得した",
             "保健所（または報告区分）単位のデータを表示します。",
-            "都道府県ごとに集計単位・報告数(count)/定点当たり報告数(rate)の有無が異なります。"),
+            "都道府県ごとに集計単位・報告数/定点当たり報告数の有無が異なります。"),
           fluidRow(
             column(4, uiOutput("hokenjo_metric_selector_ui"))
           ),
@@ -5940,7 +5940,7 @@ server <- function(input, output, session) {
   # ── 保健所別マップ（都道府県・疾患はメインのコントロールパネルと連動）──
   output$hokenjo_metric_selector_ui <- renderUI({
     selectInput("hokenjo_metric", "表示指標",
-                choices = c("定点当たり報告数(rate)" = "rate", "報告数(count)" = "count"),
+                choices = c("定点当たり報告数" = "rate", "報告数" = "count"),
                 selected = "rate")
   })
 
