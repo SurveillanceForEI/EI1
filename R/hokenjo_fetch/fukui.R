@@ -69,3 +69,50 @@ fetch_fukui <- function() {
   })
   do.call(rbind, out[!sapply(out, is.null)])
 }
+
+# .fukui_one_hokenjo()は最新週(最終データ行)のみを返すが、CSV自体は
+# 当年の全週データを含んでいるため、バックフィル用に全週を返すバリアント
+.fukui_one_hokenjo_history <- function(hokenjo, code) {
+  base <- "https://kansensyou-joho.pref.fukui.lg.jp/csv/ih5100"
+  d_rate  <- .fukui_read_csv(paste0(base, code, "0.csv"))
+  d_count <- .fukui_read_csv(paste0(base, code, "1.csv"))
+  if (is.null(d_rate) || is.null(d_count)) return(NULL)
+
+  header_row <- which(apply(d_rate, 1, function(r) any(r == "週")))[1]
+  if (is.na(header_row)) return(NULL)
+  disease_cols <- 4:ncol(d_rate)
+  diseases_raw <- as.character(d_rate[header_row, disease_cols])
+  keep <- !is.na(diseases_raw) & nchar(trimws(diseases_raw)) > 0 & diseases_raw != "NA"
+  disease_cols <- disease_cols[keep]
+  diseases <- trimws(diseases_raw[keep])
+
+  data_rows <- (header_row + 1):nrow(d_rate)
+  out <- list()
+  for (i in data_rows) {
+    week_txt <- trimws(as.character(d_rate[i, 1]))
+    if (is.na(week_txt) || nchar(week_txt) == 0) week_txt <- trimws(as.character(d_rate[i, 2]))
+    week_num <- suppressWarnings(as.integer(gsub("[^0-9]", "", week_txt)))
+    if (is.na(week_num)) next
+    has_val <- any(!is.na(d_rate[i, disease_cols]) & nchar(trimws(as.character(d_rate[i, disease_cols]))) > 0)
+    if (!has_val) next
+    week_label <- paste0(week_txt, " (", trimws(d_rate[i, 3]), ")")
+    for (k in seq_along(diseases)) {
+      col <- disease_cols[k]
+      out[[length(out) + 1]] <- data.frame(
+        pref = "福井県", week_label = week_label, week_num = week_num, hokenjo = hokenjo,
+        disease = diseases[k],
+        count = parse_hokenjo_number(d_count[i, col]),
+        rate  = parse_hokenjo_number(d_rate[i, col]),
+        stringsAsFactors = FALSE
+      )
+    }
+  }
+  do.call(rbind, out)
+}
+
+fetch_fukui_history <- function() {
+  out <- lapply(names(.fukui_hokenjo_codes), function(h) {
+    .fukui_one_hokenjo_history(h, .fukui_hokenjo_codes[[h]])
+  })
+  do.call(rbind, out[!sapply(out, is.null)])
+}
