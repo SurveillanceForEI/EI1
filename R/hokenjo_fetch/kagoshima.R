@@ -18,7 +18,7 @@
                         "マイコプラズマ肺炎", "クラミジア肺炎(オウム病は除く)", "感染性胃腸炎(ロタウイルス)")
 
 .kagoshima_parse_block <- function(lines, diseases, hokenjo_list) {
-  hokenjo_re <- paste0("^(", paste(hokenjo_list, collapse = "|"), ")\\s+(.+)$")
+  hokenjo_re <- paste0("^\\s*(", paste(hokenjo_list, collapse = "|"), ")\\s+(.+)$")
   out <- list()
   for (ln in lines) {
     m <- regmatches(ln, regexec(hokenjo_re, ln))[[1]]
@@ -63,6 +63,7 @@ fetch_kagoshima <- function(pdf_url) {
   df1 <- .kagoshima_parse_block(blk1, .KAGOSHIMA_BLOCK1, .KAGOSHIMA_HOKENJO)
   df2 <- .kagoshima_parse_block(blk2, .KAGOSHIMA_BLOCK2, .KAGOSHIMA_HOKENJO)
   all_df <- rbind(df1, df2)
+  if (is.null(all_df) || nrow(all_df) == 0) stop("kagoshima: 保健所別データの行が抽出できませんでした（レイアウトが異なる可能性）")
 
   data.frame(
     pref = "鹿児島県", week_label = week_label,
