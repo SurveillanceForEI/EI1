@@ -43,7 +43,7 @@ HOKENJO_REFRESH_DISPATCH <- list(
   "栃木県"   = function() fetch_tochigi(.sample_url("栃木県")),
   "群馬県"   = function() fetch_gunma(.sample_url("群馬県")),
   "埼玉県"   = function() fetch_saitama(.sample_url("埼玉県")),
-  "千葉県"   = function() fetch_chiba(.sample_url("千葉県")),
+  "千葉県"   = function() fetch_chiba_graph(),
   "東京都"   = function() fetch_tokyo(.sample_url("東京都")),
   "神奈川県" = function() fetch_kanagawa(.sample_url("神奈川県")),
   "新潟県"   = function() fetch_niigata(.sample_url("新潟県")),

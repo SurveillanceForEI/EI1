@@ -5983,6 +5983,10 @@ server <- function(input, output, session) {
     build_hokenjo_map_data(HOKENJO_CURRENT, st$pref, st$disease, HOKENJO_NAME_MAP)
   })
 
+  # 数値ラベルのない棒グラフPDFから目視・画像解析で読み取った近似値のみで
+  # 構成されている都道府県（テーブル形式の元データが無いため）
+  HOKENJO_GRAPH_APPROX_PREFS <- c("千葉県")
+
   output$hokenjo_status_ui <- renderUI({
     st <- hokenjo_status()
     d <- if (st$status == "ok") hokenjo_map_data() else NULL
@@ -6002,6 +6006,10 @@ server <- function(input, output, session) {
       if (length(wk) > 0) {
         tags$div(style="display:inline-block;background:#eef4ff;color:#345;border-radius:4px;padding:3px 10px;font-size:0.85em;font-weight:600;margin-bottom:6px;",
           paste0("表示中データ: ", wk[1]))
+      },
+      if (st$status == "ok" && !is.null(st$pref) && st$pref %in% HOKENJO_GRAPH_APPROX_PREFS) {
+        tags$div(style="color:#8a6d1a;background:#fff8e1;border:1px solid #f0dfa0;border-radius:4px;padding:8px 12px;font-size:0.85em;margin-bottom:8px;",
+          sprintf("※ %sは数値ラベルの無い棒グラフ形式の週報のみが公表されているため、グラフの目盛りを基にした近似値です（正確な集計値ではありません）。", st$pref))
       },
       if (!is.null(msg)) {
         tags$div(style="color:#a55;background:#fff6f6;border:1px solid #f0d0d0;border-radius:4px;padding:8px 12px;font-size:0.88em;margin-bottom:8px;",
