@@ -45,10 +45,17 @@ fetch_oita <- function(pdf_url) {
     download.file(pdf_url, tmp, mode = "wb", quiet = TRUE)
   }
   txt <- pdftools::pdf_text(tmp)
-  p3 <- NA_integer_; p6 <- NA_integer_
+  # p3(疾病×保健所の主表、複数ブロック)のタイトル表記は週により
+  # 「疾病・保健所(総数)」「疾病・保健所・性別(総数)」のいずれかで揺れる。
+  # p6(ARIのみの単一ブロック表)と区別するため、「大分県」見出し行が
+  # 最も多く(=複数ブロック)出現するページをp3として選ぶ
+  n_blocks_by_page <- sapply(txt, function(pg) sum(grepl("^大分県", strsplit(pg, "\n")[[1]])))
+  title_match <- grepl("疾病・保健所(・性別)?\\(総数\\)", txt)
+  candidates <- which(title_match & n_blocks_by_page >= 1)
+  p3 <- if (length(candidates) > 0) candidates[which.max(n_blocks_by_page[candidates])] else NA_integer_
+  p6 <- NA_integer_
   for (p in seq_along(txt)) {
-    if (grepl("疾病・保健所\\(総数\\)", txt[p])) p3 <- p
-    if (grepl("疾病・保健所・性別\\(総数\\)", txt[p])) p6 <- p
+    if (grepl("疾病・保健所・性別\\(総数\\)", txt[p]) && !identical(p, p3)) p6 <- p
   }
   if (is.na(p3)) stop("oita: 保健所別ページが見つかりません")
 
