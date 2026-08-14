@@ -1,8 +1,10 @@
 # 徳島県「定点把握対象疾患 報告数」PDF（週報、通常5ページ目）
-# 例: https://www.pref.tokushima.lg.jp/file/attachment/1008847.pdf
+# 例: https://www.pref.tokushima.lg.jp/file/attachment/1070872.pdf
 # 保健所別（徳島,阿南,美波,吉野川,美馬,三好）の「報告数」（人数のみ、定点当たりなし）
-# 行末は [徳島,阿南,美波,吉野川,美馬,三好, 全国前週, 全国累計] の順で8トークンなので、
-# 行内の数値トークンの末尾8個のうち先頭6個を保健所別報告数として使う。
+# 行頭側（今週/前週/2週間前/累計/前年累計）は空欄セルがあるとトークン数が
+# 行ごとに変動するため固定位置での抽出はできない。一方、行末の
+# 徳島,阿南,美波,吉野川,美馬,三好の6保健所は必ず埋まっている（"-"や"…"を含む）ため、
+# 行内数値トークンの「末尾6個」をそのまま保健所別報告数として使う。
 
 fetch_tokushima <- function(pdf_url, page = NULL) {
   if (!requireNamespace("pdftools", quietly = TRUE)) stop("pdftools が必要です")
@@ -48,9 +50,8 @@ fetch_tokushima <- function(pdf_url, page = NULL) {
     after <- sub(paste0(".*", gsub("([().])", "\\\\\\1", dz)), "", ln)
     toks <- strsplit(trimws(after), "\\s+")[[1]]
     toks <- toks[toks != ""]
-    if (length(toks) < 8) next
-    tail8 <- utils::tail(toks, 8)
-    hk_counts <- tail8[1:6]
+    if (length(toks) < 6) next
+    hk_counts <- utils::tail(toks, 6)
     for (j in seq_along(hokenjo_order)) {
       out[[length(out) + 1]] <- data.frame(
         pref = "徳島県", week_label = week_label, hokenjo = hokenjo_order[j],

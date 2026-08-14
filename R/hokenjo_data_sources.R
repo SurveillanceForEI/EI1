@@ -253,7 +253,7 @@ HOKENJO_DATA_SOURCES <- list(
 
   .hj("徳島県", "◎", "表（PDF）", 6,
       hokenjo_names = c("徳島", "阿南", "美波", "吉野川", "美馬", "三好"),
-      sample_url = "https://www.pref.tokushima.lg.jp/file/attachment/1070032.pdf",
+      sample_url = "https://www.pref.tokushima.lg.jp/file/attachment/1070872.pdf",
       archive_from = "要確認",
       notes = "ARI・COVID等について保健所別数値表、上位3位の小児科定点疾患も同様"),
 
