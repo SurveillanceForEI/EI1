@@ -100,7 +100,9 @@ fetch_kochi <- function(pdf_url = NULL) {
   } else NA_character_
 
   # 「定点当たり人数」の行を境に上段(報告数)/下段(定点当たり)を分割
-  split_idx <- which(sapply(rows, function(r) grepl("定点当たり人数|定点当たり", row_text(r)) && grepl("第[0-9]+週|感染症情報", row_text(r))))
+  # 1行目のページタイトル自体に「定点当たり人数」を含むことがあり、
+  # それを境界と誤認しないよう2行目以降のみを対象にする
+  split_idx <- which(sapply(rows[-1], function(r) grepl("定点当たり人数|定点当たり", row_text(r)) && grepl("第[0-9]+週|感染症情報", row_text(r)))) + 1
   boundary <- if (length(split_idx) > 0) min(split_idx) else floor(length(rows) / 2)
 
   rows_count <- rows[1:boundary]
@@ -108,8 +110,24 @@ fetch_kochi <- function(pdf_url = NULL) {
 
   df_count <- .kochi_extract_block(rows_count)
   df_rate <- .kochi_extract_block(rows_rate)
+  # 稀に同じ(hokenjo, disease)の組が重複して抽出される週があり、
+  # merge()が"'by' must specify uniquely valid columns"で失敗するため、
+  # 先頭行のみを残して重複を除去してから結合する
+  if (!is.null(df_count)) df_count <- df_count[!duplicated(df_count[, c("hokenjo", "disease")]), ]
+  if (!is.null(df_rate))  df_rate  <- df_rate[!duplicated(df_rate[, c("hokenjo", "disease")]), ]
 
-  merged <- merge(df_count, df_rate, by = c("hokenjo", "disease"), suffixes = c("_count", "_rate"), all = TRUE)
+  # 一部週はページ上に報告数(count)の表が見当たらず定点当たり(rate)の
+  # みが取得できる。この場合はcountをNAとしてrateのみで返す
+  if (is.null(df_count) || nrow(df_count) == 0) {
+    if (is.null(df_rate) || nrow(df_rate) == 0) stop("kochi: 報告数・定点当たりのいずれの表も見つかりませんでした")
+    merged <- data.frame(hokenjo = df_rate$hokenjo, disease = df_rate$disease,
+                          value_count = NA_real_, value_rate = df_rate$value, stringsAsFactors = FALSE)
+  } else if (is.null(df_rate) || nrow(df_rate) == 0) {
+    merged <- data.frame(hokenjo = df_count$hokenjo, disease = df_count$disease,
+                          value_count = df_count$value, value_rate = NA_real_, stringsAsFactors = FALSE)
+  } else {
+    merged <- merge(df_count, df_rate, by = c("hokenjo", "disease"), suffixes = c("_count", "_rate"), all = TRUE)
+  }
 
   data.frame(
     pref = "高知県",
