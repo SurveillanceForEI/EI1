@@ -70,6 +70,7 @@ JAPAN_MAP <- tryCatch({
 }, error = function(e) NULL)
 cat("保健所別データ読み込み中（キャッシュ）...\n")
 HOKENJO_CURRENT <- load_hokenjo_current()
+HOKENJO_HISTORY <- load_hokenjo_history()
 HOKENJO_NAME_MAP <- load_hokenjo_name_map()
 cat("EBS データ読み込み中（キャッシュ）...\n")
 EBS_STARTUP_CACHE <- "data/ebs_startup_cache.rds"
@@ -576,7 +577,8 @@ function ebsUntranslateCards(containerId) {
             "自治体によっては一部の疾患・保健所のみの公表、または保健所別データ自体を",
             "公表していない場合があります。その場合はここに取得できていない旨を表示します。"),
           fluidRow(
-            column(4, uiOutput("hokenjo_metric_selector_ui"))
+            column(4, uiOutput("hokenjo_metric_selector_ui")),
+            column(8, uiOutput("hokenjo_week_slider_ui"))
           ),
           uiOutput("hokenjo_status_ui"),
           fluidRow(
@@ -5948,6 +5950,22 @@ server <- function(input, output, session) {
                 selected = "rate")
   })
 
+  # 現在のpref/diseaseについて、履歴データ(HOKENJO_HISTORY)に存在する週番号一覧
+  hokenjo_available_week_nums <- reactive({
+    st <- hokenjo_status()
+    if (st$status != "ok" || is.null(HOKENJO_HISTORY)) return(integer(0))
+    wk <- HOKENJO_HISTORY$week_num[HOKENJO_HISTORY$pref == st$pref & HOKENJO_HISTORY$disease == st$disease]
+    sort(unique(wk[!is.na(wk)]))
+  })
+
+  output$hokenjo_week_slider_ui <- renderUI({
+    wks <- hokenjo_available_week_nums()
+    if (length(wks) < 2) return(NULL)
+    sliderInput("hokenjo_week_num", "表示週（第N週）",
+                min = min(wks), max = max(wks), value = max(wks),
+                step = 1, sep = "", ticks = FALSE, width = "100%")
+  })
+
   # 現在の都道府県・疾患選択に対する状態を判定する
   # status: "no_pref"(全国選択中) / "not_teiten"(全数モード) /
   #         "pref_unavailable"(その県のデータ未取得) / "disease_unmatched"(疾患が突合できない) /
@@ -5980,7 +5998,17 @@ server <- function(input, output, session) {
   hokenjo_map_data <- reactive({
     st <- hokenjo_status()
     if (st$status != "ok") return(NULL)
-    build_hokenjo_map_data(HOKENJO_CURRENT, st$pref, st$disease, HOKENJO_NAME_MAP)
+
+    wk_num <- input$hokenjo_week_num
+    src <- HOKENJO_CURRENT
+    if (!is.null(wk_num) && !is.null(HOKENJO_HISTORY)) {
+      sub <- HOKENJO_HISTORY[HOKENJO_HISTORY$pref == st$pref &
+                               HOKENJO_HISTORY$disease == st$disease &
+                               !is.na(HOKENJO_HISTORY$week_num) &
+                               HOKENJO_HISTORY$week_num == wk_num, ]
+      if (nrow(sub) > 0) src <- sub
+    }
+    build_hokenjo_map_data(src, st$pref, st$disease, HOKENJO_NAME_MAP)
   })
 
   # 数値ラベルのない棒グラフPDFから目視・画像解析で読み取った近似値のみで

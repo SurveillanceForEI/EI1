@@ -11,6 +11,7 @@
 source("R/hokenjo_boundary_pipeline.R")   # .PREF_SLUG を使う
 
 HOKENJO_CURRENT_PATH <- "data/hokenjo_current.rds"
+HOKENJO_HISTORY_PATH <- "data/hokenjo_history.rds"
 HOKENJO_NAME_MAP_PATH <- "data/geo/hokenjo_name_map.csv"
 
 load_hokenjo_current <- function() {
@@ -27,6 +28,17 @@ load_hokenjo_current <- function() {
   # native/unknown表示になる。enc2utf8()（バイト変換）ではなく
   # Encoding<-での明示的な再マーキングのみを行う（バイトは既に正しい
   # UTF-8のため、変換をかけると逆に文字化けする）
+  chr_cols <- vapply(d, is.character, logical(1))
+  for (col in names(d)[chr_cols]) {
+    Encoding(d[[col]]) <- "UTF-8"
+  }
+  d
+}
+
+load_hokenjo_history <- function() {
+  if (!file.exists(HOKENJO_HISTORY_PATH)) return(NULL)
+  d <- tryCatch(readRDS(HOKENJO_HISTORY_PATH), error = function(e) NULL)
+  if (is.null(d)) return(NULL)
   chr_cols <- vapply(d, is.character, logical(1))
   for (col in names(d)[chr_cols]) {
     Encoding(d[[col]]) <- "UTF-8"
