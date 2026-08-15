@@ -368,27 +368,30 @@ ui <- dashboardPage(
             setTimeout(registerHokenjoWeekLabelHandler, 50);
             return;
           }
-          var pendingLabels = null;
-          var applyPrettify = function(labels) {
-            var $el = $('#hokenjo_week_num');
-            var irs = $el.data('ionRangeSlider');
-            if (!irs) return false;
+          // 直近に受信したラベル表を保持し、現在の#hokenjo_week_numが
+          // まだこのラベルで初期化されていなければ適用する。都道府県切替時は
+          // 「メッセージ受信」と「renderUIによるスライダー要素の再生成（古い
+          // 要素の破棄→新しい要素の生成）」の順序保証が無いため、メッセージ
+          // 到達時点でまだ古い（間もなく破棄される）要素にしか適用できない
+          // ケースがある。そのため一度適用して終わりにせず、DOM変化のたびに
+          // 「今のスライダーにまだ適用済みでなければ再適用」を試み続ける。
+          var currentLabels = null;
+          var applyPrettify = function() {
+            if (!currentLabels) return;
+            var irs = $('#hokenjo_week_num').data('ionRangeSlider');
+            if (!irs || irs.options.prettify_enabled) return;
+            var labels = currentLabels;
             irs.update({
               prettify_enabled: true,
               prettify: function(num) { return labels[num] || ('第' + num + '週'); }
             });
-            return true;
           };
-          // sliderInputはタブが表示された時点で初めてDOMに挿入される（かつ
-          // ionRangeSlider自体の初期化も非同期）ため、単純なタイムアウト再試行
-          // では間に合わないことがある。MutationObserverでDOM挿入を監視する
-          var observer = new MutationObserver(function() {
-            if (pendingLabels && applyPrettify(pendingLabels)) pendingLabels = null;
-          });
+          var observer = new MutationObserver(applyPrettify);
           observer.observe(document.documentElement, { childList: true, subtree: true });
 
           Shiny.addCustomMessageHandler('hokenjo_week_labels', function(labels) {
-            if (!applyPrettify(labels)) pendingLabels = labels;
+            currentLabels = labels;
+            applyPrettify();
           });
         })();
       ")),
