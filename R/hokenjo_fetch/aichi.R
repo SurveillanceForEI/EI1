@@ -71,12 +71,24 @@ fetch_aichi <- function(pdf_url = NULL, year = NULL, week = NULL, page = NULL) {
   week_label <- if (length(week_m) > 0) week_m[1] else NA_character_
 
   # 「愛知県全体」行のy座標を基準行として使う（週によっては「全体」が
-  # 付かず「愛知県」単独表記のことがあるため、その場合はフォールバックする）
+  # 付かず「愛知県」単独表記のことがあり、しかもページ内の縦書き見出し等
+  # 別箇所にも同じ文字列が出現しうるため、実際にデータ行（数値が
+  # 並んでいる行）になっている候補だけを採用する）
   base_hits <- words[words$text == "愛知県全体", ]
   if (nrow(base_hits) == 0) base_hits <- words[words$text == "愛知県", ]
   if (nrow(base_hits) == 0) stop("基準行(愛知県全体)が見つかりません。ページ番号を確認してください")
-  base_row_y <- base_hits$y[1]
-  base_row <- words[words$y > base_row_y - 4 & words$y < base_row_y + 4 & words$x > base_hits$x[1] + 5, ]
+  base_row <- NULL
+  for (i in seq_len(nrow(base_hits))) {
+    cand_y <- base_hits$y[i]
+    # ラベルとデータが同じ行のことも、ラベルの数ポイント下の別行に
+    # データが続くこともあるため、y方向にやや広めの窓で探す
+    cand_row <- words[words$y > cand_y - 4 & words$y < cand_y + 8 & words$x > base_hits$x[i] + 5, ]
+    if (sum(grepl("^[0-9,]+(\\.[0-9]+)?$", cand_row$text)) >= 20) {
+      base_row <- cand_row
+      break
+    }
+  }
+  if (is.null(base_row)) stop("基準行(愛知県全体)のデータ行が特定できません")
   base_row <- base_row[order(base_row$x), ]
   col_x <- base_row$x
   if (length(col_x) != 27) {
