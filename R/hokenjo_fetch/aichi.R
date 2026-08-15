@@ -70,8 +70,10 @@ fetch_aichi <- function(pdf_url = NULL, year = NULL, week = NULL, page = NULL) {
                         regexpr("20[0-9]{2}年[0-9]+週", paste(words$text, collapse = " ")))
   week_label <- if (length(week_m) > 0) week_m[1] else NA_character_
 
-  # 「愛知県全体」行のy座標を基準行として使う
+  # 「愛知県全体」行のy座標を基準行として使う（週によっては「全体」が
+  # 付かず「愛知県」単独表記のことがあるため、その場合はフォールバックする）
   base_hits <- words[words$text == "愛知県全体", ]
+  if (nrow(base_hits) == 0) base_hits <- words[words$text == "愛知県", ]
   if (nrow(base_hits) == 0) stop("基準行(愛知県全体)が見つかりません。ページ番号を確認してください")
   base_row_y <- base_hits$y[1]
   base_row <- words[words$y > base_row_y - 4 & words$y < base_row_y + 4 & words$x > base_hits$x[1] + 5, ]
