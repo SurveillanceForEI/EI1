@@ -13,7 +13,6 @@ fetch_shimane <- function(pdf_url) {
     download.file(pdf_url, path, mode = "wb", quiet = TRUE)
   }
   txt <- pdftools::pdf_text(path)
-  if (length(txt) < 3) stop("島根県: ページ数が想定と異なります(3ページ以上を想定)")
 
   # 定点あたり報告数/報告実数の表は常に2,3ページ目とは限らない
   # （概況ページが挟まり後ろにずれることがある）ため、タイトル文言で
@@ -23,13 +22,24 @@ fetch_shimane <- function(pdf_url) {
   # 情報」というタイトル文言も併せて要求する
   rate_page_idx <- which(grepl("感染症発生動向調査情報", txt) & grepl("定点あたり報告数", txt) & !grepl("報告実数", txt))[1]
   count_page_idx <- which(grepl("感染症発生動向調査情報", txt) & grepl("報告実数", txt))[1]
-  if (is.na(rate_page_idx) || is.na(count_page_idx)) stop("島根県: 定点あたり報告数/報告実数のページが見つかりません")
 
-  page_rate  <- txt[[rate_page_idx]]
-  page_count <- txt[[count_page_idx]]
+  # 2025年前半など旧レイアウトでは概況ページ+統合ページの2ページ構成で、
+  # rate/countが別ページに分かれておらず、実数のみが1ページに掲載される
+  # （定点あたり報告数の列自体が存在しない）
+  legacy_mode <- is.na(rate_page_idx) || is.na(count_page_idx)
+  if (legacy_mode) {
+    legacy_page_idx <- which(grepl("感染症発生動向調査情報", txt) & grepl("定点把握疾患：週報", txt))[1]
+    if (is.na(legacy_page_idx)) stop("島根県: 定点あたり報告数/報告実数のページが見つかりません")
+    page_rate  <- NA_character_
+    page_count <- txt[[legacy_page_idx]]
+  } else {
+    page_rate  <- txt[[rate_page_idx]]
+    page_count <- txt[[count_page_idx]]
+  }
 
   week_label <- NA_character_
-  wl <- regmatches(page_rate, regexpr("[0-9]{4}年\\s*第[0-9]+週", page_rate))
+  label_src <- if (legacy_mode) page_count else page_rate
+  wl <- regmatches(label_src, regexpr("[0-9]{4}年\\s*第[0-9]+週", label_src))
   if (length(wl) > 0) week_label <- gsub("\\s", "", wl)
 
   regions <- c("松江", "雲南", "出雲", "大田", "浜田", "益田", "隠岐")
@@ -79,13 +89,14 @@ fetch_shimane <- function(pdf_url) {
     res
   }
 
-  rate_data  <- extract_week3(page_rate)
+  rate_data  <- if (legacy_mode) list() else extract_week3(page_rate)
   count_data <- extract_week3(page_count)
 
+  disease_keys <- if (legacy_mode) names(count_data) else names(rate_data)
   out <- list()
-  for (dz in names(rate_data)) {
+  for (dz in disease_keys) {
     for (region in regions) {
-      rate_v  <- rate_data[[dz]][[region]]
+      rate_v  <- if (!is.null(rate_data[[dz]])) rate_data[[dz]][[region]] else NA
       count_v <- if (!is.null(count_data[[dz]])) count_data[[dz]][[region]] else NA
       out[[length(out) + 1]] <- data.frame(
         pref = "島根県", week_label = week_label, hokenjo = region,
