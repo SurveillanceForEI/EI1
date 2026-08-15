@@ -2128,7 +2128,7 @@ server <- function(input, output, session) {
       if (!is.null(sel)) paste0(format(sel, "%Y年%m月"), " の都道府県別 月次報告数")
       else "都道府県別 月次報告数"
     } else if (!is.null(sel)) {
-      paste0(format(sel, "%Y年第%W週（%m/%d〜）"), " の都道府県別 定点あたり報告数")
+      paste0(sprintf("%s（%s〜%s）", format(sel, "%Y年第%W週"), format(sel, "%m/%d"), format(sel + 6, "%m/%d")), " の都道府県別 定点あたり報告数")
     } else "都道府県別 定点あたり報告数"
     make_source_bar(week_label)
   })
@@ -2241,7 +2241,7 @@ server <- function(input, output, session) {
     is_std   <- !is_zensu && input$disease %in% names(STD_DISEASE_CONFIG)
     week_val <- if (is.null(sel)) NULL
                 else if (is_std) format(sel, "%Y年%m月")
-                else format(sel, "%Y年第%W週（%m/%d〜）")
+                else sprintf("%s（%s〜%s）", format(sel, "%Y年第%W週"), format(sel, "%m/%d"), format(sel + 6, "%m/%d"))
     make_filter_bar(list(
       "疾患"     = disease_label,
       "表示週"   = week_val,
@@ -2395,7 +2395,13 @@ server <- function(input, output, session) {
     dates <- map_available_dates()
     n <- length(dates)
     if (n == 0) return(NULL)
-    date_labels <- format(dates, "%Y/%m/%d")
+    is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
+    is_std   <- !is_zensu && !is.null(input$disease) && input$disease %in% names(STD_DISEASE_CONFIG)
+    date_labels <- if (is_std) {
+      format(dates, "%Y/%m")
+    } else {
+      sprintf("%s〜%s", format(dates, "%m/%d"), format(dates + 6, "%m/%d"))
+    }
     tags$div(
       style = "padding:2px 4px 6px 4px;",
       # 選択週の日付テキスト表示
@@ -2449,7 +2455,7 @@ server <- function(input, output, session) {
     if (is.null(sel)) return(NULL)
     is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
     is_std   <- !is_zensu && input$disease %in% names(STD_DISEASE_CONFIG)
-    lbl <- if (is_std) format(sel, "%Y年%m月") else format(sel, "%Y年 第%W週（%m/%d〜）")
+    lbl <- if (is_std) format(sel, "%Y年%m月") else sprintf("%s（%s〜%s）", format(sel, "%Y年 第%W週"), format(sel, "%m/%d"), format(sel + 6, "%m/%d"))
     tags$div(
       style = "font-size:0.85em;font-weight:600;color:#2c5f8a;margin-bottom:2px;",
       icon("calendar-week", style = "margin-right:4px;"),
