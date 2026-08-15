@@ -6097,6 +6097,13 @@ server <- function(input, output, session) {
     )
   })
 
+  # 東京都は伊豆諸島・小笠原諸島の境界データを含むため、自動fitBoundsのままだと
+  # 本土（23区・多摩地域）が小さくズームアウトされてしまう。本土のみの
+  # 範囲に絞ってデフォルト表示する
+  HOKENJO_MAP_BOUNDS_OVERRIDE <- list(
+    "東京都" = list(lng1 = 138.85, lat1 = 35.45, lng2 = 139.95, lat2 = 35.95)
+  )
+
   output$hokenjo_map <- renderLeaflet({
     d <- hokenjo_map_data()
     metric <- if (!is.null(input$hokenjo_metric)) input$hokenjo_metric else "rate"
@@ -6109,7 +6116,7 @@ server <- function(input, output, session) {
     pal <- colorNumeric(c("#ffffcc", "#fd8d3c", "#800026"), c(0, max_val * 1.1), na.color = "#cccccc")
     metric_label <- if (metric == "rate") "定点当たり報告数" else "報告数"
 
-    leaflet(d) %>% addTiles(options = tileOptions(opacity = 0.5)) %>%
+    m <- leaflet(d) %>% addTiles(options = tileOptions(opacity = 0.5)) %>%
       addPolygons(
         fillColor = ~pal(get(metric)), fillOpacity = 0.8,
         color = "#fff", weight = 1,
@@ -6118,6 +6125,13 @@ server <- function(input, output, session) {
         labelOptions = labelOptions(style = list("font-size" = "12px"))
       ) %>%
       addLegend(pal = pal, values = c(0, max_val), title = metric_label, position = "bottomright")
+
+    st <- hokenjo_status()
+    bounds <- if (st$status == "ok") HOKENJO_MAP_BOUNDS_OVERRIDE[[st$pref]] else NULL
+    if (!is.null(bounds)) {
+      m <- m %>% fitBounds(lng1 = bounds$lng1, lat1 = bounds$lat1, lng2 = bounds$lng2, lat2 = bounds$lat2)
+    }
+    m
   })
 
   output$hokenjo_bar_plot <- renderPlotly({
