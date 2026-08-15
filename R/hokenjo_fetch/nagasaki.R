@@ -20,8 +20,14 @@ fetch_nagasaki <- function(pdf_url) {
 
   week_line <- Filter(function(r) grepl("第[0-9]+週", row_text(r)) && grepl("疾病別・保健所管内別", row_text(r)), rows)
   week_label <- if (length(week_line) > 0) {
-    m <- regmatches(row_text(week_line[[1]]), regexpr("第[0-9]+週", row_text(week_line[[1]])))
-    paste0("2026年", m)
+    line_text <- row_text(week_line[[1]])
+    m <- regmatches(line_text, regexpr("20[0-9]{2}年第[0-9]+週", line_text))
+    if (length(m) == 0 || nchar(m) == 0) {
+      # 年が同じ行に含まれない場合はページ全体から探す
+      page_text <- paste(sapply(rows, row_text), collapse = " ")
+      m <- regmatches(page_text, regexpr("20[0-9]{2}年第[0-9]+週", page_text))
+    }
+    if (length(m) > 0 && nchar(m) > 0) m else NA_character_
   } else NA_character_
 
   hdr_idx <- which(sapply(rows, function(r) any(r$text == "県") && any(r$text == "対馬")))

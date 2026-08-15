@@ -39,9 +39,9 @@ fetch_chiba <- function(pdf_url = NULL) {
 
     wl <- w$text[grepl("^[0-9]+$", w$text)]
     wk <- w$text[w$text == "週" ]
-    hdr_row <- w[w$y >= 60 & w$y <= 75, ]
-    m <- regmatches(paste(hdr_row$text, collapse = ""), regexpr("第[0-9]+週", paste(hdr_row$text, collapse = "")))
-    if (length(m) > 0 && nchar(m) > 0) week_label <- paste0("2026年", m)
+    page_full_text <- paste(w$text, collapse = "")
+    m <- regmatches(page_full_text, regexpr("20[0-9]{2}年第[0-9]+週", page_full_text))
+    if (length(m) > 0 && nchar(m) > 0) week_label <- m
 
     # 列順（x座標）を検出
     hdr <- w[w$y >= 70 & w$y <= 84 & nchar(w$text) == 1, ]

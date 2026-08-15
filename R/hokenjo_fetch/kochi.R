@@ -94,10 +94,9 @@ fetch_kochi <- function(pdf_url = NULL) {
   words <- pdf_words(pdf_url, page = 5)
   rows <- group_words_into_rows(words, y_tol = 3)
 
-  week_line <- Filter(function(r) grepl("第[0-9]+週", row_text(r)), rows)
+  week_line <- Filter(function(r) grepl("20[0-9]{2}年第[0-9]+週", row_text(r)), rows)
   week_label <- if (length(week_line) > 0) {
-    m <- regmatches(row_text(week_line[[1]]), regexpr("第[0-9]+週", row_text(week_line[[1]])))
-    paste0("2026年", m)
+    regmatches(row_text(week_line[[1]]), regexpr("20[0-9]{2}年第[0-9]+週", row_text(week_line[[1]])))
   } else NA_character_
 
   # 「定点当たり人数」の行を境に上段(報告数)/下段(定点当たり)を分割
