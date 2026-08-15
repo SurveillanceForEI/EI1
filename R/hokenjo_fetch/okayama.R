@@ -33,7 +33,7 @@ fetch_okayama <- function(pdf_url, page = NULL) {
   page_txt <- txt[[target_page]]
 
   week_label <- NA_character_
-  wl <- regmatches(page_txt, regexpr("20[0-9]{2}年\\s*第[0-9]+週", page_txt))
+  wl <- regmatches(page_txt, regexpr("20[0-9]{2}年\\s*第?[0-9]+週", page_txt))
   if (length(wl) > 0) week_label <- gsub("\\s", "", wl)
 
   regions_full <- c("全県", "岡山市", "倉敷市", "備前", "備中", "備北", "真庭", "美作")
