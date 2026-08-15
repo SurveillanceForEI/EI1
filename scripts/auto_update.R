@@ -113,6 +113,21 @@ tryCatch({
     log("ARI病原体データ: データなし")
 }, error = function(e) log("ARI病原体データ エラー: ", e$message))
 
+# ⑦ 保健所別データ（最新週をhokenjo_history.rdsへ追記し、hokenjo_current.rdsも同期）
+log("保健所別データ取得中...")
+tryCatch({
+  hokenjo_log <- system2("Rscript", c("scripts/refresh_hokenjo_history.R"), stdout = TRUE, stderr = TRUE)
+  log("保健所別履歴データ完了: ", paste(utils::tail(hokenjo_log, 3), collapse = " / "))
+
+  if (file.exists("data/hokenjo_history.rds")) {
+    h <- readRDS("data/hokenjo_history.rds")
+    latest <- h[!is.na(h$week_num), ]
+    latest <- do.call(rbind, lapply(split(latest, latest$pref), function(df) df[df$week_num == max(df$week_num), ]))
+    saveRDS(latest, "data/hokenjo_current.rds")
+    log("保健所別最新週データ完了: data/hokenjo_current.rds (", nrow(latest), " 行)")
+  }
+}, error = function(e) log("保健所別データ エラー: ", e$message))
+
 log("===== 自動更新完了 =====")
 
 # タイムスタンプファイルを書き出す（Shinyアプリが読み取り表示を更新）

@@ -84,6 +84,23 @@ tryCatch({
   log("IASR 取得エラー: ", e$message)
 })
 
+# ── 3.5 保健所別データ（最新週をhokenjo_history.rdsへ追記し、hokenjo_current.rdsも同期） ──
+log("保健所別データ取得開始...")
+tryCatch({
+  hokenjo_log <- system2("Rscript", c("scripts/refresh_hokenjo_history.R"), stdout = TRUE, stderr = TRUE)
+  log("保健所別履歴データ完了: ", paste(utils::tail(hokenjo_log, 3), collapse = " / "))
+
+  if (file.exists("data/hokenjo_history.rds")) {
+    h <- readRDS("data/hokenjo_history.rds")
+    latest <- h[!is.na(h$week_num), ]
+    latest <- do.call(rbind, lapply(split(latest, latest$pref), function(df) df[df$week_num == max(df$week_num), ]))
+    saveRDS(latest, "data/hokenjo_current.rds")
+    log("保健所別最新週データ完了: data/hokenjo_current.rds (", nrow(latest), " 行)")
+  }
+}, error = function(e) {
+  log("保健所別データ エラー: ", e$message)
+})
+
 # ── 4. GitHubへpush（Connect Cloud側のデータ鮮度を保つため） ──
 # shinyapps.ioへは直接ファイル一式をデプロイするが、Posit Connect Cloud
 # 版はGitHubリポジトリの中身からデプロイする方式のため、pushしないと
@@ -96,7 +113,8 @@ tryCatch({
     "data/cache_iasr", "data/cache_ari",
     "data/japan_map.rds", "data/last_update.txt",
     "data/ebs_startup_cache.rds", "data/gtrends_cache_JP.rds",
-    "data/data_change_log.rds"
+    "data/data_change_log.rds",
+    "data/hokenjo_current.rds", "data/hokenjo_history.rds"
   )
   data_paths <- data_paths[file.exists(data_paths)]
   # タスクスケジューラ等の非対話実行環境ではgitのglobal設定(HOME解決)が
@@ -165,6 +183,20 @@ tryCatch({
     file.path("www/js", list.files("www/js", pattern = "\\.js$"))
   else character(0)
 
+  hokenjo_boundary_files <- if (dir.exists("data/geo/hokenjo_boundaries"))
+    file.path("data/geo/hokenjo_boundaries",
+              list.files("data/geo/hokenjo_boundaries", pattern = "\\.geojson$"))
+  else character(0)
+  hokenjo_name_map_file <- if (file.exists("data/geo/hokenjo_name_map.csv"))
+    "data/geo/hokenjo_name_map.csv"
+  else character(0)
+  hokenjo_current_file <- if (file.exists("data/hokenjo_current.rds"))
+    "data/hokenjo_current.rds"
+  else character(0)
+  hokenjo_history_file <- if (file.exists("data/hokenjo_history.rds"))
+    "data/hokenjo_history.rds"
+  else character(0)
+
   app_files <- c(
     "app.R",
     r_source_files,
@@ -180,7 +212,11 @@ tryCatch({
     cache_iasr_files,
     hosp_data_file,
     std_data_file,
-    ari_data_file
+    ari_data_file,
+    hokenjo_current_file,
+    hokenjo_history_file,
+    hokenjo_name_map_file,
+    hokenjo_boundary_files
   )
 
   rsconnect::deployApp(
