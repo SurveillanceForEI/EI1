@@ -32,8 +32,10 @@ fetch_ibaraki <- function(pdf_url = NULL) {
 
   w <- pdftools::pdf_data(path)[[target_page]]
 
-  week_line <- w$text[grepl("^20[0-9]{2}年第[0-9]+週$", w$text)]
-  week_label <- if (length(week_line) > 0) week_line[1] else NA_character_
+  week_line <- w$text[grepl("20[0-9]{2}年第[0-9]+週", w$text)]
+  week_label <- if (length(week_line) > 0) {
+    regmatches(week_line[1], regexpr("20[0-9]{2}年第[0-9]+週", week_line[1]))
+  } else NA_character_
 
   # --- 列順（保健所名）をヘッダー部のx座標から検出 ---
   known_names <- c("中央", "日立", "潮来", "土浦", "つくば", "筑西", "古河",

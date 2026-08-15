@@ -37,8 +37,9 @@ fetch_miyazaki <- function(pdf_url) {
   words <- pdf_words(pdf_url, page = target_page)
   rows <- group_words_into_rows(words, y_tol = 3)
 
-  wk_m <- regmatches(row_text(rows[[1]]), regexpr("第[0-9]+週", row_text(rows[[1]])))
-  week_label <- if (length(wk_m) > 0) paste0("2026年", wk_m) else NA_character_
+  header_text <- row_text(rows[[1]])
+  week_label <- regmatches(header_text, regexpr("[0-9]{4}年\\s*第[0-9]+週", header_text))
+  week_label <- if (length(week_label) > 0) gsub("\\s+", "", week_label) else NA_character_
 
   bins <- .MIYAZAKI_X_BINS
   hokenjo <- .MIYAZAKI_HOKENJO
