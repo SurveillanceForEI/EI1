@@ -20,8 +20,12 @@ fetch_shizuoka <- function(pdf_url = "https://www.pref.shizuoka.jp/_res/projects
 
   row_names <- c("賀茂", "熱海", "東部", "御殿場", "富士", "静岡市", "中部", "西部", "浜松市")
 
-  wm <- regmatches(pages_txt[target_pages[1]], regexec("第\\s*([0-9]+)\\s*週", pages_txt[target_pages[1]]))[[1]]
-  week_label <- if (length(wm) == 2) sprintf("2026年第%s週", wm[2]) else NA_character_
+  # 表紙ページ等に全角数字で「２０２５年第３０週」のように書かれていることが
+  # あるため、全ページを半角化してから「YYYY年第N週」を探す
+  pages_txt_norm <- chartr("０１２３４５６７８９", "0123456789", pages_txt)
+  full_text <- paste(pages_txt_norm, collapse = " ")
+  wm <- regmatches(full_text, regexpr("20[0-9]{2}年第[0-9]+週", full_text))
+  week_label <- if (length(wm) > 0 && nchar(wm) > 0) wm else NA_character_
 
   exclude_labels <- c("保健所名", "第", "週", "定点把握感染症", "保健所別状況", "指定届出機関", "（定点）数")
 
