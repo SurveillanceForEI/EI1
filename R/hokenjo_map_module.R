@@ -14,6 +14,18 @@ HOKENJO_CURRENT_PATH <- "data/hokenjo_current.rds"
 HOKENJO_HISTORY_PATH <- "data/hokenjo_history.rds"
 HOKENJO_NAME_MAP_PATH <- "data/geo/hokenjo_name_map.csv"
 
+# ISO週定義（月曜始まり）で、年+週番号から「YYYY年第N週（M/D〜M/D）」形式の
+# 表示ラベルを作る。週報側のweek_labelは自治体ごとに書式がバラバラなため、
+# スライダー表示用には暦から一律に計算する
+hokenjo_week_period_label <- function(week_num, year = 2026) {
+  base <- as.Date(sprintf("%d-01-04", year))  # ISO週1は必ず1/4を含む
+  approx_date <- base + (week_num - 1) * 7
+  monday <- approx_date - (as.integer(format(approx_date, "%u")) - 1)
+  sunday <- monday + 6
+  sprintf("%d年第%d週（%s〜%s）", year, week_num,
+          format(monday, "%m/%d"), format(sunday, "%m/%d"))
+}
+
 load_hokenjo_current <- function() {
   if (!file.exists(HOKENJO_CURRENT_PATH)) return(NULL)
   d <- tryCatch(readRDS(HOKENJO_CURRENT_PATH), error = function(e) NULL)

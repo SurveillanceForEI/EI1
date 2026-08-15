@@ -362,6 +362,36 @@ ui <- dashboardPage(
       tags$link(rel="stylesheet", href="custom.css"),
       tags$script(src="js/ebs_cards.js"),
       tags$script(src="js/ebs_trend_chart.js"),
+      tags$script(HTML("
+        (function registerHokenjoWeekLabelHandler() {
+          if (typeof Shiny === 'undefined' || !Shiny.addCustomMessageHandler) {
+            setTimeout(registerHokenjoWeekLabelHandler, 50);
+            return;
+          }
+          var pendingLabels = null;
+          var applyPrettify = function(labels) {
+            var $el = $('#hokenjo_week_num');
+            var irs = $el.data('ionRangeSlider');
+            if (!irs) return false;
+            irs.update({
+              prettify_enabled: true,
+              prettify: function(num) { return labels[num] || ('第' + num + '週'); }
+            });
+            return true;
+          };
+          // sliderInputはタブが表示された時点で初めてDOMに挿入される（かつ
+          // ionRangeSlider自体の初期化も非同期）ため、単純なタイムアウト再試行
+          // では間に合わないことがある。MutationObserverでDOM挿入を監視する
+          var observer = new MutationObserver(function() {
+            if (pendingLabels && applyPrettify(pendingLabels)) pendingLabels = null;
+          });
+          observer.observe(document.documentElement, { childList: true, subtree: true });
+
+          Shiny.addCustomMessageHandler('hokenjo_week_labels', function(labels) {
+            if (!applyPrettify(labels)) pendingLabels = labels;
+          });
+        })();
+      ")),
       tags$link(href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap",
                 rel="stylesheet"),
       # Notes内の計算式を数式として表示するためのMathJax（\( \) と \[ \] のみをmath区切りとして使用し、
@@ -5961,9 +5991,21 @@ server <- function(input, output, session) {
   output$hokenjo_week_slider_ui <- renderUI({
     wks <- hokenjo_available_week_nums()
     if (length(wks) < 2) return(NULL)
-    sliderInput("hokenjo_week_num", "表示週（第N週）",
-                min = min(wks), max = max(wks), value = max(wks),
-                step = 1, sep = "", ticks = FALSE, width = "100%")
+    tagList(
+      sliderInput("hokenjo_week_num", "表示週",
+                  min = min(wks), max = max(wks), value = max(wks),
+                  step = 1, sep = "", ticks = FALSE, width = "100%")
+    )
+  })
+
+  # スライダーのハンドル上に「YYYY年第N週（M/D〜M/D）」表記を出すため、
+  # 週番号→表示ラベルの対応表をクライアントへ送りionRangeSliderのprettifyを更新する
+  observe({
+    wks <- hokenjo_available_week_nums()
+    if (length(wks) < 2) return()
+    all_wk <- seq(min(wks), max(wks))
+    labels <- setNames(vapply(all_wk, hokenjo_week_period_label, character(1)), as.character(all_wk))
+    session$sendCustomMessage("hokenjo_week_labels", as.list(labels))
   })
 
   # 現在の都道府県・疾患選択に対する状態を判定する
