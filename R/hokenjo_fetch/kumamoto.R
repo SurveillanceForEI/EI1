@@ -33,8 +33,9 @@ fetch_kumamoto <- function(pdf_url) {
   page_txt <- txt[page6]
   lines <- strsplit(page_txt, "\n")[[1]]
 
-  week_m <- regmatches(page_txt, regexpr("第[0-9]+週", page_txt))
-  week_label <- if (length(week_m) > 0) paste0("2026年", week_m) else NA_character_
+  full_text_norm <- chartr("０１２３４５６７８９", "0123456789", paste(txt, collapse = " "))
+  wm <- regmatches(full_text_norm, regexec("令和\\s*([0-9]+)\\s*年.{0,20}第\\s*([0-9]+)\\s*週", full_text_norm))[[1]]
+  week_label <- if (length(wm) == 3) sprintf("%d年第%s週", as.integer(wm[2]) + 2018, wm[3]) else NA_character_
 
   data_line_re <- paste0("^\\s*[0-9]+\\s+(", paste(.KUMAMOTO_HOKENJO, collapse = "|"), ")保健所\\s+(.+)$")
 
