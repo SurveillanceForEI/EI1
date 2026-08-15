@@ -8,10 +8,12 @@ fetch_hyogo <- function(year = NULL, week = NULL, week_url = NULL) {
     week_url <- sprintf("https://web.pref.hyogo.lg.jp/iphs01/kansensho_jyoho/download/documents/weekly_%d-%02dw_t3201-t3203.xlsx",
                          year, week)
   }
-  tmp <- tempfile(fileext = ".xlsx")
+  ext <- if (grepl("\\.xls$", week_url, ignore.case = TRUE)) ".xls" else ".xlsx"
+  tmp <- tempfile(fileext = ext)
   download.file(week_url, tmp, mode = "wb", quiet = TRUE)
 
-  d <- readxl::read_excel(tmp, sheet = "T3201_週報感染症保健所別", col_names = FALSE)
+  sheet_name <- if ("T3201_週報感染症保健所別" %in% readxl::excel_sheets(tmp)) "T3201_週報感染症保健所別" else "T3201"
+  d <- readxl::read_excel(tmp, sheet = sheet_name, col_names = FALSE)
   d <- as.data.frame(d)
 
   # 1行目: タイトル, 2行目: "2026年31週（...）"（week_label）, 5行目: 保健所名ヘッダー
