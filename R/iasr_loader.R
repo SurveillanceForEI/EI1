@@ -362,8 +362,13 @@ load_iasr_category <- function(cat_id) {
   cache_path <- file.path(IASR_CACHE_DIR, paste0(cat_id, ".rds"))
 
   if (file.exists(cache_path)) {
-    age_h <- as.numeric(difftime(Sys.time(), file.mtime(cache_path), units = "hours"))
-    if (age_h < IASR_CACHE_HOURS) return(readRDS(cache_path))
+    cached <- tryCatch(readRDS(cache_path), error = function(e) NULL)
+    cached_at <- attr(cached, "cached_at")
+    # デプロイ時にファイルのmtimeがリセットされ得るため、ファイルmtimeではなく
+    # データ内に埋め込んだタイムスタンプで鮮度判定する（無ければファイルmtimeにフォールバック）
+    ref_time <- if (!is.null(cached_at)) cached_at else file.mtime(cache_path)
+    age_h <- as.numeric(difftime(Sys.time(), ref_time, units = "hours"))
+    if (!is.null(cached) && age_h < IASR_CACHE_HOURS) return(cached)
   }
 
   cfg <- IASR_CATEGORIES[[cat_id]]
@@ -414,7 +419,10 @@ load_iasr_category <- function(cat_id) {
       arrange(time_type, date, virus)
   }
 
-  if (!is.null(d) && nrow(d) > 0) saveRDS(d, cache_path)
+  if (!is.null(d) && nrow(d) > 0) {
+    attr(d, "cached_at") <- Sys.time()
+    saveRDS(d, cache_path)
+  }
   d
 }
 
