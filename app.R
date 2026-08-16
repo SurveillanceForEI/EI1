@@ -6051,13 +6051,16 @@ server <- function(input, output, session) {
     if (st$status != "ok") return(NULL)
 
     wk_num <- input$hokenjo_week_num
-    src <- HOKENJO_CURRENT
     if (!is.null(wk_num) && !is.null(HOKENJO_HISTORY)) {
-      sub <- HOKENJO_HISTORY[HOKENJO_HISTORY$pref == st$pref &
+      # スライダーで週が選択されている場合、その週のデータが無ければ
+      # HOKENJO_CURRENT（最新週）へ黙って差し替えず、データ無し扱いにする
+      # （差し替えるとスライダーの位置と地図・グラフの表示週がズレてしまうため）
+      src <- HOKENJO_HISTORY[HOKENJO_HISTORY$pref == st$pref &
                                HOKENJO_HISTORY$disease == st$disease &
                                !is.na(HOKENJO_HISTORY$week_num) &
                                HOKENJO_HISTORY$week_num == wk_num, ]
-      if (nrow(sub) > 0) src <- sub
+    } else {
+      src <- HOKENJO_CURRENT
     }
     build_hokenjo_map_data(src, st$pref, st$disease, HOKENJO_NAME_MAP)
   })
