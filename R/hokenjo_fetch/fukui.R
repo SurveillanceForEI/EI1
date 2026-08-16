@@ -72,8 +72,9 @@ fetch_fukui <- function() {
 
 # .fukui_one_hokenjo()は最新週(最終データ行)のみを返すが、CSV自体は
 # 当年の全週データを含んでいるため、バックフィル用に全週を返すバリアント
-.fukui_one_hokenjo_history <- function(hokenjo, code) {
-  base <- "https://kansensyou-joho.pref.fukui.lg.jp/csv/ih5100"
+.fukui_one_hokenjo_history <- function(hokenjo, code, year_prefix = "0") {
+  # year_prefix: "0"=当年、"1"=前年（サイトのURL命名規則）
+  base <- paste0("https://kansensyou-joho.pref.fukui.lg.jp/csv/ih51", year_prefix, "0")
   d_rate  <- .fukui_read_csv(paste0(base, code, "0.csv"))
   d_count <- .fukui_read_csv(paste0(base, code, "1.csv"))
   if (is.null(d_rate) || is.null(d_count)) return(NULL)
