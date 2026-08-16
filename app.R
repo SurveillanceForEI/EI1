@@ -5989,12 +5989,17 @@ server <- function(input, output, session) {
                 selected = "rate")
   })
 
-  # 現在のpref/diseaseについて、履歴データ(HOKENJO_HISTORY)に存在する週番号一覧
+  # 現在のpref/diseaseについて、履歴データ(HOKENJO_HISTORY)に存在する
+  # 「年*100+週番号」の複合キー一覧（week_numだけだと年をまたいで1〜52が
+  # 再利用されるため、年+週番号で一意化してスライダーが2025年〜最新まで
+  # 正しく連続した範囲になるようにする）
   hokenjo_available_week_nums <- reactive({
     st <- hokenjo_status()
     if (st$status != "ok" || is.null(HOKENJO_HISTORY)) return(integer(0))
-    wk <- HOKENJO_HISTORY$week_num[HOKENJO_HISTORY$pref == st$pref & HOKENJO_HISTORY$disease == st$disease]
-    sort(unique(wk[!is.na(wk)]))
+    sub <- HOKENJO_HISTORY[HOKENJO_HISTORY$pref == st$pref & HOKENJO_HISTORY$disease == st$disease, ]
+    ok <- !is.na(sub$week_num) & !is.na(sub$hokenjo_year)
+    keys <- hokenjo_year_week_key(sub$hokenjo_year[ok], sub$week_num[ok])
+    sort(unique(keys))
   })
 
   output$hokenjo_week_slider_ui <- renderUI({
@@ -6012,8 +6017,8 @@ server <- function(input, output, session) {
   observe({
     wks <- hokenjo_available_week_nums()
     if (length(wks) < 2) return()
-    all_wk <- seq(min(wks), max(wks))
-    labels <- setNames(vapply(all_wk, hokenjo_week_period_label, character(1)), as.character(all_wk))
+    all_keys <- seq(min(wks), max(wks))
+    labels <- setNames(vapply(all_keys, hokenjo_week_period_label_key, character(1)), as.character(all_keys))
     session$sendCustomMessage("hokenjo_week_labels", as.list(labels))
   })
 
@@ -6050,15 +6055,22 @@ server <- function(input, output, session) {
     st <- hokenjo_status()
     if (st$status != "ok") return(NULL)
 
-    wk_num <- input$hokenjo_week_num
-    if (!is.null(wk_num) && !is.null(HOKENJO_HISTORY)) {
-      # スライダーで週が選択されている場合、その週のデータが無ければ
-      # HOKENJO_CURRENT（最新週）へ黙って差し替えず、データ無し扱いにする
-      # （差し替えるとスライダーの位置と地図・グラフの表示週がズレてしまうため）
+    wk_key <- input$hokenjo_week_num
+    if (!is.null(wk_key) && !is.null(HOKENJO_HISTORY)) {
+      # スライダーの値は「年*100+週番号」の複合キー。week_numだけで絞ると
+      # 年をまたいで同じ週番号のデータ（例: 2025年第10週と2026年第10週）が
+      # 混ざってしまうため、年も合わせて絞り込む。
+      # 該当週のデータが無ければHOKENJO_CURRENT（最新週）へ黙って差し替えず、
+      # データ無し扱いにする（差し替えるとスライダーの位置と地図・グラフの
+      # 表示週がズレてしまうため）
+      target_year <- wk_key %/% 100L
+      target_week <- wk_key %% 100L
       src <- HOKENJO_HISTORY[HOKENJO_HISTORY$pref == st$pref &
                                HOKENJO_HISTORY$disease == st$disease &
                                !is.na(HOKENJO_HISTORY$week_num) &
-                               HOKENJO_HISTORY$week_num == wk_num, ]
+                               HOKENJO_HISTORY$week_num == target_week &
+                               !is.na(HOKENJO_HISTORY$hokenjo_year) &
+                               HOKENJO_HISTORY$hokenjo_year == target_year, ]
     } else {
       src <- HOKENJO_CURRENT
     }

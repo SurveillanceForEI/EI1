@@ -55,7 +55,45 @@ load_hokenjo_history <- function() {
   for (col in names(d)[chr_cols]) {
     Encoding(d[[col]]) <- "UTF-8"
   }
+  # week_num（1〜52）は年をまたいで再利用されるため、週報スライダーで
+  # 「2025年〜最新」のような年をまたぐ連続範囲を作れるよう、week_labelから
+  # 実際の西暦年を抜き出しておく（年+週番号の複合キーの元になる）
+  d$hokenjo_year <- vapply(d$week_label, .hokenjo_extract_year, integer(1))
   d
+}
+
+# week_labelは自治体ごとに書式がバラバラ（西暦/令和、全角/半角数字、
+# 日付埋め込みなど）なため、複数パターンを順に試して西暦年を取り出す
+.hokenjo_extract_year <- function(label) {
+  if (is.na(label)) return(NA_integer_)
+  s <- chartr("０１２３４５６７８９", "0123456789", label)
+  m <- regmatches(s, regexpr("(20[0-9]{2})年", s))
+  if (length(m) > 0 && nzchar(m)) return(as.integer(sub("年", "", m)))
+  m <- regmatches(s, regexec("令和\\s*([0-9]+)\\s*年", s))[[1]]
+  if (length(m) == 2) return(as.integer(m[2]) + 2018L)
+  m <- regmatches(s, regexpr("(20[0-9]{2})[.\\/-]", s))
+  if (length(m) > 0 && nzchar(m)) return(as.integer(substr(m, 1, 4)))
+  # 福井県の週報ラベル "1 (R. 6.12.30 ～ R. 7. 1. 5)" のような、
+  # 令和の略記「R.」＋週末（終了日側）の年から西暦を推定する
+  # (開始日と終了日で年またぎがあり得るため、区間の終わり側=より新しい方を採る)
+  rm <- gregexpr("R\\.\\s*([0-9]+)\\s*\\.", s)[[1]]
+  if (rm[1] != -1) {
+    matched <- regmatches(s, gregexpr("R\\.\\s*([0-9]+)\\s*\\.", s))[[1]]
+    nums <- as.integer(sub("R\\.\\s*([0-9]+)\\s*\\.", "\\1", matched))
+    if (length(nums) > 0) return(max(nums, na.rm = TRUE) + 2018L)
+  }
+  NA_integer_
+}
+
+# 年+週番号を「年*100+週番号」の単一整数キーに変換する（スライダーの値として使う）
+hokenjo_year_week_key <- function(year, week_num) year * 100L + week_num
+
+# 複合キーから「YYYY年第N週（M/D〜M/D）」ラベルを作る
+hokenjo_week_period_label_key <- function(key) {
+  year <- key %/% 100L
+  week_num <- key %% 100L
+  if (is.na(year) || is.na(week_num) || week_num < 1 || week_num > 53) return("")
+  hokenjo_week_period_label(week_num, year)
 }
 
 load_hokenjo_name_map <- function() {
