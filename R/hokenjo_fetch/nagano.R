@@ -93,3 +93,83 @@ fetch_nagano <- function(pdf_url = "https://www.pref.nagano.lg.jp/shippei-kansen
   }
   do.call(rbind, out)
 }
+
+# 長野県「定点把握感染症（五類（定点））届出状況」PDF（通常の週報、月報合併号ではない）
+# https://www.pref.nagano.lg.jp/shippei-kansen/kenko/kenko/kansensho/joho/documents/{YEAR}-{WEEK}w.pdf 型
+#
+# 保健所別の表には報告数(count)のみが載っており、定点当たり報告数(rate)は
+# 表中に無い。代わりに「届出定点数」（保健所ごとの定点数、疾患カテゴリ別に
+# ｲﾝﾌﾙ/COVID-19・小児・眼科・基幹の4種）が同じ表内にあるので、
+# rate = count / 該当カテゴリの定点数 で算出する。
+# 列はx座標で判定（定点の無い保健所は列ごと欠落するため、位置基準の方が
+# トークン数基準より安全）。
+.nagano_weekly_sentinel_cols <- c("infl_covid" = 70, "ped" = 83, "eye" = 96, "core" = 108)
+.nagano_weekly_diseases <- data.frame(
+  name = c("インフルエンザ", "COVID-19", "RSウイルス感染症", "咽頭結膜熱",
+           "Ａ群溶血性レンサ球菌咽頭炎", "感染性胃腸炎", "水痘", "手足口病",
+           "伝染性紅斑", "突発性発しん", "ヘルパンギーナ", "流行性耳下腺炎",
+           "急性出血性結膜炎", "流行性角結膜炎", "細菌性髄膜炎", "無菌性髄膜炎",
+           "マイコプラズマ肺炎", "クラミジア肺炎(オウム病除く)", "感染性胃腸炎(ロタウイルス)"),
+  x = c(130, 158, 186, 211, 235, 256, 284, 308, 333, 357, 382, 406, 431, 452, 480, 504, 529, 553, 578),
+  sentinel_x = c(70, 70, 83, 83, 83, 83, 83, 83, 83, 83, 83, 83, 96, 96, 108, 108, 108, 108, 108),
+  stringsAsFactors = FALSE
+)
+
+fetch_nagano_weekly_report <- function(pdf_url, year = NA_integer_, week_num = NA_integer_) {
+  if (!exists("pdf_words")) stop("pdf_table_utils.R を先に source してください")
+
+  tmp <- tempfile(fileext = ".pdf")
+  download.file(pdf_url, tmp, mode = "wb", quiet = TRUE)
+  pages_txt <- pdftools::pdf_text(tmp)
+  target_page <- which(grepl("届出定点数", pages_txt))[1]
+  if (is.na(target_page)) stop("届出定点数の表が見つかりません（保健所別データなし）")
+
+  hokenjo_order <- c("佐久", "上田", "諏訪", "伊那", "飯田", "木曽", "松本", "大町", "長野", "北信", "長野市", "松本市")
+
+  wm <- regmatches(pages_txt[target_page], regexec("(20[0-9]{2})年.{0,10}第([0-9]+)週", pages_txt[target_page]))[[1]]
+  if (length(wm) == 3) {
+    week_label <- sprintf("%s年第%s週", wm[2], wm[3])
+  } else if (!is.na(year) && !is.na(week_num)) {
+    week_label <- sprintf("%d年第%d週", year, week_num)
+  } else {
+    week_label <- NA_character_
+  }
+
+  words <- pdf_words(tmp, page = target_page)
+
+  # 保健所名列(x=39-42)の各行yを取得
+  name_hits <- words[words$x >= 38 & words$x <= 45 & words$text %in% hokenjo_order, ]
+  name_hits <- name_hits[!duplicated(name_hits$text), ]
+  name_hits <- name_hits[match(hokenjo_order, name_hits$text), ]
+  if (any(is.na(name_hits$text))) stop("保健所名の行が見つかりません")
+
+  all_x <- sort(c(unname(.nagano_weekly_sentinel_cols), .nagano_weekly_diseases$x))
+  n <- length(all_x)
+  lo_bound <- c(all_x[1] - 8, (all_x[-n] + all_x[-1]) / 2)
+  hi_bound <- c((all_x[-n] + all_x[-1]) / 2, all_x[n] + 12)
+  get_val_at <- function(row_words, target_x) {
+    idx <- which(all_x == target_x)
+    tok <- row_words$text[row_words$x >= lo_bound[idx] & row_words$x < hi_bound[idx]]
+    if (length(tok) == 0) return(NA_real_)
+    parse_hokenjo_number(tok[1])
+  }
+
+  out <- list()
+  for (k in seq_along(hokenjo_order)) {
+    hy <- name_hits$y[k]
+    row_words <- words[words$y >= hy - 3 & words$y <= hy + 3 & words$x > 45, ]
+    sentinel_vals <- sapply(.nagano_weekly_sentinel_cols, function(x) get_val_at(row_words, x))
+    for (d in seq_len(nrow(.nagano_weekly_diseases))) {
+      cnt <- get_val_at(row_words, .nagano_weekly_diseases$x[d])
+      sent_x <- .nagano_weekly_diseases$sentinel_x[d]
+      sent_n <- sentinel_vals[as.character(names(.nagano_weekly_sentinel_cols)[.nagano_weekly_sentinel_cols == sent_x])]
+      rate <- if (!is.na(cnt) && !is.na(sent_n) && sent_n > 0) round(cnt / sent_n, 2) else NA_real_
+      out[[length(out) + 1]] <- data.frame(
+        pref = "長野県", week_label = week_label, hokenjo = hokenjo_order[k],
+        disease = .nagano_weekly_diseases$name[d], count = cnt, rate = rate,
+        stringsAsFactors = FALSE
+      )
+    }
+  }
+  do.call(rbind, out)
+}
