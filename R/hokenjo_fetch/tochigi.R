@@ -58,14 +58,16 @@ fetch_tochigi <- function(pdf_url = NULL) {
 
     if (is_count_row) {
       cur_count <- rr$text[in_range & rr$text != "報告数"]
-      cur_name <- character(0)
+      # 2025年前半の週報は疾病名が「報告数」と同じ行に並ぶレイアウトのため、
+      # そのままだと名前が失われる。同一行の左側（x<x_min）にある名前トークンを拾っておく
+      cur_name <- rr$text[rr$x < x_min & rr$x >= 80 & rr$text != "報告数"]
       next
     }
 
     if (is_rate_row) {
       cur_rate <- rr$text[in_range & rr$text != "定点当り"]
       cur_rate <- sapply(cur_rate, strip_mark, USE.NAMES = FALSE)
-      name_extra <- rr$text[rr$x < x_min & rr$x >= 90 & !(rr$text %in% c("定点当り", "報告数"))]
+      name_extra <- rr$text[rr$x < x_min & rr$x >= 80 & !(rr$text %in% c("定点当り", "報告数"))]
       cur_name <- c(cur_name, name_extra)
       disease <- trimws(paste(cur_name, collapse = ""))
       if (disease != "" && !is.null(cur_count) && length(cur_rate) >= 5) {
@@ -85,7 +87,7 @@ fetch_tochigi <- function(pdf_url = NULL) {
     }
 
     if (!is.null(cur_count)) {
-      name_extra <- rr$text[rr$x < x_min & rr$x >= 90]
+      name_extra <- rr$text[rr$x < x_min & rr$x >= 80]
       cur_name <- c(cur_name, name_extra)
     }
   }
