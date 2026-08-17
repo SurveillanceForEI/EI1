@@ -57,9 +57,21 @@ fetch_shiga_page4_counts <- function(pdf_url, page = 4) {
   do.call(rbind, out)
 }
 
-fetch_shiga <- function(pdf_url, page = 3) {
+fetch_shiga <- function(pdf_url, page = NULL) {
   if (missing(pdf_url) || is.null(pdf_url)) stop("pdf_url を指定してください（滋賀県の添付IDは週ごとに変わるため事前確認が必要）")
   if (!exists("pdf_words")) stop("pdf_table_utils.R を先に source してください")
+
+  if (is.null(page)) {
+    # ページ構成は号によって前後する（ARI解説ページの有無等）ため、
+    # 「定点当たりの報告数」の見出しを含むページを都度検出する
+    tmp <- tempfile(fileext = ".pdf")
+    download.file(pdf_url, tmp, mode = "wb", quiet = TRUE)
+    pages_txt <- pdftools::pdf_text(tmp)
+    # 表紙や目次にも同じ文言が現れることがあるため、最後の一致（実際の表）を採用する
+    hit <- which(grepl("定点当たりの報告数", pages_txt))
+    if (length(hit) == 0) stop("shiga: 「定点当たりの報告数」のページが見つかりません")
+    page <- hit[length(hit)]
+  }
   words <- pdf_words(pdf_url, page = page)
 
   full_text <- paste(words$text, collapse = " ")
@@ -111,7 +123,7 @@ fetch_shiga <- function(pdf_url, page = 3) {
   }
   df <- do.call(rbind, out)
 
-  cnt <- tryCatch(fetch_shiga_page4_counts(pdf_url, page = 4), error = function(e) NULL)
+  cnt <- tryCatch(fetch_shiga_page4_counts(pdf_url, page = page + 1), error = function(e) NULL)
   if (!is.null(cnt) && nrow(cnt) > 0) {
     for (i in seq_len(nrow(cnt))) {
       idx <- which(df$hokenjo == cnt$hokenjo[i] & df$disease == cnt$disease[i])
