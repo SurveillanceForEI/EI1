@@ -562,6 +562,150 @@ compute_ibs_band <- function(main_df, hist_df) {
   cbind(main_df, do.call(rbind, rows))
 }
 
+# 流行曲線グラフ用: 主方式・補助方式・アンサンブルの3方式を時系列全体に
+# ベクトル化して計算する（zensu_ibs_band()の季節性自動判定・アンサンブル
+# ロジックを時系列の各時点に適用したもの）。
+#  季節性あり: 主方式=5年比較±SD／補助方式=Farrington法ライク（トレンド回帰）
+#  季節性なし: 主方式=EARS C2ライク（直近baseline）／補助方式=CUSUM
+# main_df: 対象系列 (date, year, week, value_col) 1行以上
+# hist_df: 比較対象の全期間データ（date_rangeに依存しない同一系列の履歴）
+# 補助方式（Farrington回帰・CUSUM）は計算コストが高いため、直近
+# MAX_SECONDARY_POINTS 件のみ計算し、それより過去の点は主方式のみとする
+# （流行曲線で重要なのは直近の推移であり、古い点まで補助方式を出す必要性は低い）
+MAX_SECONDARY_POINTS <- 300L
+
+compute_ibs_band_multi <- function(main_df, hist_df, value_col = "reports_per_site") {
+  n <- nrow(main_df)
+  empty <- function() {
+    main_df$mu <- numeric(0); main_df$s <- numeric(0); main_df$has_hist <- logical(0)
+    main_df$score_primary <- numeric(0)
+    main_df$mu2 <- numeric(0); main_df$s2 <- numeric(0)
+    main_df$cusum_val <- numeric(0); main_df$cusum_thresh <- numeric(0)
+    main_df$has_secondary <- logical(0); main_df$score_secondary <- numeric(0)
+    main_df$score_ensemble <- numeric(0); main_df$seasonal <- logical(0)
+    main_df
+  }
+  if (n == 0) return(empty())
+
+  seasonal <- detect_seasonality(hist_df, value_col)
+  main_df <- main_df[order(main_df$date), ]
+  hist_sorted <- hist_df[order(hist_df$date), ]
+  compute_secondary_from <- max(1L, n - MAX_SECONDARY_POINTS + 1L)
+
+  rows <- lapply(seq_len(n), function(i) {
+    w <- main_df$week[i]; y <- main_df$year[i]; val <- main_df[[value_col]][i]; dt <- main_df$date[i]
+    want_secondary <- i >= compute_secondary_from
+
+    if (seasonal) {
+      ws <- unique(pmax(1L, pmin(53L, (w - 2L):(w + 2L))))
+      h  <- hist_df[hist_df$week %in% ws & hist_df$year >= y - 5 & hist_df$year < y, , drop = FALSE]
+      v  <- h[[value_col]]
+      cnt <- sum(!is.na(v))
+      mu  <- mean(v, na.rm = TRUE)
+      s   <- if (cnt >= 3) sd(v, na.rm = TRUE) else NA_real_
+      has <- cnt >= 3 && !is.nan(mu) && !is.na(s)
+      score1 <- if (!has || is.na(val)) NA_real_ else
+        if (val >= mu + 2 * s) 3 else if (val >= mu + s) 2 else if (val >= mu) 1 else 0
+
+      if (want_secondary) {
+        fb <- .farrington_like_calc(val, w, y, hist_df, value_col)
+        has2 <- isTRUE(fb$has_hist)
+        score2 <- if (!has2 || is.na(val)) NA_real_ else
+          if (fb$exceeds2sd) 3 else if (fb$exceeds1sd) 2 else if (fb$abovemu) 1 else 0
+      } else { has2 <- FALSE; fb <- NULL; score2 <- NA_real_ }
+
+      data.frame(mu = ifelse(has, mu, NA_real_), s = ifelse(has, s, NA_real_),
+                 has_hist = has, score_primary = score1,
+                 mu2 = if (has2) fb$mu else NA_real_, s2 = if (has2) fb$s else NA_real_,
+                 cusum_val = NA_real_, cusum_thresh = NA_real_,
+                 has_secondary = has2, score_secondary = score2)
+    } else {
+      ts_upto <- hist_sorted[!is.na(hist_sorted$date) & hist_sorted$date <= dt, , drop = FALSE]
+      v <- ts_upto[[value_col]]
+      nn <- length(v)
+      base_end <- nn - 2L; base_start <- base_end - 6L
+      if (nn < 9 || base_start < 1) {
+        return(data.frame(mu = NA_real_, s = NA_real_, has_hist = FALSE, score_primary = NA_real_,
+                           mu2 = NA_real_, s2 = NA_real_, cusum_val = NA_real_, cusum_thresh = NA_real_,
+                           has_secondary = FALSE, score_secondary = NA_real_))
+      }
+      baseline <- v[base_start:base_end]
+      mu    <- mean(baseline, na.rm = TRUE)
+      sigma <- sqrt(max(mu, 1))
+      score1 <- if (is.na(val)) NA_real_ else
+        if (val >= mu + 3 * sigma) 3 else if (val >= mu + 2 * sigma) 2 else if (val > mu) 1 else 0
+
+      if (want_secondary) {
+        cu <- tryCatch(.cusum_score(v, base_start, base_end, mu, sigma), error = function(e) NULL)
+        has2 <- !is.null(cu)
+        score2 <- if (!has2 || is.na(val)) NA_real_ else cu$score
+      } else { has2 <- FALSE; cu <- NULL; score2 <- NA_real_ }
+
+      data.frame(mu = mu, s = sigma, has_hist = TRUE, score_primary = score1,
+                 mu2 = NA_real_, s2 = NA_real_,
+                 cusum_val = if (has2) cu$c_t else NA_real_, cusum_thresh = if (has2) cu$h_lim else NA_real_,
+                 has_secondary = has2, score_secondary = score2)
+    }
+  })
+
+  band <- do.call(rbind, rows)
+  band$score_ensemble <- ifelse(!is.na(band$score_primary) & !is.na(band$score_secondary),
+                                 round((band$score_primary + band$score_secondary) / 2),
+                                 NA_real_)
+  band$seasonal <- seasonal
+  cbind(main_df, band)
+}
+
+# compute_ibs_band_multi() の出力から、流行曲線グラフ用の帯（ribbon）と
+# 超過点（marker）を、選択中の判定方式（"primary"/"secondary"/"ensemble"）に
+# 応じて切り出す。value_col は超過点マーカーのy値に使う実測値の列名。
+excess_band_for_plot <- function(band, method = "primary", value_col = "reports_per_site") {
+  if (is.null(band) || nrow(band) == 0) return(list(ribbon = NULL, ribbon_label = "", exceed = NULL, marker_label = ""))
+  seasonal <- isTRUE(band$seasonal[1])
+  val <- band[[value_col]]
+
+  primary_ribbon_label <- if (seasonal) "過去5年平均±2SD" else "直近7週平均±2σ（EARS基準）"
+  primary_ribbon <- function() {
+    d <- band[!is.na(band$has_hist) & band$has_hist, , drop = FALSE]
+    if (nrow(d) == 0) return(NULL)
+    data.frame(date = d$date, ymin = pmax(0, d$mu - 2 * d$s), ymax = d$mu + 2 * d$s)
+  }
+
+  if (method == "secondary") {
+    marker_label <- "超過（補助方式）"
+    if (seasonal) {
+      ribbon_label <- "トレンド回帰(Farrington)基準±2SD"
+      d <- band[!is.na(band$has_secondary) & band$has_secondary, , drop = FALSE]
+      ribbon <- if (nrow(d) == 0) NULL else
+        data.frame(date = d$date, ymin = pmax(0, d$mu2 - 2 * d$s2), ymax = d$mu2 + 2 * d$s2)
+    } else {
+      # CUSUMは累積値であり実測値と同じy軸スケールの「帯」を持たないため、
+      # 帯は表示せず超過点のみを表示する
+      ribbon_label <- ""
+      ribbon <- NULL
+    }
+    exceed_mask <- !is.na(band$score_secondary) & band$score_secondary == 3
+  } else if (method == "ensemble") {
+    ribbon_label <- paste0(primary_ribbon_label, "（参考帯）")
+    ribbon <- primary_ribbon()
+    marker_label <- "超過（アンサンブル）"
+    exceed_mask <- !is.na(band$score_ensemble) & band$score_ensemble == 3
+  } else {
+    ribbon_label <- primary_ribbon_label
+    ribbon <- primary_ribbon()
+    marker_label <- "超過（主方式）"
+    exceed_mask <- !is.na(band$score_primary) & band$score_primary == 3
+  }
+
+  exceed <- if (any(exceed_mask)) {
+    d <- band[exceed_mask, , drop = FALSE]
+    d[[value_col]] <- val[exceed_mask]
+    d
+  } else NULL
+
+  list(ribbon = ribbon, ribbon_label = ribbon_label, exceed = exceed, marker_label = marker_label)
+}
+
 # 流行レベル判定の中核ロジック: 参考基準値（注意報/警報相当）・Rt値・IBS方式の
 # 過去5年比較（±SD）の3指標をそれぞれ0-3点でスコア化し、重み付き平均（傾斜配分）で
 # 統合スコア（0-3、四捨五入済み）を返す。classify_alert() のラベル変換前の数値版であり、

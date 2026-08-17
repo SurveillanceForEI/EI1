@@ -645,6 +645,17 @@ function ebsUntranslateCards(containerId) {
         uiOutput("filter_bar_ts"),
         tags$div(style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:2px 4px 6px;padding:6px 10px;background:#f4f4f4;border-radius:6px;",
           tags$div(style="display:flex;align-items:center;gap:6px;",
+            tags$label("超過判定方式:", style="font-size:0.85em;margin:0;color:#555;"),
+            selectInput("excess_method", NULL,
+              choices = c("主方式（5年比較 / EARS C2）"="primary",
+                          "補助方式（トレンド回帰 / CUSUM）"="secondary",
+                          "アンサンブル（平均）"="ensemble"),
+              selected = "primary", width = "260px")
+          ),
+          tags$a(href="javascript:void(0)", onclick="goToNotes('notes-zensu-ibs')",
+            style="font-size:0.78em;color:#888;text-decoration:none;",
+            icon("circle-info"), " 判定方式について"),
+          tags$div(style="display:flex;align-items:center;gap:6px;",
             checkboxInput("show_forecast", "予測を表示（4週後まで）", value = FALSE, width = "auto")
           ),
           conditionalPanel("input.show_forecast",
@@ -2562,6 +2573,14 @@ server <- function(input, output, session) {
   # timeseries_plot / kpi_alert / ranking_table / data_tab_df で共通利用
   ts_band_series <- reactive({
     compute_ibs_band(ts_main_data(), ts_hist_data())
+  })
+
+  # 流行曲線グラフの「超過判定方式」切替（主方式/補助方式/アンサンブル）用。
+  # ts_band_series() とは別の遅延評価にしておくことで、
+  # 判定方式を切り替えない限り（＝流行曲線タブを開かない限り）補助方式の
+  # 追加計算（トレンド回帰・CUSUM）が走らないようにする
+  ts_band_series_multi <- reactive({
+    compute_ibs_band_multi(ts_main_data(), ts_hist_data(), value_col = "reports_per_site")
   })
 
   # ── KPI ────────────────────────────────────────────────
@@ -4608,26 +4627,28 @@ server <- function(input, output, session) {
     lbl    <- DISEASE_CONFIG[[input$disease]]$label
     thresh <- DISEASE_CONFIG[[input$disease]]$alert_threshold
     main_label <- if (is_pref) input$pref_filter else "全国"
+    excess_method <- if (is.null(input$excess_method)) "primary" else input$excess_method
     # 各時点から過去5年間の同一週番号データで平均±2SD を計算（都道府県選択時はその都道府県のデータで算出）
-    # ts_band_series() は date_range に依存しない全期間データ（ts_hist_data）を参照するため、
+    # ts_band_series_multi() は date_range に依存しない全期間データ（ts_hist_data）を参照するため、
     # date_range をずらしても帯が短くならない
-    nat2 <- ts_band_series() %>%
-      mutate(ymin = ifelse(has_hist, pmax(0, mu - 2*s), NA_real_),
-             ymax = ifelse(has_hist, mu + 2*s, NA_real_))
-    p <- plot_ly() %>%
-      add_ribbons(data=nat2 %>% filter(has_hist), x=~date,
-        ymin=~ymin, ymax=~ymax,
-        fillcolor=paste0(col,"33"), line=list(color="transparent"),
-        name=paste0(main_label,"　過去5年平均±2SD"), hoverinfo="skip") %>%
+    nat2 <- ts_band_series_multi()
+    eb <- excess_band_for_plot(nat2, excess_method, value_col = "reports_per_site")
+    p <- plot_ly()
+    if (!is.null(eb$ribbon)) {
+      p <- p %>% add_ribbons(data = eb$ribbon, x = ~date,
+        ymin = ~ymin, ymax = ~ymax,
+        fillcolor = paste0(col, "33"), line = list(color = "transparent"),
+        name = paste0(main_label, "　", eb$ribbon_label), hoverinfo = "skip")
+    }
+    p <- p %>%
       add_lines(data=nat, x=~date, y=~reports_per_site,
         line=list(color=col, width=2.5), name=main_label,
         hovertemplate=paste0(main_label, "　%{x|%Y-W%W}: %{y:.2f}<extra></extra>"))
-    # +2SD 超過点を赤丸でプロット
-    exceed <- nat2 %>% filter(has_hist, reports_per_site > ymax)
-    if (nrow(exceed) > 0) {
-      p <- p %>% add_markers(data=exceed, x=~date, y=~reports_per_site,
+    # 超過点を赤丸でプロット（選択中の判定方式に応じて主方式/補助方式/アンサンブルを切替）
+    if (!is.null(eb$exceed) && nrow(eb$exceed) > 0) {
+      p <- p %>% add_markers(data=eb$exceed, x=~date, y=~reports_per_site,
         marker=list(color="#e74c3c", size=6, symbol="circle"),
-        name="+2SD超過", hovertemplate="%{x|%Y-W%W}: %{y:.2f}<extra></extra>")
+        name=eb$marker_label, hovertemplate="%{x|%Y-W%W}: %{y:.2f}<extra></extra>")
     }
     # ── 短期予測（4週先まで）─────────────────────────────
     # 学習・起点にはスライダー(date_range)に依存しない全期間データ(ts_hist_data)を使う
@@ -5504,37 +5525,31 @@ server <- function(input, output, session) {
 
     dconf <- ZENSU_DISEASE_CONFIG[[input$zensu_disease_ts]]
     col   <- dconf$color
+    excess_method <- if (is.null(input$excess_method)) "primary" else input$excess_method
 
-    # 過去5年・前後2週移動平均 ±2SD 帯
+    # 過去5年・前後2週移動平均 ±2SD 帯（季節性の有無で主方式・補助方式を自動切替）
     zh <- zensu_hist()
-    band_rows <- lapply(seq_len(nrow(d_agg)), function(i) {
-      w  <- d_agg$week[i]; y <- d_agg$year[i]
-      ws <- unique(pmax(1L, pmin(53L, (w-2L):(w+2L))))
-      h  <- zh %>% filter(week %in% ws, year >= y - 5, year < y)
-      n  <- sum(!is.na(h$cases))
-      mu <- mean(h$cases, na.rm = TRUE)
-      s  <- if (n >= 3) sd(h$cases, na.rm = TRUE) else 0
-      if (is.na(s)) s <- 0
-      data.frame(ymin = max(0, mu - 2*s), ymax = mu + 2*s, has_hist = n >= 3)
-    })
-    d_band <- cbind(d_agg, do.call(rbind, band_rows))
+    d_band <- compute_ibs_band_multi(d_agg, zh, value_col = "cases")
+    eb <- excess_band_for_plot(d_band, excess_method, value_col = "cases")
 
-    p <- plot_ly() %>%
-      add_ribbons(data = d_band %>% filter(has_hist), x = ~date,
+    p <- plot_ly()
+    if (!is.null(eb$ribbon)) {
+      p <- p %>% add_ribbons(data = eb$ribbon, x = ~date,
         ymin = ~ymin, ymax = ~ymax,
         fillcolor = paste0(col, "33"), line = list(color = "transparent"),
-        name = "過去5年平均±2SD", hoverinfo = "skip") %>%
+        name = eb$ribbon_label, hoverinfo = "skip")
+    }
+    p <- p %>%
       add_bars(data = d_agg, x = ~date, y = ~cases,
         marker = list(color = col, opacity = 0.82),
         hovertemplate = "%{x|%Y-%m-%d}　%{y}件<extra></extra>",
         name = dconf$label)
 
-    # +2SD 超過点を赤丸でプロット
-    exceed <- d_band %>% filter(has_hist, cases > ymax)
-    if (nrow(exceed) > 0) {
-      p <- p %>% add_markers(data = exceed, x = ~date, y = ~cases,
+    # 超過点を赤丸でプロット（選択中の判定方式に応じて主方式/補助方式/アンサンブルを切替）
+    if (!is.null(eb$exceed) && nrow(eb$exceed) > 0) {
+      p <- p %>% add_markers(data = eb$exceed, x = ~date, y = ~cases,
         marker = list(color = "#e74c3c", size = 6, symbol = "circle"),
-        name = "+2SD超過",
+        name = eb$marker_label,
         hovertemplate = "%{x|%Y-%m-%d}: %{y}件<extra></extra>")
     }
 
