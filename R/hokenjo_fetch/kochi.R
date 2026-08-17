@@ -74,7 +74,9 @@
         dname <- keywords[[di]][[1]]
         for (k in seq_along(hokenjo)) {
           sub <- r[r$x >= bins[k] & r$x < bins[k + 1] & sapply(r$text, is_num), ]
-          val <- if (nrow(sub) >= 1) parse_hokenjo_number(sub$text[1]) else NA_real_
+          # 高知県の表は報告数0のセルがハイフン等ではなく空欄（トークン無し）
+          # で表現されるため、該当列にトークンが見つからない場合は0とする
+          val <- if (nrow(sub) >= 1) parse_hokenjo_number(sub$text[1]) else 0
           out[[length(out) + 1]] <- data.frame(hokenjo = hokenjo[k], disease = dname, value = val, stringsAsFactors = FALSE)
         }
         break

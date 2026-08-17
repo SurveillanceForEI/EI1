@@ -34,7 +34,8 @@ MAX_WEEK <- 33
 # week_label文字列から週番号を抜き出す。県によって表記が異なるため
 # 複数パターンを順に試す（例: "2026年第32週", "令和８年第 32 週",
 # "令和８年第３１週"(全角数字), "2026年31週", "32 (R. 8. 8. 3 ～ R. 8. 8. 9)"）。
-# "2026年7/27～8/2"のように週番号自体が書かれていない県はNAのままとする
+# 香川県の"2026年7/27～8/2"のように週番号自体が書かれていない場合は、
+# 開始日からISO週番号（月曜始まり、%V）を逆算する
 # （4桁の年を週番号と誤認しないよう、週候補は1〜2桁に限定する）。
 extract_week_num <- function(week_label) {
   if (is.na(week_label)) return(NA_integer_)
@@ -44,6 +45,11 @@ extract_week_num <- function(week_label) {
   for (pat in patterns) {
     m <- regmatches(wl, regexec(pat, wl))[[1]]
     if (length(m) >= 2) return(as.integer(m[2]))
+  }
+  m <- regmatches(wl, regexec("(20[0-9]{2})年\\s*([0-9]{1,2})/([0-9]{1,2})", wl))[[1]]
+  if (length(m) == 4) {
+    d <- tryCatch(as.Date(sprintf("%s-%s-%s", m[2], m[3], m[4])), error = function(e) NA)
+    if (!is.na(d)) return(as.integer(format(d, "%V")))
   }
   NA_integer_
 }
