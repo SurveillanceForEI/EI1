@@ -632,16 +632,21 @@ compute_ibs_band_multi <- function(main_df, hist_df, value_col = "reports_per_si
       baseline <- v[base_start:base_end]
       mu    <- mean(baseline, na.rm = TRUE)
       sigma <- sqrt(max(mu, 1))
-      score1 <- if (is.na(val)) NA_real_ else
+      # baseline（直近7週）が全てNAだと mu が NaN になり、以降の比較が
+      # 全てNAになってしまう（if()でエラーになる）ため、その場合は
+      # 主方式・補助方式とも「基準値なし」として扱う
+      has_baseline <- !is.nan(mu) && is.finite(mu) && is.finite(sigma)
+      score1 <- if (!has_baseline || is.na(val)) NA_real_ else
         if (val >= mu + 3 * sigma) 3 else if (val >= mu + 2 * sigma) 2 else if (val > mu) 1 else 0
 
-      if (want_secondary) {
+      if (want_secondary && has_baseline) {
         cu <- tryCatch(.cusum_score(v, base_start, base_end, mu, sigma), error = function(e) NULL)
         has2 <- !is.null(cu)
         score2 <- if (!has2 || is.na(val)) NA_real_ else cu$score
       } else { has2 <- FALSE; cu <- NULL; score2 <- NA_real_ }
 
-      data.frame(mu = mu, s = sigma, has_hist = TRUE, score_primary = score1,
+      data.frame(mu = if (has_baseline) mu else NA_real_, s = if (has_baseline) sigma else NA_real_,
+                 has_hist = has_baseline, score_primary = score1,
                  mu2 = NA_real_, s2 = NA_real_,
                  cusum_val = if (has2) cu$c_t else NA_real_, cusum_thresh = if (has2) cu$h_lim else NA_real_,
                  has_secondary = has2, score_secondary = score2)
