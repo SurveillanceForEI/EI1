@@ -368,26 +368,24 @@ ui <- dashboardPage(
             setTimeout(registerHokenjoWeekLabelHandler, 50);
             return;
           }
-          // 直近に受信したラベル表を保持し、現在の#hokenjo_week_numが
+          // 直近に受信したラベル表を保持し、現在の#hokenjo_week_idxが
           // まだこのラベルで初期化されていなければ適用する。都道府県切替時は
           // 「メッセージ受信」と「renderUIによるスライダー要素の再生成（古い
           // 要素の破棄→新しい要素の生成）」の順序保証が無いため、メッセージ
           // 到達時点でまだ古い（間もなく破棄される）要素にしか適用できない
           // ケースがある。そのため一度適用して終わりにせず、DOM変化のたびに
           // 「今のスライダーにまだ適用済みでなければ再適用」を試み続ける。
+          // スライダーの値は実在する週だけを並べた配列への1始まりインデックス
+          // なので、範囲内の値は必ず対応するラベルを持つ（空欄になることはない）。
           var currentLabels = null;
           var applyPrettify = function() {
             if (!currentLabels) return;
-            var irs = $('#hokenjo_week_num').data('ionRangeSlider');
+            var irs = $('#hokenjo_week_idx').data('ionRangeSlider');
             if (!irs || irs.options.prettify_enabled) return;
             var labels = currentLabels;
             irs.update({
               prettify_enabled: true,
-              // 年またぎの範囲を連続スライダーにするため、実在しない週番号
-              // （例: 2025年52週の次の合成値2025年53週など）もスライダー上の
-              // 値としては存在しうる。そうした値はサーバー側で空文字列を
-              // 返しているので、生の数値から「第N週」を捏造せず空欄にする
-              prettify: function(num) { var l = labels[num]; return (l && l.length > 0) ? l : ''; }
+              prettify: function(num) { return labels[num] || ''; }
             });
           };
           var observer = new MutationObserver(applyPrettify);
@@ -6034,23 +6032,36 @@ server <- function(input, output, session) {
     integer(0)
   })
 
+  # スライダーの値は「年*100+週番号」の複合キーそのものではなく、実際に
+  # データが存在する週だけを並べた配列への1始まりインデックスにする
+  # （min〜maxの連続範囲だと、年またぎ等でデータの無い週の値も選択できて
+  # しまい、ハイフンや空欄のまま止まれてしまうため）
   output$hokenjo_week_slider_ui <- renderUI({
     wks <- hokenjo_available_week_nums()
     if (length(wks) < 2) return(NULL)
     tagList(
-      sliderInput("hokenjo_week_num", "表示週",
-                  min = min(wks), max = max(wks), value = max(wks),
+      sliderInput("hokenjo_week_idx", "表示週",
+                  min = 1, max = length(wks), value = length(wks),
                   step = 1, sep = "", ticks = FALSE, width = "100%")
     )
   })
 
+  # 選択中のインデックスを実際の「年*100+週番号」キーに変換する
+  hokenjo_selected_week_key <- reactive({
+    wks <- hokenjo_available_week_nums()
+    idx <- input$hokenjo_week_idx
+    if (length(wks) < 2 || is.null(idx) || idx < 1 || idx > length(wks)) return(NULL)
+    wks[idx]
+  })
+
   # スライダーのハンドル上に「YYYY年第N週（M/D〜M/D）」表記を出すため、
-  # 週番号→表示ラベルの対応表をクライアントへ送りionRangeSliderのprettifyを更新する
+  # インデックス→表示ラベルの対応表をクライアントへ送りionRangeSliderの
+  # prettifyを更新する（インデックスは必ず実在する週に対応するため、
+  # ハイフンや空欄になることはない）
   observe({
     wks <- hokenjo_available_week_nums()
     if (length(wks) < 2) return()
-    all_keys <- seq(min(wks), max(wks))
-    labels <- setNames(vapply(all_keys, hokenjo_week_period_label_key, character(1)), as.character(all_keys))
+    labels <- setNames(vapply(wks, hokenjo_week_period_label_key, character(1)), as.character(seq_along(wks)))
     session$sendCustomMessage("hokenjo_week_labels", as.list(labels))
   })
 
@@ -6087,11 +6098,10 @@ server <- function(input, output, session) {
     st <- hokenjo_status()
     if (st$status != "ok") return(NULL)
 
-    wk_key <- input$hokenjo_week_num
+    wk_key <- hokenjo_selected_week_key()
     if (!is.null(wk_key) && !is.null(HOKENJO_HISTORY)) {
-      # スライダーの値は「年*100+週番号」の複合キー。week_numだけで絞ると
-      # 年をまたいで同じ週番号のデータ（例: 2025年第10週と2026年第10週）が
-      # 混ざってしまうため、年も合わせて絞り込む。
+      # スライダーは実在する週だけに対応するインデックスなので、選択された
+      # キー（年*100+週番号）は必ずデータが存在するはずだが、念のため
       # 該当週のデータが無ければHOKENJO_CURRENT（最新週）へ黙って差し替えず、
       # データ無し扱いにする（差し替えるとスライダーの位置と地図・グラフの
       # 表示週がズレてしまうため）
@@ -6166,7 +6176,7 @@ server <- function(input, output, session) {
     } else NA_character_
     if (is.na(label)) return(NULL)
 
-    wk_key <- input$hokenjo_week_num
+    wk_key <- hokenjo_selected_week_key()
     target_year <- if (!is.null(wk_key)) wk_key %/% 100L else NA_integer_
     target_week <- if (!is.null(wk_key)) wk_key %% 100L else NA_integer_
 
