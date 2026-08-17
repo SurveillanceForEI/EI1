@@ -17,8 +17,12 @@ fetch_wakayama <- function(pdf_url, page = NULL) {
   full <- pdftools::pdf_text(tf)
 
   if (is.null(page)) {
-    page <- which(grepl("保健所別の患者報告数", full))[1]
-    if (is.na(page)) stop("「保健所別の患者報告数」ページが見つかりません")
+    # 本文中の注目トピック解説（1ページ目等）にも「保健所別」の文言が
+    # 現れることがあるため、実際の表がある最後の一致ページを使う
+    hits <- which(grepl("＜保健所別の患者報告数", full))
+    if (length(hits) == 0) hits <- which(grepl("保健所別の患者報告数", full))
+    if (length(hits) == 0) stop("「保健所別の患者報告数」ページが見つかりません")
+    page <- hits[length(hits)]
   }
   txt <- full[page]
   lines <- strsplit(txt, "\n")[[1]]
