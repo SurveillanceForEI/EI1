@@ -6120,6 +6120,43 @@ server <- function(input, output, session) {
     }
   )
 
+  # 「全国」選択時: 都道府県ごとにHOKENJO_CURRENT（最新週）から選択疾患を
+  # 名寄せし、保健所平均の定点当たり報告数・合計報告数を集計して
+  # 全国地図の塗り分けに使う（グラフは都道府県単位の内訳なので出さない）
+  hokenjo_national_map_data <- reactive({
+    pref <- input$pref_filter
+    if (!is.null(pref) && pref != "" && pref != "全国") return(NULL)
+    if (!is.null(input$ts_mode) && input$ts_mode == "zensu") return(NULL)
+    if (is.null(HOKENJO_CURRENT)) return(NULL)
+
+    disease_id <- input$disease
+    label <- if (!is.null(disease_id) && disease_id %in% names(DISEASE_CONFIG)) {
+      DISEASE_CONFIG[[disease_id]]$label
+    } else if (!is.null(disease_id) && disease_id %in% names(STD_DISEASE_CONFIG)) {
+      STD_DISEASE_CONFIG[[disease_id]]$label
+    } else NA_character_
+    if (is.na(label)) return(NULL)
+
+    prefs <- unique(as.character(HOKENJO_CURRENT$pref))
+    rows <- lapply(prefs, function(p) {
+      matched <- resolve_hokenjo_disease(HOKENJO_CURRENT, p, label)
+      if (is.null(matched)) return(NULL)
+      sub <- HOKENJO_CURRENT[HOKENJO_CURRENT$pref == p & HOKENJO_CURRENT$disease == matched, ]
+      if (nrow(sub) == 0) return(NULL)
+      data.frame(
+        pref_name = p,
+        rate = mean(sub$rate, na.rm = TRUE),
+        count = sum(sub$count, na.rm = TRUE),
+        week_label = unique(sub$week_label)[1],
+        stringsAsFactors = FALSE
+      )
+    })
+    out <- do.call(rbind, Filter(Negate(is.null), rows))
+    if (is.null(out) || nrow(out) == 0) return(NULL)
+    out$rate[is.nan(out$rate)] <- NA_real_
+    out
+  })
+
   # 数値ラベルのない棒グラフPDFから目視・画像解析で読み取った近似値のみで
   # 構成されている都道府県（テーブル形式の元データが無いため）
   HOKENJO_GRAPH_APPROX_PREFS <- c("千葉県")
@@ -6128,9 +6165,14 @@ server <- function(input, output, session) {
     st <- hokenjo_status()
     d <- if (st$status == "ok") hokenjo_map_data() else NULL
     wk <- if (!is.null(d)) { w <- unique(d$week_label); w[!is.na(w)] } else character(0)
+    if (st$status == "no_pref") {
+      nd <- hokenjo_national_map_data()
+      wk <- if (!is.null(nd)) { w <- unique(nd$week_label); w[!is.na(w)] } else character(0)
+    }
 
+    national_ok <- st$status == "no_pref" && !is.null(hokenjo_national_map_data())
     msg <- switch(st$status,
-      no_pref = "画面上部で都道府県を選択すると、保健所別マップが表示されます（現在「全国」選択中）。",
+      no_pref = if (national_ok) NULL else "「全国」選択時に地図で塗り分けられる保健所別データが見つかりませんでした。都道府県を選択すると、その県内の保健所別マップが表示されます。",
       not_teiten = "保健所別マップは「定点把握」の週次疾患のみ対応しています（現在は全数把握モードです）。",
       pref_unavailable = sprintf("%sの週報からは保健所別データを取得できていません。", st$pref),
       disease_unmatched = sprintf("%sの週報には「%s」の保健所別内訳が見当たりませんでした。", st$pref, st$label),
@@ -6148,6 +6190,10 @@ server <- function(input, output, session) {
         tags$div(style="color:#8a6d1a;background:#fff8e1;border:1px solid #f0dfa0;border-radius:4px;padding:8px 12px;font-size:0.85em;margin-bottom:8px;",
           sprintf("※ %sは数値ラベルの無い棒グラフ形式の週報のみが公表されているため、グラフの目盛りを基にした近似値です（正確な集計値ではありません）。", st$pref))
       },
+      if (national_ok) {
+        tags$div(style="color:#345;background:#eef4ff;border:1px solid #cdddf5;border-radius:4px;padding:8px 12px;font-size:0.85em;margin-bottom:8px;",
+          "「全国」選択中は都道府県ごとの集計値（保健所平均）を地図に表示しています。都道府県を選択すると、その県内の保健所別の内訳（マップ・グラフ）が表示されます。")
+      },
       if (!is.null(msg)) {
         tags$div(style="color:#a55;background:#fff6f6;border:1px solid #f0d0d0;border-radius:4px;padding:8px 12px;font-size:0.88em;margin-bottom:8px;",
           msg)
@@ -6163,8 +6209,35 @@ server <- function(input, output, session) {
   )
 
   output$hokenjo_map <- renderLeaflet({
-    d <- hokenjo_map_data()
+    st0 <- hokenjo_status()
     metric <- if (!is.null(input$hokenjo_metric)) input$hokenjo_metric else "rate"
+
+    if (st0$status == "no_pref") {
+      nd <- hokenjo_national_map_data()
+      if (is.null(nd) || nrow(nd) == 0 || is.null(JAPAN_MAP) || !(metric %in% names(nd))) {
+        return(leaflet() %>% addTiles() %>% fitBounds(lng1 = 123, lat1 = 24, lng2 = 146, lat2 = 46))
+      }
+      vals <- nd[[metric]]
+      max_val <- suppressWarnings(max(vals, na.rm = TRUE))
+      if (!is.finite(max_val) || max_val <= 0) max_val <- 1
+      pal <- colorNumeric(c("#ffffcc", "#fd8d3c", "#800026"), c(0, max_val * 1.1), na.color = "#cccccc")
+      metric_label <- if (metric == "rate") "定点当たり報告数<br>（保健所平均）" else "報告数<br>（保健所合計）"
+      md <- JAPAN_MAP %>% left_join(nd, by = "pref_name")
+      return(
+        leaflet(md) %>% addTiles(options = tileOptions(opacity = 0.4)) %>%
+          addPolygons(
+            fillColor = ~pal(get(metric)), fillOpacity = 0.8,
+            color = "#fff", weight = 1,
+            highlight = highlightOptions(weight = 2, color = "#333", bringToFront = TRUE),
+            label = ~paste0(pref_name, ": ", ifelse(is.na(get(metric)), "データなし", round(get(metric), 2))),
+            labelOptions = labelOptions(style = list("font-size" = "12px"))
+          ) %>%
+          addLegend(pal = pal, values = c(0, max_val), title = metric_label, position = "bottomright") %>%
+          fitBounds(lng1 = 123, lat1 = 24, lng2 = 146, lat2 = 46)
+      )
+    }
+
+    d <- hokenjo_map_data()
     if (is.null(d) || nrow(d) == 0 || !(metric %in% names(d))) {
       return(leaflet() %>% addTiles() %>% fitBounds(lng1 = 123, lat1 = 24, lng2 = 146, lat2 = 46))
     }
@@ -6193,6 +6266,7 @@ server <- function(input, output, session) {
   })
 
   output$hokenjo_bar_plot <- renderPlotly({
+    if (hokenjo_status()$status == "no_pref") return(NULL)  # 全国選択時は地図のみ（グラフ不要）
     d <- hokenjo_map_data()
     metric <- if (!is.null(input$hokenjo_metric)) input$hokenjo_metric else "rate"
     if (is.null(d) || nrow(d) == 0 || !(metric %in% names(d))) return(NULL)
