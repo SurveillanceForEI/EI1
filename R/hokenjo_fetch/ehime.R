@@ -142,7 +142,8 @@ fetch_ehime <- function(pdf_url) {
 
   # 週ラベルはページ全体テキストから取得
   txt <- pdftools::pdf_text(path)
-  wl <- regmatches(txt[[1]], regexpr("第\\s*[0-9]+\\s*週\\s*[\\(（][0-9.]+[～~][0-9.]+[\\)）]", txt[[1]]))
+  # 「〜」(波ダッシュ U+301C) と「～」(全角チルダ U+FF5E) の両方に対応する
+  wl <- regmatches(txt[[1]], regexpr("第\\s*[0-9]+\\s*週\\s*[\\(（][0-9.]+[～~〜][0-9.]+[\\)）]", txt[[1]]))
   week_label <- if (length(wl) > 0) gsub("\\s", "", wl) else NA_character_
 
   result <- data.frame(

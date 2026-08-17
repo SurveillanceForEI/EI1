@@ -91,13 +91,50 @@ fetch_kochi <- function(pdf_url = NULL) {
   }
   if (!exists("pdf_words")) stop("pdf_table_utils.R を先に source してください")
 
-  words <- pdf_words(pdf_url, page = 5)
+  # 保健所別表のページ番号は週によって変動する（p.1,2,4,5,6,7など）ため、
+  # 「定点名」ラベルと保健所名(4つ以上)が両方含まれるページを探して使う。
+  # URLの場合は毎回ダウンロードし直さないよう、先にローカルへ保存しておく
+  local_path <- pdf_url
+  if (grepl("^https?://", pdf_url)) {
+    local_path <- tempfile(fileext = ".pdf")
+    download.file(pdf_url, local_path, mode = "wb", quiet = TRUE)
+  }
+  n_pages <- tryCatch(pdftools::pdf_info(local_path)$pages, error = function(e) 9L)
+  target_page <- NA_integer_
+  for (page in seq_len(min(n_pages, 9))) {
+    words_p <- tryCatch(pdf_words(local_path, page = page), error = function(e) NULL)
+    if (is.null(words_p) || nrow(words_p) == 0) next
+    if (sum(.KOCHI_HOKENJO %in% words_p$text) >= 4 && any(grepl("定点名", words_p$text))) {
+      target_page <- page
+      break
+    }
+  }
+  if (is.na(target_page)) stop("kochi: 保健所別の表ページが見つかりません")
+
+  words <- pdf_words(local_path, page = target_page)
   rows <- group_words_into_rows(words, y_tol = 3)
 
-  week_line <- Filter(function(r) grepl("20[0-9]{2}年第[0-9]+週", row_text(r)), rows)
-  week_label <- if (length(week_line) > 0) {
-    regmatches(row_text(week_line[[1]]), regexpr("20[0-9]{2}年第[0-9]+週", row_text(week_line[[1]])))
-  } else NA_character_
+  # 週表記は「20xx年第N週」「令和N年第N週」に加え、「第N週 令和N年M月D日〜」
+  # のように週番号と年表記の前後が入れ替わっていることもあるため、同じ行
+  # 内から週番号と年をそれぞれ独立に拾って組み立てる
+  week_label <- NA_character_
+  for (r in rows) {
+    t <- row_text(r)
+    if (!grepl("第\\s*[0-9]+\\s*週", t)) next
+    wk_m <- regmatches(t, regexpr("第\\s*([0-9]+)\\s*週", t))
+    if (length(wk_m) == 0 || !nzchar(wk_m)) next
+    wk_num_txt <- gsub("\\s+", "", wk_m)
+    yr_m <- regmatches(t, regexec("(20[0-9]{2})年", t))[[1]]
+    if (length(yr_m) == 2) {
+      week_label <- paste0(yr_m[2], "年", wk_num_txt)
+      break
+    }
+    yr_m <- regmatches(t, regexec("令和\\s*([0-9]+)\\s*年", t))[[1]]
+    if (length(yr_m) == 2) {
+      week_label <- paste0(as.integer(yr_m[2]) + 2018L, "年", wk_num_txt)
+      break
+    }
+  }
 
   # 「定点当たり人数」の行を境に上段(報告数)/下段(定点当たり)を分割
   # 1行目のページタイトル自体に「定点当たり人数」を含むことがあり、
