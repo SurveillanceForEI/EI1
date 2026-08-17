@@ -613,6 +613,10 @@ function ebsUntranslateCards(containerId) {
             column(4, uiOutput("hokenjo_metric_selector_ui")),
             column(8, uiOutput("hokenjo_week_slider_ui"))
           ),
+          tags$div(style="text-align:right;margin-bottom:6px;",
+            downloadButton("hokenjo_bulk_dl", "保健所別データ一括ダウンロード（全都道府県・全疾患・全週・CSV）",
+                           class="btn-xs btn-default", icon=icon("download"))
+          ),
           uiOutput("hokenjo_status_ui"),
           fluidRow(
             column(7,
@@ -6076,6 +6080,23 @@ server <- function(input, output, session) {
     }
     build_hokenjo_map_data(src, st$pref, st$disease, HOKENJO_NAME_MAP)
   })
+
+  # 保健所別データの一括ダウンロード（画面の都道府県・疾患・週選択とは無関係に、
+  # 取得できている全都道府県・全疾患・全週のデータを一つのCSVにまとめて出力する）
+  output$hokenjo_bulk_dl <- downloadHandler(
+    filename = function() paste0("保健所別データ_全県_", Sys.Date(), ".csv"),
+    content = function(file) {
+      if (is.null(HOKENJO_HISTORY) || nrow(HOKENJO_HISTORY) == 0) {
+        write.csv(data.frame(), file, row.names = FALSE); return()
+      }
+      out <- HOKENJO_HISTORY %>%
+        transmute(都道府県 = pref, 保健所 = hokenjo, 疾患 = disease,
+                  年 = hokenjo_year, 週番号 = week_num, 週表記 = week_label,
+                  報告数 = count, 定点当たり報告数 = rate) %>%
+        arrange(都道府県, 疾患, 年, 週番号, 保健所)
+      write_csv_bom(out, file)
+    }
+  )
 
   # 数値ラベルのない棒グラフPDFから目視・画像解析で読み取った近似値のみで
   # 構成されている都道府県（テーブル形式の元データが無いため）
