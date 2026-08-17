@@ -15,20 +15,46 @@
 
 fetch_nagasaki <- function(pdf_url) {
   if (!exists("pdf_words")) stop("pdf_table_utils.R を先に source してください")
-  words <- pdf_words(pdf_url, page = 4)
+
+  local_path <- pdf_url
+  if (grepl("^https?://", pdf_url)) {
+    local_path <- tempfile(fileext = ".pdf")
+    download.file(pdf_url, local_path, mode = "wb", quiet = TRUE)
+  }
+
+  words <- pdf_words(local_path, page = 4)
   rows <- group_words_into_rows(words, y_tol = 3)
 
   week_line <- Filter(function(r) grepl("第[0-9]+週", row_text(r)) && grepl("疾病別・保健所管内別", row_text(r)), rows)
-  week_label <- if (length(week_line) > 0) {
+  week_num_txt <- if (length(week_line) > 0) {
+    regmatches(row_text(week_line[[1]]), regexpr("第[0-9]+週", row_text(week_line[[1]])))
+  } else NA_character_
+
+  week_label <- NA_character_
+  if (!is.na(week_num_txt) && nzchar(week_num_txt)) {
     line_text <- row_text(week_line[[1]])
     m <- regmatches(line_text, regexpr("20[0-9]{2}年第[0-9]+週", line_text))
-    if (length(m) == 0 || nchar(m) == 0) {
-      # 年が同じ行に含まれない場合はページ全体から探す
+    if (length(m) > 0 && nchar(m) > 0) {
+      week_label <- m
+    } else {
+      # 年がp.4に無い場合はp.4全体、それでも無ければ表紙(p.1)を探す
+      # （表紙には「2026年第31週」のように年が明記されているが、
+      #   (2)表の見出し行には週番号のみで年が書かれていないことがある）
       page_text <- paste(sapply(rows, row_text), collapse = " ")
-      m <- regmatches(page_text, regexpr("20[0-9]{2}年第[0-9]+週", page_text))
+      yr_m <- regmatches(page_text, regexpr("20[0-9]{2}年(?=.*第[0-9]+週)", page_text, perl = TRUE))
+      if (length(yr_m) == 0 || !nzchar(yr_m)) {
+        p1_words <- tryCatch(pdf_words(local_path, page = 1), error = function(e) NULL)
+        if (!is.null(p1_words)) {
+          p1_rows <- group_words_into_rows(p1_words, y_tol = 3)
+          p1_text <- paste(sapply(p1_rows, row_text), collapse = " ")
+          yr_m <- regmatches(p1_text, regexpr("20[0-9]{2}年", p1_text))
+        }
+      }
+      if (length(yr_m) > 0 && nzchar(yr_m)) {
+        week_label <- paste0(yr_m, week_num_txt)
+      }
     }
-    if (length(m) > 0 && nchar(m) > 0) m else NA_character_
-  } else NA_character_
+  }
 
   hdr_idx <- which(sapply(rows, function(r) any(r$text == "県") && any(r$text == "対馬")))
   if (length(hdr_idx) == 0) stop("nagasaki: ヘッダー行が見つかりません")
