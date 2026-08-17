@@ -6121,8 +6121,9 @@ server <- function(input, output, session) {
   )
 
   # 「全国」選択時: 都道府県ごとにHOKENJO_CURRENT（最新週）から選択疾患を
-  # 名寄せし、保健所平均の定点当たり報告数・合計報告数を集計して
-  # 全国地図の塗り分けに使う（グラフは都道府県単位の内訳なので出さない）
+  # 名寄せし、build_hokenjo_map_data()で各県の保健所別ポリゴンを作った上で
+  # 全県分を結合し、全国地図を保健所単位で塗り分ける
+  # （グラフは全国横断では意味を持たないため出さない）
   hokenjo_national_map_data <- reactive({
     pref <- input$pref_filter
     if (!is.null(pref) && pref != "" && pref != "全国") return(NULL)
@@ -6138,23 +6139,52 @@ server <- function(input, output, session) {
     if (is.na(label)) return(NULL)
 
     prefs <- unique(as.character(HOKENJO_CURRENT$pref))
-    rows <- lapply(prefs, function(p) {
+    pieces <- lapply(prefs, function(p) {
       matched <- resolve_hokenjo_disease(HOKENJO_CURRENT, p, label)
       if (is.null(matched)) return(NULL)
-      sub <- HOKENJO_CURRENT[HOKENJO_CURRENT$pref == p & HOKENJO_CURRENT$disease == matched, ]
-      if (nrow(sub) == 0) return(NULL)
-      data.frame(
-        pref_name = p,
-        rate = mean(sub$rate, na.rm = TRUE),
-        count = sum(sub$count, na.rm = TRUE),
-        week_label = unique(sub$week_label)[1],
-        stringsAsFactors = FALSE
-      )
+      d <- tryCatch(build_hokenjo_map_data(HOKENJO_CURRENT, p, matched, HOKENJO_NAME_MAP), error = function(e) NULL)
+      if (is.null(d) || nrow(d) == 0) return(NULL)
+      d$pref <- p
+      d
     })
-    out <- do.call(rbind, Filter(Negate(is.null), rows))
-    if (is.null(out) || nrow(out) == 0) return(NULL)
-    out$rate[is.nan(out$rate)] <- NA_real_
+    pieces <- Filter(Negate(is.null), pieces)
+    if (length(pieces) == 0) return(NULL)
+    out <- do.call(rbind, pieces)
     out
+  })
+
+  # 凡例スケール固定用（地域別比較のmap_scale_max()と同じ考え方）:
+  # 現在表示している週だけでなく、選択中の疾患の全期間・全保健所での
+  # 最大値を使うことで、週を切り替えても色の基準が変わらないようにする
+  hokenjo_map_scale_max <- reactive({
+    metric <- if (!is.null(input$hokenjo_metric)) input$hokenjo_metric else "rate"
+    if (is.null(HOKENJO_HISTORY)) return(1)
+    st <- hokenjo_status()
+
+    if (st$status == "ok") {
+      sub <- HOKENJO_HISTORY[HOKENJO_HISTORY$pref == st$pref & HOKENJO_HISTORY$disease == st$disease, ]
+      mx <- suppressWarnings(max(sub[[metric]], na.rm = TRUE))
+      return(if (!is.finite(mx) || mx <= 0) 1 else mx)
+    }
+
+    if (st$status == "no_pref") {
+      disease_id <- input$disease
+      label <- if (!is.null(disease_id) && disease_id %in% names(DISEASE_CONFIG)) {
+        DISEASE_CONFIG[[disease_id]]$label
+      } else if (!is.null(disease_id) && disease_id %in% names(STD_DISEASE_CONFIG)) {
+        STD_DISEASE_CONFIG[[disease_id]]$label
+      } else NA_character_
+      if (is.na(label)) return(1)
+      prefs <- unique(as.character(HOKENJO_HISTORY$pref))
+      vals <- unlist(lapply(prefs, function(p) {
+        matched <- resolve_hokenjo_disease(HOKENJO_HISTORY, p, label)
+        if (is.null(matched)) return(NULL)
+        HOKENJO_HISTORY[[metric]][HOKENJO_HISTORY$pref == p & HOKENJO_HISTORY$disease == matched]
+      }))
+      mx <- suppressWarnings(max(vals, na.rm = TRUE))
+      return(if (!is.finite(mx) || mx <= 0) 1 else mx)
+    }
+    1
   })
 
   # 数値ラベルのない棒グラフPDFから目視・画像解析で読み取った近似値のみで
@@ -6192,7 +6222,7 @@ server <- function(input, output, session) {
       },
       if (national_ok) {
         tags$div(style="color:#345;background:#eef4ff;border:1px solid #cdddf5;border-radius:4px;padding:8px 12px;font-size:0.85em;margin-bottom:8px;",
-          "「全国」選択中は都道府県ごとの集計値（保健所平均）を地図に表示しています。都道府県を選択すると、その県内の保健所別の内訳（マップ・グラフ）が表示されます。")
+          "「全国」選択中は全都道府県の保健所単位で地図を塗り分けています。都道府県を選択すると、その県のみのマップ・グラフに切り替わります。")
       },
       if (!is.null(msg)) {
         tags$div(style="color:#a55;background:#fff6f6;border:1px solid #f0d0d0;border-radius:4px;padding:8px 12px;font-size:0.88em;margin-bottom:8px;",
@@ -6214,22 +6244,19 @@ server <- function(input, output, session) {
 
     if (st0$status == "no_pref") {
       nd <- hokenjo_national_map_data()
-      if (is.null(nd) || nrow(nd) == 0 || is.null(JAPAN_MAP) || !(metric %in% names(nd))) {
+      if (is.null(nd) || nrow(nd) == 0 || !(metric %in% names(nd))) {
         return(leaflet() %>% addTiles() %>% fitBounds(lng1 = 123, lat1 = 24, lng2 = 146, lat2 = 46))
       }
-      vals <- nd[[metric]]
-      max_val <- suppressWarnings(max(vals, na.rm = TRUE))
-      if (!is.finite(max_val) || max_val <= 0) max_val <- 1
+      max_val <- hokenjo_map_scale_max()
       pal <- colorNumeric(c("#ffffcc", "#fd8d3c", "#800026"), c(0, max_val * 1.1), na.color = "#cccccc")
-      metric_label <- if (metric == "rate") "定点当たり報告数<br>（保健所平均）" else "報告数<br>（保健所合計）"
-      md <- JAPAN_MAP %>% left_join(nd, by = "pref_name")
+      metric_label <- if (metric == "rate") "定点当たり報告数" else "報告数"
       return(
-        leaflet(md) %>% addTiles(options = tileOptions(opacity = 0.4)) %>%
+        leaflet(nd) %>% addTiles(options = tileOptions(opacity = 0.4)) %>%
           addPolygons(
             fillColor = ~pal(get(metric)), fillOpacity = 0.8,
-            color = "#fff", weight = 1,
+            color = "#fff", weight = 0.5,
             highlight = highlightOptions(weight = 2, color = "#333", bringToFront = TRUE),
-            label = ~paste0(pref_name, ": ", ifelse(is.na(get(metric)), "データなし", round(get(metric), 2))),
+            label = ~paste0(pref, " ", hokenjo, ": ", ifelse(is.na(get(metric)), "データなし", round(get(metric), 2))),
             labelOptions = labelOptions(style = list("font-size" = "12px"))
           ) %>%
           addLegend(pal = pal, values = c(0, max_val), title = metric_label, position = "bottomright") %>%
@@ -6241,9 +6268,7 @@ server <- function(input, output, session) {
     if (is.null(d) || nrow(d) == 0 || !(metric %in% names(d))) {
       return(leaflet() %>% addTiles() %>% fitBounds(lng1 = 123, lat1 = 24, lng2 = 146, lat2 = 46))
     }
-    vals <- d[[metric]]
-    max_val <- suppressWarnings(max(vals, na.rm = TRUE))
-    if (!is.finite(max_val) || max_val <= 0) max_val <- 1
+    max_val <- hokenjo_map_scale_max()
     pal <- colorNumeric(c("#ffffcc", "#fd8d3c", "#800026"), c(0, max_val * 1.1), na.color = "#cccccc")
     metric_label <- if (metric == "rate") "定点当たり報告数" else "報告数"
 
