@@ -154,12 +154,20 @@ normalize_hokenjo_names <- function(df, pref, name_map) {
 }
 
 # メイン画面の疾患ラベル（DISEASE_CONFIG由来）と、県ごとに表記ゆれのある
-# 週報側疾患名（全角/半角、括弧の有無など）を突き合わせるための正規化
+# 週報側疾患名（全角/半角、半角カタカナ、括弧の有無など）を突き合わせる
+# ための正規化
 .normalize_disease_label <- function(x) {
+  # 半角カタカナ（ﾚﾝｻ・ｸﾗﾐｼﾞｱ・ｵｳﾑ等）を全角に統一してから、
+  # 続く全角→半角変換（英数字・括弧・ハイフン）に流す
+  if (requireNamespace("stringi", quietly = TRUE)) {
+    x <- stringi::stri_trans_general(x, "Halfwidth-Fullwidth")
+  }
   x <- chartr(
-    "ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ０１２３４５６７８９（）",
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789()", x)
+    "ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ０１２３４５６７８９（）－",
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789()-", x)
   x <- gsub("[ 　]", "", x)
+  # 「発疹」「発しん」のように漢字/ひらがな表記が県によって異なる疾患名を統一
+  x <- gsub("発疹", "発しん", x, fixed = TRUE)
   # 「COVID-19」と「新型コロナウイルス感染症」は同一疾患の別表記のため統一する
   x <- gsub("新型コロナウイルス感染症", "COVID-19", x, fixed = TRUE)
   trimws(x)
@@ -199,6 +207,22 @@ resolve_hokenjo_disease <- function(current_data, pref, target_label) {
     if (identical(sort(c_guards), sort(target_guards))) return(c)
   }
   NULL
+}
+
+# resolve_hokenjo_disease()は「標準ラベル→県の生の疾患名」の一方向だが、
+# CSVエクスポート等で「県の生の疾患名→標準ラベル」の逆引きが必要なため、
+# 候補ラベル一覧を総当たりして対応表を作る（都道府県ごとに一度だけ計算）
+hokenjo_disease_label_map <- function(history_data, pref, candidate_labels) {
+  if (is.null(history_data)) return(character(0))
+  pref_data <- history_data[history_data$pref == pref, ]
+  avail <- unique(pref_data$disease)
+  if (length(avail) == 0) return(character(0))
+  map <- setNames(rep(NA_character_, length(avail)), avail)
+  for (lab in candidate_labels) {
+    hit <- resolve_hokenjo_disease(pref_data, pref, lab)
+    if (!is.null(hit) && hit %in% names(map) && is.na(map[hit])) map[hit] <- lab
+  }
+  map
 }
 
 # 都道府県+疾患を指定して、境界sfオブジェクトにcount/rateを結合したものを返す

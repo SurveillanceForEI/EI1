@@ -6089,9 +6089,31 @@ server <- function(input, output, session) {
       if (is.null(HOKENJO_HISTORY) || nrow(HOKENJO_HISTORY) == 0) {
         write.csv(data.frame(), file, row.names = FALSE); return()
       }
-      out <- HOKENJO_HISTORY %>%
-        transmute(都道府県 = pref, 保健所 = hokenjo, 疾患 = disease,
-                  年 = hokenjo_year, 週番号 = week_num, 週表記 = week_label,
+      # 疾患名は都道府県ごとに週報側の生の表記（全角半角混在・略記など）
+      # のままなので、画面のプルダウンと同じ標準ラベルに正規化する
+      candidate_labels <- unique(c(
+        vapply(DISEASE_CONFIG, function(x) x$label, character(1)),
+        vapply(STD_DISEASE_CONFIG, function(x) x$label, character(1))
+      ))
+      d <- HOKENJO_HISTORY
+      d$disease_std <- d$disease
+      for (p in unique(d$pref)) {
+        map <- hokenjo_disease_label_map(HOKENJO_HISTORY, p, candidate_labels)
+        idx <- d$pref == p
+        matched <- map[d$disease[idx]]
+        d$disease_std[idx] <- ifelse(!is.na(matched), matched, d$disease[idx])
+      }
+      # 週表記も自治体ごとにバラバラな元表記のままなので、年+週番号から
+      # 「YYYY年第N週（M/D〜M/D）」形式に一律計算し直す（スライダーの
+      # ラベルと同じロジック）。年・週番号のいずれかが不明な行は空欄にする。
+      # 行ごとにmapplyすると60万行では非常に遅いため、(年,週番号)の
+      # 一意な組み合わせだけ計算してから結合する
+      combo <- unique(d[!is.na(d$hokenjo_year) & !is.na(d$week_num), c("hokenjo_year", "week_num")])
+      combo$week_label_std <- mapply(hokenjo_week_period_label, combo$week_num, combo$hokenjo_year)
+      d <- dplyr::left_join(d, combo, by = c("hokenjo_year", "week_num"))
+      out <- d %>%
+        transmute(都道府県 = pref, 保健所 = hokenjo, 疾患 = disease_std,
+                  年 = hokenjo_year, 週番号 = week_num, 週表記 = week_label_std,
                   報告数 = count, 定点当たり報告数 = rate) %>%
         arrange(都道府県, 疾患, 年, 週番号, 保健所)
       write_csv_bom(out, file)
