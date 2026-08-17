@@ -1,103 +1,109 @@
-# 宮城県「感染症発生動向調査情報」週報PDF 1ページ目の集計表
-# https://www.pref.miyagi.jp/documents/1967/syuho{YEAR}{WEEK}w.pdf
-# 保健所: 仙南、塩釜、大崎、石巻、気仙沼、仙台市
-# （HOKENJO_DATA_SOURCESには「グラフのみで数値表なし」とあったが、
-#   実際には1ページ目に患者報告数（上段）・定点当たり報告数（下段）の
-#   数値表が存在することを確認した。列順は左から 仙南,塩釜,大崎,石巻,
-#   気仙沼,仙台市,患者数(県計),累計 で、"仙台市"が末尾側にあることに注意）
+# 宮城県「感染症発生動向調査情報」週報PDF
+# https://www.pref.miyagi.jp/documents/1967/<filename>.pdf
+# （URLファイル名が週ごとに命名規則がバラバラなため、呼び出し側で解決すること）
 #
-# 疾患名は「報告数+疾患名」の行として1行にまとまり（y_tol=3で結合される）、
-# その直後の行が「定点当たり報告数のみ」の行になる。値が0またはデータなし
-# の保健所は空欄（トークンなし）で省略されるため、座標（x）による
-# 最近傍列マッチングで保健所を特定する。
+# レイアウト: p.1の表に、疾患ごとに「患者数」行→「定点あたり」行のペアが
+# 縦に並ぶ。列は 仙南/塩釜/大崎/石巻/気仙沼/仙台市 の6保健所＋
+# 県計/累計の集計列。疾患名は固定19種（表記も安定）で、単一トークンとして
+# 抽出できるため、固定リストを座標のyアンカーとして使う。値が0件の保健所は
+# 空欄（トークン無し）になるため、インフルエンザ行（全保健所で必ず値がある）の
+# 実測x座標を列アンカーとして使い、最近傍トークンを割り当てる。
+# 空欄は0件として扱う（ユーザー指示）。
+
+.MIYAGI_HOKENJO <- c("仙南", "塩釜", "大崎", "石巻", "気仙沼", "仙台市")
+
+.MIYAGI_DISEASES <- c(
+  "インフルエンザ", "新型コロナウイルス感染症", "ＲＳウイルス感染症", "咽頭結膜熱",
+  "Ａ群溶血性レンサ球菌咽頭炎", "感染性胃腸炎", "水痘", "手足口病", "伝染性紅斑",
+  "突発性発しん", "ヘルパンギーナ", "流行性耳下腺炎", "急性出血性結膜炎",
+  "流行性角結膜炎", "感染性胃腸炎（ロタウイルス）", "ｸﾗﾐｼﾞｱ肺炎(ｵｳﾑ病は除く)",
+  "細菌性髄膜炎(真菌性を含む)", "ﾏｲｺﾌﾟﾗｽﾞﾏ肺炎", "無菌性髄膜炎"
+)
 
 fetch_miyagi <- function(pdf_url) {
   if (!exists("pdf_words")) stop("pdf_table_utils.R を先に source してください")
 
-  words <- pdf_words(pdf_url, page = 1)
-  rows <- group_words_into_rows(words, y_tol = 3)
+  tmp <- tempfile(fileext = ".pdf")
+  download.file(pdf_url, tmp, mode = "wb", quiet = TRUE)
+  txt <- pdftools::pdf_text(tmp)[1]
 
-  title_tx <- paste(sapply(rows[1:3], row_text), collapse = " ")
-  wm <- regmatches(title_tx, regexec("第([0-9]+)週", title_tx))[[1]]
-  ym <- regmatches(title_tx, regexpr("20[0-9]{2}(?=\\.[0-9]+\\.[0-9]+)", title_tx, perl = TRUE))
-  week_label <- if (length(wm) == 2 && length(ym) > 0) paste0(ym, "年第", wm[2], "週") else NA_character_
-
-  hokenjo_order <- c("仙南", "塩釜", "大崎", "石巻", "気仙沼", "仙台市")
-  col_order <- c(hokenjo_order, "患者数", "累計")
-
-  is_number <- function(s) grepl("^[0-9,]+(\\.[0-9]+)?$", s)
-
-  # 列のx中心は、ヘッダーのラベル位置ではなく実データ行から校正する
-  # （"気仙沼"ラベルの文字位置と実際の数値セルの中心がずれているため、
-  #   ラベル基準の最近傍判定では気仙沼の値が仙台市に誤って割り当てられる
-  #   ことがある）。最初に見つかる「8列すべて値がある行」（通常は
-  # 「急性呼吸器感染症」）を基準行として、その数値トークンのx座標を
-  # そのまま列中心として採用する。
-  col_x <- NULL
-  for (k in seq_along(rows)) {
-    r <- rows[[k]][order(rows[[k]]$x), ]
-    nums <- r[is_number(r$text), ]
-    if (nrow(nums) == 8) { col_x <- nums$x; break }
+  # 週番号は本文中の「－ 第N週 －」表記、年は発行日の令和表記から取る
+  # （日付範囲は期間開始日が年またぎのことがあり、発行年とは限らないため）
+  s <- chartr("０１２３４５６７８９", "0123456789", txt)
+  s_flat <- gsub("\\s+", "", s)
+  week_label <- NA_character_
+  wnum_m <- regmatches(s_flat, regexec("第([0-9]+)週", s_flat))[[1]]
+  yr_m <- regmatches(s_flat, regexec("令和([0-9]+)年", s_flat))[[1]]
+  if (length(yr_m) == 2 && length(wnum_m) == 2) {
+    week_label <- sprintf("%d年第%s週", as.integer(yr_m[2]) + 2018L, wnum_m[2])
   }
-  if (is.null(col_x)) stop("列位置校正用の基準行（8列すべて値がある行）が見つかりません")
 
-  # 表本体の開始行（"患者数"と"累計"を含む見出し行の次）から、
-  # 脚注段落（"＊1 急性呼吸器感染症は、..."）の手前までを対象とする
-  start_idx <- NA_integer_
-  end_idx <- length(rows)
-  for (k in seq_along(rows)) {
-    tx <- row_text(rows[[k]])
-    if (is.na(start_idx) && grepl("患者数", tx) && grepl("累計", tx)) start_idx <- k + 1
-    if (grepl("急性呼吸器感染症は、急性の上気道炎", tx)) { end_idx <- k - 1; break }
+  words <- pdf_words(tmp, page = 1)
+
+  hdr <- words[words$text %in% .MIYAGI_HOKENJO & words$y < 100, ]
+  hdr <- hdr[!duplicated(hdr$text), ]
+  if (nrow(hdr) != length(.MIYAGI_HOKENJO)) stop("miyagi: 保健所別ヘッダー行が見つかりません")
+  hdr <- hdr[match(.MIYAGI_HOKENJO, hdr$text), ]
+  xs <- hdr$x
+  n <- length(.MIYAGI_HOKENJO)
+
+  is_num <- function(t) grepl("^[0-9,.]+$", t)
+
+  # 個々の疾患行だけでは欠測（0件で空欄）がありうるため、ページ全体の数値トークンの
+  # x座標をクラスタリングして列アンカーを求める（値が多い週ほど密になり、
+  # どの週でも安定して6保健所+集計2列分のクラスタが得られる）
+  all_num <- words[words$x >= xs[1] - 30 & is_num(words$text), ]
+  if (nrow(all_num) < n) stop("miyagi: 数値トークンが不足しています（アンカー計算不可）")
+  ux <- sort(unique(round(all_num$x)))
+  clusters <- list()
+  cur <- ux[1]
+  for (v in ux[-1]) {
+    if (v - cur[length(cur)] <= 8) cur <- c(cur, v) else { clusters[[length(clusters) + 1]] <- cur; cur <- v }
   }
-  if (is.na(start_idx)) stop("表の開始位置が見つかりません")
+  clusters[[length(clusters) + 1]] <- cur
+  cluster_centers <- sapply(clusters, function(cl) {
+    toks <- all_num[round(all_num$x) %in% cl, ]
+    weighted.mean(toks$x, w = rep(1, nrow(toks)))
+  })
+  cluster_centers <- sort(cluster_centers)
+  if (length(cluster_centers) < n) stop("miyagi: 列クラスタ数が不足しています")
+  cnt_anchor_xs <- cluster_centers[seq_len(n)]
+  rate_anchor_xs <- cnt_anchor_xs
+
+  nearest_match <- function(row, anchor_xs) {
+    vals <- rep(NA_character_, length(anchor_xs))
+    if (nrow(row) == 0) return(vals)
+    for (t in seq_len(nrow(row))) {
+      d <- abs(anchor_xs - row$x[t])
+      k <- which.min(d)
+      if (d[k] <= 15 && is.na(vals[k])) vals[k] <- row$text[t]
+    }
+    vals
+  }
 
   out <- list()
-  i <- start_idx
-  while (i <= end_idx) {
-    r <- rows[[i]]
-    r <- r[order(r$x), ]
-    # 「急性呼吸器感染症定点」「小児科定点」「眼科定点」「基幹定点」等の
-    # 定点種別カテゴリラベル（縦書きで疾患名の前後に混入）を除外する
-    category_labels <- c(
-      "急性呼吸器", "感染症定点", "小児科定点", "眼科定点", "基幹定点",
-      "拡張", "疾病", "感染症", "定点"
-    )
-    name_toks <- r$text[!is_number(r$text)]
-    name_toks <- gsub("＊[0-9０-９]$", "", name_toks)
-    name_toks <- name_toks[nzchar(name_toks)]
-    name_toks <- name_toks[!name_toks %in% category_labels]
-    num_toks <- r[is_number(r$text), ]
-    if (length(name_toks) > 0 && any(nchar(name_toks) >= 2) && nrow(num_toks) >= 1) {
-      disease <- paste(name_toks, collapse = "")
-      # 各数値トークンをx最近傍の列（保健所6列＋患者数＋累計の8列）に割当てる
-      cnt <- setNames(rep(NA_character_, 8), col_order)
-      for (j in seq_len(nrow(num_toks))) {
-        nearest <- which.min(abs(col_x - num_toks$x[j]))
-        cnt[col_order[nearest]] <- num_toks$text[j]
-      }
-      # 次の行が定点当たり報告数のみの行かどうかを確認
-      rte <- setNames(rep(NA_character_, 8), col_order)
-      if (i + 1 <= end_idx) {
-        r2 <- rows[[i + 1]]
-        r2 <- r2[order(r2$x), ]
-        if (nrow(r2) > 0 && all(grepl("^[0-9]+\\.[0-9]+$", r2$text))) {
-          for (j in seq_len(nrow(r2))) {
-            nearest <- which.min(abs(col_x - r2$x[j]))
-            rte[col_order[nearest]] <- r2$text[j]
-          }
-          i <- i + 1
-        }
-      }
-      for (h in hokenjo_order) {
-        out[[length(out) + 1]] <- data.frame(
-          pref = "宮城県", week_label = week_label, hokenjo = h, disease = disease,
-          count = parse_hokenjo_number(cnt[h]), rate = parse_hokenjo_number(rte[h]),
-          stringsAsFactors = FALSE
-        )
-      }
+  for (disease in .MIYAGI_DISEASES) {
+    hit <- words[words$text == disease & words$x < 150, ]
+    if (nrow(hit) == 0) next
+    dy <- hit$y[1]
+
+    # 疾患名のyは「患者数行」と「定点あたり行」の間に位置する
+    # （患者数がやや上、定点あたりがやや下）
+    cnt_row <- words[words$y >= dy - 6 & words$y < dy & words$x >= xs[1] - 30 & is_num(words$text), ]
+    rate_row <- words[words$y > dy & words$y <= dy + 8 & words$x >= xs[1] - 30 & is_num(words$text), ]
+    cnt_vals <- nearest_match(cnt_row, cnt_anchor_xs)
+    rate_vals <- nearest_match(rate_row, rate_anchor_xs)
+
+    # 空欄（値トークンなし）は0件と判断する（ユーザー指示）
+    for (k in seq_along(.MIYAGI_HOKENJO)) {
+      cnt_val <- if (!is.na(cnt_vals[k])) parse_hokenjo_number(cnt_vals[k]) else 0
+      rate_val <- if (!is.na(rate_vals[k])) parse_hokenjo_number(rate_vals[k]) else 0
+      out[[length(out) + 1]] <- data.frame(
+        pref = "宮城県", week_label = week_label, hokenjo = .MIYAGI_HOKENJO[k],
+        disease = disease, count = cnt_val, rate = rate_val,
+        stringsAsFactors = FALSE
+      )
     }
-    i <- i + 1
   }
   do.call(rbind, out)
 }
