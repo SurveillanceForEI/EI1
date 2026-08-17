@@ -71,8 +71,11 @@ load_hokenjo_history <- function() {
   if (length(m) > 0 && nzchar(m)) return(as.integer(sub("年", "", m)))
   m <- regmatches(s, regexec("令和\\s*([0-9]+)\\s*年", s))[[1]]
   if (length(m) == 2) return(as.integer(m[2]) + 2018L)
-  m <- regmatches(s, regexpr("(20[0-9]{2})[.\\/-]", s))
-  if (length(m) > 0 && nzchar(m)) return(as.integer(substr(m, 1, 4)))
+  # 日付埋め込み形式は「2024.12.30〜2025.1.5」のように年またぎ週で
+  # 開始日・終了日の年が異なることがあるため、最初の一致ではなく
+  # 区間の終わり側=より新しい年を採用する（ISO週の所属年の慣例に合わせる）
+  matched <- regmatches(s, gregexpr("(20[0-9]{2})[.\\/-]", s))[[1]]
+  if (length(matched) > 0) return(max(as.integer(substr(matched, 1, 4))))
   # 福井県の週報ラベル "1 (R. 6.12.30 ～ R. 7. 1. 5)" のような、
   # 令和の略記「R.」＋週末（終了日側）の年から西暦を推定する
   # (開始日と終了日で年またぎがあり得るため、区間の終わり側=より新しい方を採る)
