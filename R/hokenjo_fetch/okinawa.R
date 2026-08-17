@@ -8,7 +8,9 @@
 
 OKINAWA_HOKENJO_ORDER <- c("北部", "中部", "那覇市", "南部", "宮古", "八重山")
 
-fetch_okinawa <- function(url, sheet = NULL) {
+.OKINAWA_CURRENT_YEAR <- 2026
+
+fetch_okinawa <- function(url, sheet = NULL, year = .OKINAWA_CURRENT_YEAR) {
   if (!requireNamespace("readxl", quietly = TRUE)) stop("readxl パッケージが必要です")
   tmp <- tempfile(fileext = ".xlsx")
   download.file(url, tmp, mode = "wb", quiet = TRUE)
@@ -58,7 +60,7 @@ fetch_okinawa <- function(url, sheet = NULL) {
         idx <- Find(function(i) identical(attr(out[[i]], "key"), key), seq_along(out))
         if (is.null(idx)) {
           row_df <- data.frame(
-            pref = "沖縄県", week_label = paste0("第", week_num, "週"),
+            pref = "沖縄県", week_label = sprintf("%d年第%d週", year, week_num),
             hokenjo = OKINAWA_HOKENJO_ORDER[k], disease = disease,
             count = if (is_rate_block) NA_real_ else val,
             rate  = if (is_rate_block) val else NA_real_,
@@ -75,13 +77,11 @@ fetch_okinawa <- function(url, sheet = NULL) {
   do.call(rbind, lapply(out, function(x) { attr(x, "key") <- NULL; x }))
 }
 
-.OKINAWA_CURRENT_YEAR <- 2026
-
 # fetch_okinawa()は最新週(右端の非NA列)のみを採用するが、シート自体は
 # 前年からの連続した週データを含んでいる。バックフィル用に、右端から
 # 週番号が1つずつ減っている連続区間（＝当年の第1週〜最新週）を
 # すべて抽出するバリアント
-fetch_okinawa_history <- function(url, sheet = NULL, current_week = NULL, max_week = 53) {
+fetch_okinawa_history <- function(url, sheet = NULL, current_week = NULL, max_week = 53, year = .OKINAWA_CURRENT_YEAR) {
   if (!requireNamespace("readxl", quietly = TRUE)) stop("readxl パッケージが必要です")
   tmp <- tempfile(fileext = ".xlsx")
   download.file(url, tmp, mode = "wb", quiet = TRUE)
@@ -135,7 +135,7 @@ fetch_okinawa_history <- function(url, sheet = NULL, current_week = NULL, max_we
           idx <- Find(function(i) identical(attr(out[[i]], "key"), key), seq_along(out))
           if (is.null(idx)) {
             row_df <- data.frame(
-              pref = "沖縄県", week_label = sprintf("第%d週", wk), week_num = wk,
+              pref = "沖縄県", week_label = sprintf("%d年第%d週", year, wk), week_num = wk,
               hokenjo = OKINAWA_HOKENJO_ORDER[k], disease = disease,
               count = if (is_rate_block) NA_real_ else val,
               rate  = if (is_rate_block) val else NA_real_,
