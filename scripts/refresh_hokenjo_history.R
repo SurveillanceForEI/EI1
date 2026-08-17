@@ -55,9 +55,25 @@ extract_week_num <- function(week_label) {
 }
 
 # 週番号が判別できない場合のフォールバックキー（週ラベル文字列そのもの
-# を使うことで、次回実行時も同じ行を正しく「取得済み」として判定できる）
+# を使うことで、次回実行時も同じ行を正しく「取得済み」として判定できる）。
+# week_numだけでは年をまたいで再利用される値のため、年も含めないと
+# 「2025年に同じ週番号のデータが既にある」場合に当年の週を誤ってスキップ
+# してしまう（逆に、年が不明な場合は従来通りweek_numのみで判定する）
 make_key <- function(pref, week_num, week_label) {
-  if (!is.na(week_num)) paste(pref, week_num) else paste(pref, "label:", week_label)
+  yr <- .hokenjo_extract_year_local(week_label)
+  if (!is.na(week_num) && !is.na(yr)) paste(pref, yr, week_num)
+  else if (!is.na(week_num)) paste(pref, week_num)
+  else paste(pref, "label:", week_label)
+}
+
+.hokenjo_extract_year_local <- function(label) {
+  if (is.na(label)) return(NA_integer_)
+  s <- chartr("０１２３４５６７８９", "0123456789", label)
+  m <- regmatches(s, regexpr("(20[0-9]{2})年", s))
+  if (length(m) > 0 && nzchar(m)) return(as.integer(sub("年", "", m)))
+  m <- regmatches(s, regexec("令和\\s*([0-9]+)\\s*年", s))[[1]]
+  if (length(m) == 2) return(as.integer(m[2]) + 2018L)
+  NA_integer_
 }
 
 # ---- 既存の履歴を読み込み、(pref, week_num) の取得済みキーを把握 ----
@@ -125,7 +141,7 @@ if (!is.null(hokkaido_res) && nrow(hokkaido_res) > 0) {
 
 for (pref in names(PATTERN_DISPATCH)) {
   for (week in 1:MAX_WEEK) {
-    key <- paste(pref, week)
+    key <- paste(pref, CURRENT_YEAR, week)
     if (key %in% existing_keys) next  # 取得済みはスキップ
     res <- tryCatch(PATTERN_DISPATCH[[pref]](week), error = function(e) NULL)
     if (!is.null(res) && is.data.frame(res) && nrow(res) > 0) {
