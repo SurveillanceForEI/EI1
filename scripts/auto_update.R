@@ -121,8 +121,24 @@ tryCatch({
 
   if (file.exists("data/hokenjo_history.rds")) {
     h <- readRDS("data/hokenjo_history.rds")
-    latest <- h[!is.na(h$week_num), ]
-    latest <- do.call(rbind, lapply(split(latest, latest$pref), function(df) df[df$week_num == max(df$week_num), ]))
+    # week_num（1〜52）は年をまたいで再利用されるため、単純にmax(week_num)で
+    # 「最新週」を選ぶと、当年の第32週などより2025年の第52週（過去の
+    # バックフィルデータ）の方が数値が大きく誤って選ばれてしまう。
+    # week_labelから年を抜き出し、年*100+週番号で「真の最新週」を判定する
+    .extract_year <- function(label) {
+      if (is.na(label)) return(NA_integer_)
+      s <- chartr("０１２３４５６７８９", "0123456789", label)
+      m <- regmatches(s, regexpr("(20[0-9]{2})年", s))
+      if (length(m) > 0 && nzchar(m)) return(as.integer(sub("年", "", m)))
+      m <- regmatches(s, regexec("令和\\s*([0-9]+)\\s*年", s))[[1]]
+      if (length(m) == 2) return(as.integer(m[2]) + 2018L)
+      NA_integer_
+    }
+    yr <- vapply(h$week_label, .extract_year, integer(1))
+    latest <- h[!is.na(h$week_num) & !is.na(yr), ]
+    latest$.sort_key <- yr[!is.na(h$week_num) & !is.na(yr)] * 100L + latest$week_num
+    latest <- do.call(rbind, lapply(split(latest, latest$pref), function(df) df[df$.sort_key == max(df$.sort_key), ]))
+    latest$.sort_key <- NULL
     saveRDS(latest, "data/hokenjo_current.rds")
     log("保健所別最新週データ完了: data/hokenjo_current.rds (", nrow(latest), " 行)")
   }
