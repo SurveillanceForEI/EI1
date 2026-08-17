@@ -51,21 +51,27 @@ fetch_akita <- function(pdf_url = "https://idsc.pref.akita.jp/kss/RAPIDS.pdf") {
     disease <- name_word$text[1]
     if (!nzchar(disease)) next
 
-    # 数値/ダッシュ/アスタリスクのトークンを2個1組（報告数,定点あたり）とみなし、
-    # 組の先頭(報告数)のxを「報告数」列の位置と最近傍照合して保健所を決める
+    # 報告数/定点あたりのどちらか（または両方）が空欄の保健所があり、
+    # トークンを機械的に2個1組でペアリングすると以降の組がずれてしまう
+    # （例: ある保健所の値が丸ごと欠落すると、後続の保健所の報告数が
+    # 定点あたり列として、定点あたりが次の保健所の報告数として読まれる）。
+    # そのため、各トークンを「報告数列」「定点あたり列」全保健所分の
+    # 期待x位置と個別に最近傍照合し、ペアリングの前提を置かないようにする
+    expected <- data.frame(
+      x = c(cnt_x_all, rate_x_all),
+      region = rep(region_names_all, 2),
+      kind = rep(c("count", "rate"), each = n_all),
+      stringsAsFactors = FALSE
+    )
     val_words <- r[grepl("^([0-9]+(\\.[0-9]+)?|-|\\*)$", r$text) & r$x > 150, ]
     val_words <- val_words[order(val_words$x), ]
     vals <- setNames(rep(NA_character_, n_all * 2),
                       paste(rep(region_names_all, each = 2), c("count", "rate"), sep = "|"))
-    n_pairs <- floor(nrow(val_words) / 2)
-    if (n_pairs > 0) {
-      for (j in seq_len(n_pairs)) {
-        cx <- val_words$x[(j - 1) * 2 + 1]
-        rxv <- val_words$x[(j - 1) * 2 + 2]
-        nearest <- which.min(abs(cnt_x_all - cx))
-        reg <- region_names_all[nearest]
-        vals[paste(reg, "count", sep = "|")] <- val_words$text[(j - 1) * 2 + 1]
-        vals[paste(reg, "rate", sep = "|")] <- val_words$text[(j - 1) * 2 + 2]
+    if (nrow(val_words) > 0) {
+      for (t in seq_len(nrow(val_words))) {
+        nearest <- which.min(abs(expected$x - val_words$x[t]))
+        key <- paste(expected$region[nearest], expected$kind[nearest], sep = "|")
+        vals[key] <- val_words$text[t]
       }
     }
 
