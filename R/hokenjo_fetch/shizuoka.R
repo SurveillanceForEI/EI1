@@ -20,12 +20,25 @@ fetch_shizuoka <- function(pdf_url = "https://www.pref.shizuoka.jp/_res/projects
 
   row_names <- c("賀茂", "熱海", "東部", "御殿場", "富士", "静岡市", "中部", "西部", "浜松市")
 
-  # 表紙ページ等に全角数字で「２０２５年第３０週」のように書かれていることが
-  # あるため、全ページを半角化してから「YYYY年第N週」を探す
+  # 表紙ページ等に全角数字で「２０２５年第３０週」、または「2025年第 20 週」
+  # のように「第」と週番号の間に空白が入って書かれていることがあるため、
+  # 全ページを半角化し、空白を許容する正規表現で「YYYY年第N週」を探す。
+  # また、本文中の比較グラフ等に別の年の週表記（例:過去10年比較の凡例）が
+  # 混ざっていることがあるため、まず表紙ページ(1ページ目)に限定して検索し、
+  # 見つからない場合のみ全ページ検索にフォールバックする
   pages_txt_norm <- chartr("０１２３４５６７８９", "0123456789", pages_txt)
-  full_text <- paste(pages_txt_norm, collapse = " ")
-  wm <- regmatches(full_text, regexpr("20[0-9]{2}年第[0-9]+週", full_text))
-  week_label <- if (length(wm) > 0 && nchar(wm) > 0) wm else NA_character_
+  week_pattern <- "20[0-9]{2}年\\s*第\\s*[0-9]+\\s*週"
+  extract_week_label <- function(txt) {
+    wm <- regmatches(txt, regexpr(week_pattern, txt))
+    if (length(wm) > 0 && nzchar(wm)) gsub("\\s+", "", wm) else NA_character_
+  }
+  # 表紙(1ページ目)で見つからない場合のみ2ページ目も試す。全文書検索は
+  # 本文中の過去比較グラフ等から誤った年を拾うリスクが高いため行わない
+  # （見つからなければNAのまま=このPDFからは取得不可として扱う）
+  week_label <- extract_week_label(pages_txt_norm[1])
+  if (is.na(week_label) && length(pages_txt_norm) >= 2) {
+    week_label <- extract_week_label(pages_txt_norm[2])
+  }
 
   exclude_labels <- c("保健所名", "第", "週", "定点把握感染症", "保健所別状況", "指定届出機関", "（定点）数")
 
