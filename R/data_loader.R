@@ -694,10 +694,57 @@ detect_seasonality <- function(hist_d, value_col = "reports_per_site") {
   !is.na(cv) && cv > 0.6
 }
 
-# 全数把握疾患のIBSバンド判定（季節性の有無で自動的に評価方式を切替）
-#  季節性あり: 従来方式（同時期±2週×過去5年平均±SDとの比較、2週連続+2SDでscore=3）
-#  季節性なし: 直近の推移との比較（EARS C2ライク。直近baseline平均＋ポアソン近似の
-#              分散を用いた閾値判定。年単位の周期比較が成立しない散発疾患向け）
+# 季節性あり疾患向け: Farrington法ライクなトレンド回帰による補完判定。
+# 5年比較(mu±sd)は年による傾向変化（増加/減少トレンド）を無視した単純平均のため、
+# 同一窓のデータに対して year を説明変数とする線形回帰を当てはめ、トレンド調整済みの
+# 期待値と残差SDから逸脱度を評価する（ECDCのFarrington法の考え方を簡略化したもの）。
+# 単回帰が成立しない（対象年が3年未満、または残差SDが不定）場合は has_hist=FALSE とし、
+# 呼び出し側は5年比較の単独スコアにフォールバックする。
+.farrington_like_calc <- function(val, w, y, hist_d, value_col) {
+  ws <- unique(pmax(1L, pmin(53L, (w - 2L):(w + 2L))))
+  h  <- hist_d[hist_d$week %in% ws & hist_d$year >= y - 5 & hist_d$year < y, , drop = FALSE]
+  h  <- h[!is.na(h[[value_col]]), , drop = FALSE]
+  n_years <- length(unique(h$year))
+  if (n_years < 3 || nrow(h) < 4) return(list(has_hist = FALSE))
+  fit_df <- data.frame(yr = h$year, v = h[[value_col]])
+  fit <- tryCatch(stats::lm(v ~ yr, data = fit_df), error = function(e) NULL)
+  if (is.null(fit)) return(list(has_hist = FALSE))
+  s <- summary(fit)$sigma
+  if (is.null(s) || !is.finite(s) || s <= 0) return(list(has_hist = FALSE))
+  mu <- tryCatch(unname(stats::predict(fit, newdata = data.frame(yr = y))),
+                 error = function(e) NA_real_)
+  if (is.na(mu)) return(list(has_hist = FALSE))
+  list(mu = mu, s = s, has_hist = TRUE,
+       exceeds2sd = !is.na(val) && val > 0 && val >= mu + 2 * s,
+       exceeds1sd = !is.na(val) && val > 0 && val >= mu + s,
+       abovemu    = !is.na(val) && val > 0 && val >= mu)
+}
+
+# 季節性なし（散発）疾患向け: CUSUM（累積和管理図）による補完判定。
+# EARS C2は単週の急増のみを検知するため、緩やかだが持続的な増加（じわじわ型の増加）を
+# 見逃しやすい。CUSUMはbaseline平均からの正の逸脱を積算するため、そうした持続的な
+# トレンドを補完的に検知できる（k=0.5σ, h=4σはCDC/EARSで一般的に使われる既定値）。
+.cusum_score <- function(v, base_start, base_end, mu, sigma) {
+  k <- 0.5 * sigma
+  h_lim <- 4 * sigma
+  seg <- v[(base_end + 1):length(v)]           # ガードバンド〜現在時点までを積算
+  seg[is.na(seg)] <- mu
+  c_t <- 0
+  for (x in seg) c_t <- max(0, c_t + (x - mu - k))
+  score <- if (c_t <= 0) 0L
+           else if (c_t < h_lim) 1L
+           else if (c_t < 2 * h_lim) 2L
+           else 3L
+  list(c_t = c_t, h_lim = h_lim, score = score)
+}
+
+# 全数把握疾患のIBSバンド判定（季節性の有無で自動的に評価方式を切替、
+# それぞれに補完的な第二の手法を1つ併用してアンサンブル評価する）
+#  季節性あり: 5年比較（同時期±2週×過去5年平均±SD、2週連続+2SDでscore=3）
+#              ＋ Farrington法ライクなトレンド回帰。両者が算出可能な場合は
+#              平均（四捨五入）を最終スコアとする
+#  季節性なし: EARS C2ライク（直近baseline平均＋ポアソン近似分散との比較）
+#              ＋ CUSUM（持続的な緩増の検知）。同様に平均（四捨五入）で統合
 zensu_ibs_band <- function(cur_val, cur_date, cur_week, cur_year,
                             prev_val, prev_date, prev_week, prev_year,
                             hist_d, value_col = "reports_per_site",
@@ -721,17 +768,30 @@ zensu_ibs_band <- function(cur_val, cur_date, cur_week, cur_year,
     }
     cb <- calc(cur_val, cur_week, cur_year)
     pb <- calc(prev_val, prev_week, prev_year)
-    score <- if (!cb$has_hist) 0L
+    primary_score <- if (!cb$has_hist) 0L
              else if (cb$exceeds2sd && pb$exceeds2sd) 3L
              else if (cb$exceeds2sd || cb$exceeds1sd) 2L
              else if (cb$abovemu) 1L
              else 0L
+
+    fb <- .farrington_like_calc(cur_val, cur_week, cur_year, hist_d, value_col)
+    fb_score <- if (!isTRUE(fb$has_hist)) NA_integer_ else
+      if (fb$exceeds2sd) 3L else if (fb$exceeds1sd) 2L else if (fb$abovemu) 1L else 0L
+
+    score <- if (!cb$has_hist) 0L
+             else if (!is.na(fb_score)) as.integer(round((primary_score + fb_score) / 2))
+             else primary_score
+
     label <- if (!cb$has_hist) "基準値なし" else
       c("0"="平均以下","1"="平均〜+1SD","2"="+1〜+2SD","3"="+2SD超過（2週連続）")[as.character(score)]
     detail <- if (!cb$has_hist) "過去データ不足"
+              else if (!is.na(fb_score))
+                sprintf("%s（5年比較基準 %.2f±%.2f／トレンド回帰基準 %.2f±%.2f）",
+                        val_str(cur_val), cb$mu, cb$s, fb$mu, fb$s)
               else sprintf("%s（基準 %.2f±%.2f）", val_str(cur_val), cb$mu, cb$s)
     list(score = score, label = unname(label), detail = detail,
-         method = "seasonal", has_hist = cb$has_hist)
+         method = "seasonal", has_hist = cb$has_hist,
+         ensemble = !is.na(fb_score), secondary_method = if (!is.na(fb_score)) "farrington" else NA_character_)
   } else {
     ts_ordered <- hist_d[!is.na(hist_d$date) & hist_d$date <= cur_date, , drop = FALSE]
     ts_ordered <- ts_ordered[order(ts_ordered$date), ]
@@ -741,21 +801,31 @@ zensu_ibs_band <- function(cur_val, cur_date, cur_week, cur_year,
     base_start <- base_end - 6L
     if (n < 9 || base_start < 1) {
       return(list(score = 0L, label = "基準値なし", detail = "過去データ不足",
-                   method = "sporadic", has_hist = FALSE))
+                   method = "sporadic", has_hist = FALSE, ensemble = FALSE, secondary_method = NA_character_))
     }
     baseline <- v[base_start:base_end]
     mu    <- mean(baseline, na.rm = TRUE)
     sigma <- sqrt(max(mu, 1))                # ポアソン近似（分散≈平均、下限1）
     val   <- cur_val
-    score <- if (is.na(val)) 0L
+    primary_score <- if (is.na(val)) 0L
              else if (val >= mu + 3 * sigma) 3L
              else if (val >= mu + 2 * sigma) 2L
              else if (val > mu) 1L
              else 0L
+
+    cu <- tryCatch(.cusum_score(v, base_start, base_end, mu, sigma), error = function(e) NULL)
+    score <- if (is.na(val)) 0L
+             else if (!is.null(cu)) as.integer(round((primary_score + cu$score) / 2))
+             else primary_score
+
     label <- c("0"="平常（散発なし）","1"="やや増加","2"="増加","3"="急増")[as.character(score)]
-    detail <- sprintf("%s（直近%d週平均 %.2f）", val_str(val), length(baseline), mu)
+    detail <- if (!is.null(cu))
+                sprintf("%s（直近%d週平均 %.2f／CUSUM累積 %.2f, 閾値 %.2f）",
+                        val_str(val), length(baseline), mu, cu$c_t, cu$h_lim)
+              else sprintf("%s（直近%d週平均 %.2f）", val_str(val), length(baseline), mu)
     list(score = score, label = unname(label), detail = detail,
-         method = "sporadic", has_hist = TRUE)
+         method = "sporadic", has_hist = TRUE,
+         ensemble = !is.null(cu), secondary_method = if (!is.null(cu)) "cusum" else NA_character_)
   }
 }
 

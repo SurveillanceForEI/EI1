@@ -1174,9 +1174,9 @@ function ebsUntranslateCards(containerId) {
               "研究班報告に注意報開始基準値の記載がない疾患は②の判定を省略しています（表中「―」）。基準値自体が設定されていない疾患はこの指標を評価から除外しています。"),
             tags$li(tags$strong("② 実効再生産数（Rt）: "),
               "Rt≧2.0→3点、Rt≧1.5→2点、Rt≧1.0→1点、Rt<1.0→0点。SI（シリアルインターバル/潜伏期間推定値）が定義されていない疾患はこの指標を評価から除外しています。"),
-            tags$li(tags$strong("③ IBS方式・過去5年比較（±SD）: "),
-              "疾患ごとに季節性の強さを自動判定し、評価方式を切り替えています。季節性ありと判定された疾患は、同一週±2週・過去5年平均に対して+2SD以上→3点、+1SD以上→2点、平均以上→1点、平均未満→0点。",
-              "定点あたり報告数が少なく季節性が乏しい疾患（咽頭結膜熱・手足口病など）は、この固定的な5年比較では基準値自体が不安定になるため、直近の推移と比較するEARS C2ライクな方式に自動的に切り替わります（詳細は",
+            tags$li(tags$strong("③ IBS方式・過去5年比較（±SD、アンサンブル）: "),
+              "疾患ごとに季節性の強さを自動判定し、評価方式を切り替えています。季節性ありと判定された疾患は、同一週±2週・過去5年平均に対して+2SD以上→3点、+1SD以上→2点、平均以上→1点、平均未満→0点を主方式とし、トレンド回帰（Farrington法ライク）のスコアと平均して統合します。",
+              "定点あたり報告数が少なく季節性が乏しい疾患（咽頭結膜熱・手足口病など）は、この固定的な5年比較では基準値自体が不安定になるため、直近の推移と比較するEARS C2ライクな方式（＋CUSUM累積和）に自動的に切り替わります（詳細は",
               tags$a(href="javascript:void(0)", onclick="goToNotes('notes-zensu-ibs')", "こちら"), "）。過去データが不足する場合はこの指標を評価から除外しています。")
           ),
           tags$h5("計算式（現在の流行フェーズカード）"),
@@ -1269,23 +1269,39 @@ function ebsUntranslateCards(containerId) {
             tags$li(HTML("CV &gt; 0.6 &rarr; 「季節性あり」と判定（特定の時期に発生が集中している）")),
             tags$li("それ以外 → 「季節性なし」と判定")
           ),
-          tags$h5("② 季節性ありと判定された疾患の評価方式"),
-          tags$p("直近週の値を「同時期（±2週）×過去5年」の平均・標準偏差（SD）と比較する、従来からの方式です。"),
-          tags$div(HTML("\\[ \\text{score} = \\begin{cases} 3 & (\\text{値} \\geq \\mu + 2\\sigma\\ \\text{が2週連続}) \\\\ 2 & (\\text{値} \\geq \\mu + \\sigma) \\\\ 1 & (\\text{値} \\geq \\mu) \\\\ 0 & (\\text{それ以外}) \\end{cases} \\]")),
-          tags$h5("③ 季節性なしと判定された疾患の評価方式（散発疾患向け）"),
+          tags$h5("② 季節性ありと判定された疾患の評価方式（アンサンブル）"),
           tags$p(
-            "米国CDCのEARS（Early Aberration Reporting System）C2法を簡略化した方式を使用しています。",
+            "直近週の値を「同時期（±2週）×過去5年」の平均・標準偏差（SD）と比較する従来方式（主方式）に加え、",
+            "同じ窓のデータに year を説明変数とする線形回帰を当てはめ、トレンド調整済みの期待値・残差SDと比較する",
+            "Farrington法（ECDCで用いられる標準的なサーベイランス閾値法）を簡略化した方式を補助的に併用します。",
+            "単純な平均比較は年をまたぐ増加・減少傾向を無視してしまうため、回帰による補正で補完する狙いです。"
+          ),
+          tags$div(HTML("\\[ \\text{score}_{\\text{5年比較}} = \\begin{cases} 3 & (\\text{値} \\geq \\mu + 2\\sigma\\ \\text{が2週連続}) \\\\ 2 & (\\text{値} \\geq \\mu + \\sigma) \\\\ 1 & (\\text{値} \\geq \\mu) \\\\ 0 & (\\text{それ以外}) \\end{cases} \\]")),
+          tags$div(HTML("\\[ \\text{score}_{\\text{Farrington}} = \\begin{cases} 3 & (\\text{値} \\geq \\hat{y} + 2s) \\\\ 2 & (\\text{値} \\geq \\hat{y} + s) \\\\ 1 & (\\text{値} \\geq \\hat{y}) \\\\ 0 & (\\text{それ以外}) \\end{cases} \\quad \\hat{y}=\\text{回帰予測値、} s=\\text{残差SD} \\]")),
+          tags$p("両方式が算出可能な場合は2手法のスコアの平均（四捨五入）を最終スコアとします。対象年が3年未満などで回帰が成立しない場合は5年比較のみにフォールバックします。"),
+          tags$h5("③ 季節性なしと判定された疾患の評価方式（散発疾患向け・アンサンブル）"),
+          tags$p(
+            "米国CDCのEARS（Early Aberration Reporting System）C2法を簡略化した方式を主方式として使用しています。",
             "年単位の周期比較ができない散発疾患のため、直近の推移（ベースライン）との比較で判定しています。",
             "直近2週間をガードバンド（進行中の増加を汚染させないための除外期間）として除き、その前の7週間をベースラインとしています。"
           ),
           tags$div(HTML("\\[ \\mu = \\mathrm{mean}(\\text{直近2週を除く過去7週}) \\]")),
           tags$div(HTML("\\[ \\sigma = \\sqrt{\\max(\\mu,\\ 1)} \\quad \\text{（ポアソン近似: 分散} \\approx \\text{平均、下限1）} \\]")),
-          tags$div(HTML("\\[ \\text{score} = \\begin{cases} 3 & (\\text{値} \\geq \\mu + 3\\sigma,\\ \\text{急増}) \\\\ 2 & (\\text{値} \\geq \\mu + 2\\sigma,\\ \\text{増加}) \\\\ 1 & (\\text{値} > \\mu,\\ \\text{やや増加}) \\\\ 0 & (\\text{それ以外、平常}) \\end{cases} \\]")),
+          tags$div(HTML("\\[ \\text{score}_{\\text{C2}} = \\begin{cases} 3 & (\\text{値} \\geq \\mu + 3\\sigma,\\ \\text{急増}) \\\\ 2 & (\\text{値} \\geq \\mu + 2\\sigma,\\ \\text{増加}) \\\\ 1 & (\\text{値} > \\mu,\\ \\text{やや増加}) \\\\ 0 & (\\text{それ以外、平常}) \\end{cases} \\]")),
+          tags$p(
+            "C2法は単週の急増しか検知できず、緩やかだが持続的な増加（じわじわ型）を見逃しやすいという弱点があります。",
+            "これを補うため、CUSUM（累積和管理図）をベースライン（μ, σ）に対して同時に計算し、平均（四捨五入）でC2法と統合します。",
+            "k=0.5σ（許容幅）、決定区間 h=4σ はCDC/EARSで一般的に用いられる既定値です。"
+          ),
+          tags$div(HTML("\\[ C_t = \\max(0,\\ C_{t-1} + (x_t - \\mu - 0.5\\sigma)) \\]")),
+          tags$div(HTML("\\[ \\text{score}_{\\text{CUSUM}} = \\begin{cases} 3 & (C_t \\geq 8\\sigma) \\\\ 2 & (C_t \\geq 4\\sigma) \\\\ 1 & (0 < C_t < 4\\sigma) \\\\ 0 & (C_t = 0) \\end{cases} \\]")),
           tags$p(tags$em(
             "参考: CDC EARS法（C1/C2/C3）— 感染症サーベイランスにおける異常値検知の標準的手法の一つ。本ダッシュボードでは簡略化したC2ライクな実装を使用しています。",
             tags$br(),
             "出典: Hutwagner L, et al. \"The bioterrorism preparedness and response Early Aberration Reporting System (EARS).\" J Urban Health. 2003;80(2 Suppl 1):i89-96. ",
-            tags$a(href="https://pubmed.ncbi.nlm.nih.gov/12791774/", target="_blank", "PubMed 12791774")
+            tags$a(href="https://pubmed.ncbi.nlm.nih.gov/12791774/", target="_blank", "PubMed 12791774"),
+            tags$br(),
+            "参考: ECDC Farrington法 — 回帰ベースの流行閾値算出法。Farrington CP, et al. \"A statistical algorithm for the early detection of outbreaks of infectious disease.\" J R Stat Soc A. 1996;159(3):547-563."
           )),
           tags$br(),
 
