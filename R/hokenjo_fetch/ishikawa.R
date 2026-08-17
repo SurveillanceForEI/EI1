@@ -58,7 +58,33 @@ ISHIKAWA_DISEASE_ORDER <- c(
 
 # 画像埋め込みの疾患別ページ（保健所別×5週間の報告数/定点あたり報告数）
 # をOCRで読み取る
-.ishikawa_ocr_disease_page <- function(png_path, disease, year, eng) {
+.ishikawa_detect_col_centers <- function(d) {
+  # 縦罫線("|")のx位置から5週分の列境界を検出。本文以外のグラフ領域
+  # (y>1700程度)の罫線は除外する
+  bars <- d[d$word == "|" & d$conf > 40 & d$yc < 1000, ]
+  if (nrow(bars) < 4) return(NULL)
+  bar_x <- sort(unique(round(bars$xc / 20) * 20))
+  # 罫線が近接している場合はまとめる
+  groups <- split(bar_x, cumsum(c(1, diff(bar_x) > 60)))
+  bar_x <- sapply(groups, mean)
+  if (length(bar_x) < 4) return(NULL)
+  bar_x <- sort(bar_x)[seq_len(min(5, length(bar_x)))]  # 表左端〜4本の仕切り線で5列 (念のため5本目も許容)
+  col_centers <- (utils::head(bar_x, -1) + utils::tail(bar_x, -1)) / 2
+  if (length(col_centers) < 4) return(NULL)
+  # 列は5週分だが検出できる仕切りは4本（境界）のことが多いため、
+  # 不足分は等間隔で外挿する
+  while (length(col_centers) < 5) {
+    gap <- diff(utils::tail(col_centers, 2))
+    col_centers <- c(col_centers, utils::tail(col_centers, 1) + gap)
+  }
+  col_centers[1:5]
+}
+
+# 画像埋め込みの疾患別ページ（保健所別×5週間の報告数/定点あたり報告数）
+# をOCRで読み取る。col_centers を渡した場合はページごとの罫線検出を
+# スキップする（同一PDF内は全疾患ページで列レイアウトが共通なため、
+# 罫線検出が失敗しやすい号でも1ページ分の検出結果を使い回せる）
+.ishikawa_ocr_disease_page <- function(png_path, disease, year, eng, col_centers = NULL) {
   d <- tesseract::ocr_data(png_path, engine = eng)
   bb <- do.call(rbind, strsplit(d$bbox, ","))
   d$x1 <- as.numeric(bb[, 1]); d$y1 <- as.numeric(bb[, 2])
@@ -82,25 +108,8 @@ ISHIKAWA_DISEASE_ORDER <- c(
   }
   d <- d[!merge_idx, ]
 
-  # 縦罫線("|")のx位置から5週分の列境界を検出。本文以外のグラフ領域
-  # (y>1700程度)の罫線は除外する
-  bars <- d[d$word == "|" & d$conf > 40 & d$yc < 1000, ]
-  if (nrow(bars) < 4) return(NULL)
-  bar_x <- sort(unique(round(bars$xc / 20) * 20))
-  # 罫線が近接している場合はまとめる
-  groups <- split(bar_x, cumsum(c(1, diff(bar_x) > 60)))
-  bar_x <- sapply(groups, mean)
-  if (length(bar_x) < 4) return(NULL)
-  bar_x <- sort(bar_x)[1:5]  # 表左端〜4本の仕切り線で5列 (念のため5本目も許容)
-  col_centers <- (utils::head(bar_x, -1) + utils::tail(bar_x, -1)) / 2
-  if (length(col_centers) < 4) return(NULL)
-  # 列は5週分だが検出できる仕切りは4本（境界）のことが多いため、
-  # 不足分は等間隔で外挿する
-  while (length(col_centers) < 5) {
-    gap <- diff(utils::tail(col_centers, 2))
-    col_centers <- c(col_centers, utils::tail(col_centers, 1) + gap)
-  }
-  col_centers <- col_centers[1:5]
+  if (is.null(col_centers)) col_centers <- .ishikawa_detect_col_centers(d)
+  if (is.null(col_centers) || length(col_centers) != 5 || anyNA(col_centers)) return(NULL)
 
   is_int <- grepl("^[0-9]+$", d$word)
   is_dec <- grepl("^[0-9]+\\.[0-9]+$", d$word)
@@ -144,7 +153,8 @@ ISHIKAWA_DISEASE_ORDER <- c(
       if (s < 0 || s > 9) next
       hj_idx <- floor(s / 2) + 1
       if (hj_idx > 5) next
-      is_rate_slot <- (s %% 2) == 1
+      # 表内の行順は「定点あたり報告数行→報告数行」（先に率、後に実数）
+      is_rate_slot <- (s %% 2) == 0
       rr <- row_summary[[i]]$rows_df
       for (k in seq_len(nrow(rr))) {
         ci <- match_col(rr$xc[k])
@@ -199,18 +209,44 @@ fetch_ishikawa_history <- function(pdf_url, year = 2026) {
   }
 
   eng <- tesseract::tesseract("eng")
+
+  # 罫線検出は号によって一部ページで失敗しやすい（OCRのレイアウト解析が
+  # 崩れるページがある）ため、同一PDF内で列レイアウトが共通であることを
+  # 利用し、最初に検出に成功したページの列中心を全ページで使い回す
+  shared_col_centers <- NULL
+  render_cache <- new.env(parent = emptyenv())
+  get_png <- function(p) {
+    key <- as.character(p)
+    if (!is.null(render_cache[[key]])) return(render_cache[[key]])
+    png_path <- tempfile(fileext = ".png")
+    bmp <- tryCatch(pdftools::pdf_render_page(tmp, page = p, dpi = 300), error = function(e) NULL)
+    if (is.null(bmp)) return(NULL)
+    png::writePNG(bmp, png_path)
+    render_cache[[key]] <- png_path
+    png_path
+  }
+  for (p in disease_pages) {
+    png_path <- get_png(p)
+    if (is.null(png_path)) next
+    d0 <- tryCatch(tesseract::ocr_data(png_path, engine = eng), error = function(e) NULL)
+    if (is.null(d0)) next
+    bb <- do.call(rbind, strsplit(d0$bbox, ","))
+    d0$xc <- (as.numeric(bb[, 1]) + as.numeric(bb[, 3])) / 2
+    d0$yc <- (as.numeric(bb[, 2]) + as.numeric(bb[, 4])) / 2
+    d0$conf <- as.numeric(d0$confidence)
+    cc <- .ishikawa_detect_col_centers(d0)
+    if (!is.null(cc) && length(cc) == 5 && !anyNA(cc)) { shared_col_centers <- cc; break }
+  }
+
   out <- list(ari)
   for (i in seq_along(disease_pages)) {
     if (i > length(ISHIKAWA_DISEASE_ORDER)) break
     p <- disease_pages[i]
     disease <- ISHIKAWA_DISEASE_ORDER[i]
-    png_path <- tempfile(fileext = ".png")
-    bmp <- tryCatch(pdftools::pdf_render_page(tmp, page = p, dpi = 300), error = function(e) NULL)
-    if (is.null(bmp)) next
-    png::writePNG(bmp, png_path)
-    res <- tryCatch(.ishikawa_ocr_disease_page(png_path, disease, year, eng),
+    png_path <- get_png(p)
+    if (is.null(png_path)) next
+    res <- tryCatch(.ishikawa_ocr_disease_page(png_path, disease, year, eng, col_centers = shared_col_centers),
                      error = function(e) { message("[NG] ", disease, ": ", conditionMessage(e)); NULL })
-    unlink(png_path)
     if (is.null(res) || is.null(weeks5)) next
     # week_col(1..5、表内の左から何番目か)を実際の週番号に変換
     if (length(weeks5) == 5) {
@@ -220,6 +256,7 @@ fetch_ishikawa_history <- function(pdf_url, year = 2026) {
       out[[length(out) + 1]] <- res
     }
   }
+  for (path in mget(ls(render_cache), envir = render_cache)) unlink(path)
   do.call(rbind, out)
 }
 
