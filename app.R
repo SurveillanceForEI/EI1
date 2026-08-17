@@ -5998,12 +5998,36 @@ server <- function(input, output, session) {
   # 再利用されるため、年+週番号で一意化してスライダーが2025年〜最新まで
   # 正しく連続した範囲になるようにする）
   hokenjo_available_week_nums <- reactive({
+    if (is.null(HOKENJO_HISTORY)) return(integer(0))
     st <- hokenjo_status()
-    if (st$status != "ok" || is.null(HOKENJO_HISTORY)) return(integer(0))
-    sub <- HOKENJO_HISTORY[HOKENJO_HISTORY$pref == st$pref & HOKENJO_HISTORY$disease == st$disease, ]
-    ok <- !is.na(sub$week_num) & !is.na(sub$hokenjo_year)
-    keys <- hokenjo_year_week_key(sub$hokenjo_year[ok], sub$week_num[ok])
-    sort(unique(keys))
+
+    if (st$status == "ok") {
+      sub <- HOKENJO_HISTORY[HOKENJO_HISTORY$pref == st$pref & HOKENJO_HISTORY$disease == st$disease, ]
+      ok <- !is.na(sub$week_num) & !is.na(sub$hokenjo_year)
+      keys <- hokenjo_year_week_key(sub$hokenjo_year[ok], sub$week_num[ok])
+      return(sort(unique(keys)))
+    }
+
+    if (st$status == "no_pref") {
+      disease_id <- input$disease
+      label <- if (!is.null(disease_id) && disease_id %in% names(DISEASE_CONFIG)) {
+        DISEASE_CONFIG[[disease_id]]$label
+      } else if (!is.null(disease_id) && disease_id %in% names(STD_DISEASE_CONFIG)) {
+        STD_DISEASE_CONFIG[[disease_id]]$label
+      } else NA_character_
+      if (is.na(label)) return(integer(0))
+      prefs <- unique(as.character(HOKENJO_HISTORY$pref))
+      keys <- unlist(lapply(prefs, function(p) {
+        matched <- resolve_hokenjo_disease(HOKENJO_HISTORY, p, label)
+        if (is.null(matched)) return(NULL)
+        sub <- HOKENJO_HISTORY[HOKENJO_HISTORY$pref == p & HOKENJO_HISTORY$disease == matched, ]
+        ok <- !is.na(sub$week_num) & !is.na(sub$hokenjo_year)
+        hokenjo_year_week_key(sub$hokenjo_year[ok], sub$week_num[ok])
+      }))
+      return(sort(unique(keys)))
+    }
+
+    integer(0)
   })
 
   output$hokenjo_week_slider_ui <- renderUI({
@@ -6128,7 +6152,7 @@ server <- function(input, output, session) {
     pref <- input$pref_filter
     if (!is.null(pref) && pref != "" && pref != "全国") return(NULL)
     if (!is.null(input$ts_mode) && input$ts_mode == "zensu") return(NULL)
-    if (is.null(HOKENJO_CURRENT)) return(NULL)
+    if (is.null(HOKENJO_CURRENT) || is.null(HOKENJO_HISTORY)) return(NULL)
 
     disease_id <- input$disease
     label <- if (!is.null(disease_id) && disease_id %in% names(DISEASE_CONFIG)) {
@@ -6138,11 +6162,27 @@ server <- function(input, output, session) {
     } else NA_character_
     if (is.na(label)) return(NULL)
 
+    wk_key <- input$hokenjo_week_num
+    target_year <- if (!is.null(wk_key)) wk_key %/% 100L else NA_integer_
+    target_week <- if (!is.null(wk_key)) wk_key %% 100L else NA_integer_
+
     prefs <- unique(as.character(HOKENJO_CURRENT$pref))
     pieces <- lapply(prefs, function(p) {
-      matched <- resolve_hokenjo_disease(HOKENJO_CURRENT, p, label)
+      # 疾患名の名寄せは常にHOKENJO_HISTORY（全期間データ）に対して行う
+      # （都道府県によって週ごとに疾患の生表記が変わることがあるため）
+      matched <- resolve_hokenjo_disease(HOKENJO_HISTORY, p, label)
       if (is.null(matched)) return(NULL)
-      d <- tryCatch(build_hokenjo_map_data(HOKENJO_CURRENT, p, matched, HOKENJO_NAME_MAP), error = function(e) NULL)
+      if (!is.null(wk_key)) {
+        src <- HOKENJO_HISTORY[HOKENJO_HISTORY$pref == p &
+                                 HOKENJO_HISTORY$disease == matched &
+                                 !is.na(HOKENJO_HISTORY$week_num) &
+                                 HOKENJO_HISTORY$week_num == target_week &
+                                 !is.na(HOKENJO_HISTORY$hokenjo_year) &
+                                 HOKENJO_HISTORY$hokenjo_year == target_year, ]
+      } else {
+        src <- HOKENJO_CURRENT
+      }
+      d <- tryCatch(build_hokenjo_map_data(src, p, matched, HOKENJO_NAME_MAP), error = function(e) NULL)
       if (is.null(d) || nrow(d) == 0) return(NULL)
       d$pref <- p
       d
@@ -6222,7 +6262,7 @@ server <- function(input, output, session) {
       },
       if (national_ok) {
         tags$div(style="color:#345;background:#eef4ff;border:1px solid #cdddf5;border-radius:4px;padding:8px 12px;font-size:0.85em;margin-bottom:8px;",
-          "「全国」選択中は全都道府県の保健所単位で地図を塗り分けています。都道府県を選択すると、その県のみのマップ・グラフに切り替わります。")
+          "「全国」選択中は全都道府県の保健所単位で地図を塗り分け、グラフには上位20保健所を表示しています。都道府県を選択すると、その県のみのマップ・グラフに切り替わります。")
       },
       if (!is.null(msg)) {
         tags$div(style="color:#a55;background:#fff6f6;border:1px solid #f0d0d0;border-radius:4px;padding:8px 12px;font-size:0.88em;margin-bottom:8px;",
@@ -6291,14 +6331,34 @@ server <- function(input, output, session) {
   })
 
   output$hokenjo_bar_plot <- renderPlotly({
-    if (hokenjo_status()$status == "no_pref") return(NULL)  # 全国選択時は地図のみ（グラフ不要）
-    d <- hokenjo_map_data()
+    st <- hokenjo_status()
     metric <- if (!is.null(input$hokenjo_metric)) input$hokenjo_metric else "rate"
+    metric_label <- if (metric == "rate") "定点当たり報告数" else "報告数"
+
+    if (st$status == "no_pref") {
+      # 全国選択時は保健所数が非常に多いため、上位20保健所のみを表示する
+      nd <- hokenjo_national_map_data()
+      if (is.null(nd) || nrow(nd) == 0 || !(metric %in% names(nd))) return(NULL)
+      df <- sf::st_drop_geometry(nd)
+      df <- df[!is.na(df[[metric]]), ]
+      if (nrow(df) == 0) return(NULL)
+      df <- df[order(-df[[metric]]), ]
+      df <- head(df, 20)
+      df$label <- paste0(df$pref, " ", df$hokenjo)
+      df$label <- factor(df$label, levels = rev(df$label))
+      p <- ggplot(df, aes(x = label, y = .data[[metric]], text = paste0(label, ": ", .data[[metric]]))) +
+        geom_col(fill = "#fd8d3c") +
+        coord_flip() +
+        labs(x = NULL, y = metric_label, title = "上位20保健所") +
+        theme_minimal(base_size = 12)
+      return(ggplotly(p, tooltip = "text"))
+    }
+
+    d <- hokenjo_map_data()
     if (is.null(d) || nrow(d) == 0 || !(metric %in% names(d))) return(NULL)
     df <- sf::st_drop_geometry(d)
     df <- df[order(-df[[metric]]), ]
     df$hokenjo <- factor(df$hokenjo, levels = rev(df$hokenjo))
-    metric_label <- if (metric == "rate") "定点当たり報告数" else "報告数"
     p <- ggplot(df, aes(x = hokenjo, y = .data[[metric]], text = paste0(hokenjo, ": ", .data[[metric]]))) +
       geom_col(fill = "#fd8d3c") +
       coord_flip() +
