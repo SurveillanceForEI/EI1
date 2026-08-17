@@ -1294,6 +1294,18 @@ function ebsUntranslateCards(containerId) {
             "Farrington法（ECDCで用いられる標準的なサーベイランス閾値法）を簡略化した方式を補助的に併用します。",
             "単純な平均比較は年をまたぐ増加・減少傾向を無視してしまうため、回帰による補正で補完する狙いです。"
           ),
+          tags$div(style="background:#f8f9fa;border-left:4px solid #f39c12;border-radius:4px;padding:10px 14px;margin:8px 0;",
+            tags$strong("Farrington法をかんたんに言うと: "),
+            tags$p(style="margin:6px 0 0;",
+              "使っているデータは主方式（5年比較）と同じ「同時期±2週×過去5年」分の報告数です。",
+              "違いは比較の仕方で、主方式は「その5年分の平均値」を基準にしますが、",
+              "Farrington法は「年々どれくらい増えている/減っているか（トレンド）」を回帰直線で推定し、",
+              "その直線を今年まで延長した予測値を基準にします。",
+              "たとえば毎年じわじわ患者数が増えている疾患では、単純平均だと基準値が低すぎて",
+              "「超過」と誤判定しやすくなりますが、Farrington法はその増加傾向をあらかじめ",
+              "織り込んだ基準値になるため、より公平に「例年と比べて本当に多いか」を判定できます。"
+            )
+          ),
           tags$div(HTML("\\[ \\text{score}_{\\text{5年比較}} = \\begin{cases} 3 & (\\text{値} \\geq \\mu + 2\\sigma\\ \\text{が2週連続}) \\\\ 2 & (\\text{値} \\geq \\mu + \\sigma) \\\\ 1 & (\\text{値} \\geq \\mu) \\\\ 0 & (\\text{それ以外}) \\end{cases} \\]")),
           tags$div(HTML("\\[ \\text{score}_{\\text{Farrington}} = \\begin{cases} 3 & (\\text{値} \\geq \\hat{y} + 2s) \\\\ 2 & (\\text{値} \\geq \\hat{y} + s) \\\\ 1 & (\\text{値} \\geq \\hat{y}) \\\\ 0 & (\\text{それ以外}) \\end{cases} \\quad \\hat{y}=\\text{回帰予測値、} s=\\text{残差SD} \\]")),
           tags$p("両方式が算出可能な場合は2手法のスコアの平均（四捨五入）を最終スコアとします。対象年が3年未満などで回帰が成立しない場合は5年比較のみにフォールバックします。"),
@@ -1313,6 +1325,17 @@ function ebsUntranslateCards(containerId) {
           ),
           tags$div(HTML("\\[ C_t = \\max(0,\\ C_{t-1} + (x_t - \\mu - 0.5\\sigma)) \\]")),
           tags$div(HTML("\\[ \\text{score}_{\\text{CUSUM}} = \\begin{cases} 3 & (C_t \\geq 8\\sigma) \\\\ 2 & (C_t \\geq 4\\sigma) \\\\ 1 & (0 < C_t < 4\\sigma) \\\\ 0 & (C_t = 0) \\end{cases} \\]")),
+          tags$div(style="background:#f8f9fa;border-left:4px solid #f39c12;border-radius:4px;padding:10px 14px;margin:8px 0;",
+            tags$strong("CUSUMをかんたんに言うと: "),
+            tags$p(style="margin:6px 0 0;",
+              "使っているデータは主方式（EARS C2）と同じ、直近2週を除いた過去7週間の報告数です。",
+              "C2法は「今週だけ見て平常より明らかに多いか」を判定しますが、",
+              "毎週わずかに平常より多い状態が続いても、1週ごとには基準を超えないため見逃されがちです。",
+              "CUSUMは「平常よりわずかに多かった分」を毎週コツコツ足し込んでいく方式で、",
+              "小さな超過でも積み重なれば一定の水準（決定区間）に達した時点で「持続的な増加あり」と検知します。",
+              "貯金箱に少しずつコインを入れて、貯まった額が一定を超えたら知らせるイメージです。"
+            )
+          ),
           tags$p(tags$em(
             "参考: CDC EARS法（C1/C2/C3）— 感染症サーベイランスにおける異常値検知の標準的手法の一つ。本ダッシュボードでは簡略化したC2ライクな実装を使用しています。",
             tags$br(),
