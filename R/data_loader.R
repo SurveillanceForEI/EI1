@@ -668,47 +668,52 @@ excess_band_for_plot <- function(band, method = "primary", value_col = "reports_
   if (is.null(band) || nrow(band) == 0) return(list(ribbon = NULL, ribbon_label = "", ribbon_color = NULL, exceed = NULL, marker_label = ""))
   seasonal <- isTRUE(band$seasonal[1])
   val <- band[[value_col]]
+  n <- nrow(band)
 
+  # 主方式の帯（季節性あり=5年比較±2SD／季節性なし=EARS基準±2σ）
+  p_ymin <- ifelse(band$has_hist, pmax(0, band$mu - 2 * band$s), NA_real_)
+  p_ymax <- ifelse(band$has_hist, band$mu + 2 * band$s, NA_real_)
   primary_ribbon_label <- if (seasonal) "過去5年平均±2SD" else "直近7週平均±2σ（EARS基準）"
-  primary_ribbon <- function() {
-    d <- band[!is.na(band$has_hist) & band$has_hist, , drop = FALSE]
-    if (nrow(d) == 0) return(NULL)
-    data.frame(date = d$date, ymin = pmax(0, d$mu - 2 * d$s), ymax = d$mu + 2 * d$s)
-  }
 
-  # 超過点マーカーの基準は、季節性あり主方式で言えば「値が同時期5年平均+2SDの
-  # 線を超えた週」（元の実装での閾値と同一）。tier化されたスコアでは
-  # これは score>=2（exceeds2sd or exceeds1sdでスコア2、2週連続なら3）に相当する
-  # ため、score>=2 を「超過」の基準として統一する（主方式/補助方式/アンサンブル共通）。
-  if (method == "secondary") {
-    marker_label <- "超過（補助方式）"
-    if (seasonal) {
-      ribbon_label <- "Farrington法（トレンド回帰）基準±2SD"
-      d <- band[!is.na(band$has_secondary) & band$has_secondary, , drop = FALSE]
-      ribbon <- if (nrow(d) == 0) NULL else
-        data.frame(date = d$date, ymin = pmax(0, d$mu2 - 2 * d$s2), ymax = d$mu2 + 2 * d$s2)
-    } else {
-      # CUSUMは累積値であり実測値と同じ意味の「±SD帯」は本来持たないが、
-      # 目安として「baseline平均 〜 CUSUM決定区間(h=4σ)に達する水準」を
-      # 参考帯として表示する（他の帯とは意味が異なる近似値である点に留意）
-      ribbon_label <- "CUSUM参考帯（baseline平均〜決定区間h=4σ）"
-      d <- band[!is.na(band$has_secondary) & band$has_secondary, , drop = FALSE]
-      ribbon <- if (nrow(d) == 0) NULL else
-        data.frame(date = d$date, ymin = pmax(0, d$mu - 2 * d$s), ymax = d$mu + d$cusum_thresh)
-    }
-    exceed_mask <- !is.na(band$score_secondary) & band$score_secondary >= 2
-  } else if (method == "ensemble") {
-    ribbon_label <- paste0(primary_ribbon_label, "（参考帯）")
-    ribbon <- primary_ribbon()
-    marker_label <- "超過（アンサンブル）"
-    exceed_mask <- !is.na(band$score_ensemble) & band$score_ensemble >= 2
+  # 補助方式の帯（季節性あり=Farrington法トレンド回帰±2SD／
+  # 季節性なし=CUSUM参考帯。CUSUMは累積値であり実測値と同じ意味の帯を本来
+  # 持たないため、「baseline平均〜CUSUM決定区間(h=4σ)に達する水準」を近似的な
+  # 参考帯として用いる）
+  if (seasonal) {
+    s_ymin <- ifelse(band$has_secondary, pmax(0, band$mu2 - 2 * band$s2), NA_real_)
+    s_ymax <- ifelse(band$has_secondary, band$mu2 + 2 * band$s2, NA_real_)
+    secondary_ribbon_label <- "Farrington法（トレンド回帰）基準±2SD"
   } else {
-    ribbon_label <- primary_ribbon_label
-    ribbon <- primary_ribbon()
-    marker_label <- "超過（主方式）"
-    exceed_mask <- !is.na(band$score_primary) & band$score_primary >= 2
+    s_ymin <- ifelse(band$has_secondary, pmax(0, band$mu - 2 * band$s), NA_real_)
+    s_ymax <- ifelse(band$has_secondary, band$mu + band$cusum_thresh, NA_real_)
+    secondary_ribbon_label <- "CUSUM参考帯（baseline平均〜決定区間h=4σ）"
   }
 
+  if (method == "secondary") {
+    ymin <- s_ymin; ymax <- s_ymax
+    ribbon_label <- secondary_ribbon_label
+    marker_label <- "超過（補助方式）"
+  } else if (method == "ensemble") {
+    # 主方式・補助方式の帯が両方そろう時点は上限・下限それぞれの平均を帯とする。
+    # 補助方式は直近MAX_SECONDARY_POINTS件のみ計算されるため、それより古い
+    # 時点では補助方式の帯がなく主方式の帯にフォールバックする
+    both <- !is.na(p_ymin) & !is.na(s_ymin)
+    ymin <- ifelse(both, (p_ymin + s_ymin) / 2, p_ymin)
+    ymax <- ifelse(both, (p_ymax + s_ymax) / 2, p_ymax)
+    ribbon_label <- paste0(primary_ribbon_label, "と", secondary_ribbon_label, "の平均")
+    marker_label <- "超過（アンサンブル）"
+  } else {
+    ymin <- p_ymin; ymax <- p_ymax
+    ribbon_label <- primary_ribbon_label
+    marker_label <- "超過（主方式）"
+  }
+
+  has_band <- !is.na(ymin) & !is.na(ymax)
+  ribbon <- if (any(has_band)) data.frame(date = band$date[has_band], ymin = ymin[has_band], ymax = ymax[has_band]) else NULL
+
+  # 超過点は、常にその時点で実際に表示している帯（ymax）を実測値が
+  # 上回った週とする（表示中の帯と超過マーカーが必ず一致するようにする）
+  exceed_mask <- has_band & !is.na(val) & val > ymax
   exceed <- if (any(exceed_mask)) {
     d <- band[exceed_mask, , drop = FALSE]
     d[[value_col]] <- val[exceed_mask]
