@@ -383,7 +383,11 @@ ui <- dashboardPage(
             var labels = currentLabels;
             irs.update({
               prettify_enabled: true,
-              prettify: function(num) { return labels[num] || ('第' + num + '週'); }
+              // 年またぎの範囲を連続スライダーにするため、実在しない週番号
+              // （例: 2025年52週の次の合成値2025年53週など）もスライダー上の
+              // 値としては存在しうる。そうした値はサーバー側で空文字列を
+              // 返しているので、生の数値から「第N週」を捏造せず空欄にする
+              prettify: function(num) { var l = labels[num]; return (l && l.length > 0) ? l : ''; }
             });
           };
           var observer = new MutationObserver(applyPrettify);
