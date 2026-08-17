@@ -485,12 +485,19 @@ async function ebsTranslateCards(containerId) {
   }));
 }
 function goToNotes(anchorId) {
-  var tabLink = document.querySelector("a[data-value=\'Notes\']");
-  if (tabLink) { tabLink.click(); }
+  // 「Notes」タブは「その他」タブの下にネストされているため、
+  // 先に外側の「その他」タブを開いてから内側の「Notes」タブを開く必要がある
+  // （外側タブが非アクティブのままだと内側タブのコンテンツも非表示のまま）
+  var outerLink = document.querySelector("a[data-value=\'その他\']");
+  if (outerLink) { outerLink.click(); }
   setTimeout(function() {
-    var el = document.getElementById(anchorId);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, 350);
+    var tabLink = document.querySelector("a[data-value=\'Notes\']");
+    if (tabLink) { tabLink.click(); }
+    setTimeout(function() {
+      var el = document.getElementById(anchorId);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 350);
+  }, 150);
 }
 function ebsUntranslateCards(containerId) {
   Array.from(document.querySelectorAll("#" + containerId + " .ebs-tr")).forEach(function(el) {
