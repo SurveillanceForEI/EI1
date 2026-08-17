@@ -648,7 +648,7 @@ function ebsUntranslateCards(containerId) {
             tags$label("超過判定方式:", style="font-size:0.85em;margin:0;color:#555;"),
             selectInput("excess_method", NULL,
               choices = c("主方式（5年比較 / EARS C2）"="primary",
-                          "補助方式（トレンド回帰 / CUSUM）"="secondary",
+                          "補助方式（Farrington法 / CUSUM）"="secondary",
                           "アンサンブル（平均）"="ensemble"),
               selected = "primary", width = "260px")
           ),
@@ -4635,9 +4635,10 @@ server <- function(input, output, session) {
     eb <- excess_band_for_plot(nat2, excess_method, value_col = "reports_per_site")
     p <- plot_ly()
     if (!is.null(eb$ribbon)) {
+      ribbon_col <- if (!is.null(eb$ribbon_color)) eb$ribbon_color else col
       p <- p %>% add_ribbons(data = eb$ribbon, x = ~date,
         ymin = ~ymin, ymax = ~ymax,
-        fillcolor = paste0(col, "33"), line = list(color = "transparent"),
+        fillcolor = paste0(ribbon_col, "33"), line = list(color = "transparent"),
         name = paste0(main_label, "　", eb$ribbon_label), hoverinfo = "skip")
     }
     p <- p %>%
@@ -4717,15 +4718,21 @@ server <- function(input, output, session) {
     thresh <- DISEASE_CONFIG[[input$disease]]$alert_threshold
     is_pref <- !is.null(input$pref_filter) && input$pref_filter != "全国"
     band_scope <- if (is_pref) paste0(input$pref_filter, "の過去データ") else "全国の過去データ"
+    excess_method <- if (is.null(input$excess_method)) "primary" else input$excess_method
+    eb <- tryCatch(excess_band_for_plot(ts_band_series_multi(), excess_method, value_col = "reports_per_site"),
+                    error = function(e) NULL)
+    ribbon_col <- if (!is.null(eb) && !is.null(eb$ribbon_color)) eb$ribbon_color else col
+    band_label <- if (!is.null(eb) && nzchar(eb$ribbon_label)) eb$ribbon_label else "直前5年間・前後2週移動平均±2SD"
+    marker_label <- if (!is.null(eb)) eb$marker_label else "超過"
     tags$div(style="font-size:0.75em;color:#666;margin-top:2px;padding-left:4px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;",
       tags$span(
         tags$span(style=paste0("display:inline-block;width:14px;height:10px;background:",
-          col,"33",";border:1px solid ",col,";margin-right:4px;vertical-align:middle;")),
-        paste0("帯: ", band_scope, "（直前5年間・前後2週移動平均±2SD）")
+          ribbon_col,"33",";border:1px solid ",ribbon_col,";margin-right:4px;vertical-align:middle;")),
+        paste0("帯: ", band_scope, "（", band_label, "）")
       ),
       tags$span(
         tags$span(style="display:inline-block;width:8px;height:8px;background:#e74c3c;border-radius:50%;margin-right:4px;vertical-align:middle;"),
-        "+2SD超過"
+        marker_label
       ),
       if (!is.null(thresh)) tags$span(
         tags$span(style="display:inline-block;width:20px;border-top:2px dashed #e74c3c;margin-right:4px;vertical-align:middle;"),
@@ -5534,9 +5541,10 @@ server <- function(input, output, session) {
 
     p <- plot_ly()
     if (!is.null(eb$ribbon)) {
+      ribbon_col <- if (!is.null(eb$ribbon_color)) eb$ribbon_color else col
       p <- p %>% add_ribbons(data = eb$ribbon, x = ~date,
         ymin = ~ymin, ymax = ~ymax,
-        fillcolor = paste0(col, "33"), line = list(color = "transparent"),
+        fillcolor = paste0(ribbon_col, "33"), line = list(color = "transparent"),
         name = eb$ribbon_label, hoverinfo = "skip")
     }
     p <- p %>%
@@ -5612,15 +5620,28 @@ server <- function(input, output, session) {
 
   output$zensu_ts_legend <- renderUI({
     col <- ZENSU_DISEASE_CONFIG[[input$zensu_disease_ts]]$color
+    excess_method <- if (is.null(input$excess_method)) "primary" else input$excess_method
+    eb <- tryCatch({
+      d <- zensu_ts_filtered()
+      if (is.null(d) || nrow(d) == 0) NULL else {
+        d_agg <- d %>% group_by(date, year, week) %>%
+          summarise(cases = sum(cases, na.rm = TRUE), .groups = "drop") %>% arrange(date)
+        d_band <- compute_ibs_band_multi(d_agg, zensu_hist(), value_col = "cases")
+        excess_band_for_plot(d_band, excess_method, value_col = "cases")
+      }
+    }, error = function(e) NULL)
+    ribbon_col <- if (!is.null(eb) && !is.null(eb$ribbon_color)) eb$ribbon_color else col
+    band_label <- if (!is.null(eb) && nzchar(eb$ribbon_label)) eb$ribbon_label else "直前5年間・前後2週移動平均±2SD"
+    marker_label <- if (!is.null(eb)) eb$marker_label else "超過"
     tags$div(style="font-size:0.75em;color:#666;margin-top:2px;padding-left:4px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;",
       tags$span(
         tags$span(style=paste0("display:inline-block;width:14px;height:10px;background:",
-          col,"33",";border:1px solid ",col,";margin-right:4px;vertical-align:middle;")),
-        "帯: 直前5年間・前後2週移動平均±2SD"
+          ribbon_col,"33",";border:1px solid ",ribbon_col,";margin-right:4px;vertical-align:middle;")),
+        paste0("帯: ", band_label)
       ),
       tags$span(
         tags$span(style="display:inline-block;width:8px;height:8px;background:#e74c3c;border-radius:50%;margin-right:4px;vertical-align:middle;"),
-        "+2SD超過"
+        marker_label
       )
     )
   })

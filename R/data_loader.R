@@ -659,8 +659,13 @@ compute_ibs_band_multi <- function(main_df, hist_df, value_col = "reports_per_si
 # compute_ibs_band_multi() の出力から、流行曲線グラフ用の帯（ribbon）と
 # 超過点（marker）を、選択中の判定方式（"primary"/"secondary"/"ensemble"）に
 # 応じて切り出す。value_col は超過点マーカーのy値に使う実測値の列名。
+#  ribbon_color: 手法ごとに色を変える（主方式=疾患の系列色をそのまま流用、
+#  補助方式=オレンジ、アンサンブル=ティール）ことで、切り替えたときにどの帯を
+#  見ているか一目で分かるようにする
+EXCESS_METHOD_COLORS <- c(secondary = "#e67e22", ensemble = "#16a085")
+
 excess_band_for_plot <- function(band, method = "primary", value_col = "reports_per_site") {
-  if (is.null(band) || nrow(band) == 0) return(list(ribbon = NULL, ribbon_label = "", exceed = NULL, marker_label = ""))
+  if (is.null(band) || nrow(band) == 0) return(list(ribbon = NULL, ribbon_label = "", ribbon_color = NULL, exceed = NULL, marker_label = ""))
   seasonal <- isTRUE(band$seasonal[1])
   val <- band[[value_col]]
 
@@ -671,30 +676,37 @@ excess_band_for_plot <- function(band, method = "primary", value_col = "reports_
     data.frame(date = d$date, ymin = pmax(0, d$mu - 2 * d$s), ymax = d$mu + 2 * d$s)
   }
 
+  # 超過点マーカーの基準は、季節性あり主方式で言えば「値が同時期5年平均+2SDの
+  # 線を超えた週」（元の実装での閾値と同一）。tier化されたスコアでは
+  # これは score>=2（exceeds2sd or exceeds1sdでスコア2、2週連続なら3）に相当する
+  # ため、score>=2 を「超過」の基準として統一する（主方式/補助方式/アンサンブル共通）。
   if (method == "secondary") {
     marker_label <- "超過（補助方式）"
     if (seasonal) {
-      ribbon_label <- "トレンド回帰(Farrington)基準±2SD"
+      ribbon_label <- "Farrington法（トレンド回帰）基準±2SD"
       d <- band[!is.na(band$has_secondary) & band$has_secondary, , drop = FALSE]
       ribbon <- if (nrow(d) == 0) NULL else
         data.frame(date = d$date, ymin = pmax(0, d$mu2 - 2 * d$s2), ymax = d$mu2 + 2 * d$s2)
     } else {
-      # CUSUMは累積値であり実測値と同じy軸スケールの「帯」を持たないため、
-      # 帯は表示せず超過点のみを表示する
-      ribbon_label <- ""
-      ribbon <- NULL
+      # CUSUMは累積値であり実測値と同じ意味の「±SD帯」は本来持たないが、
+      # 目安として「baseline平均 〜 CUSUM決定区間(h=4σ)に達する水準」を
+      # 参考帯として表示する（他の帯とは意味が異なる近似値である点に留意）
+      ribbon_label <- "CUSUM参考帯（baseline平均〜決定区間h=4σ）"
+      d <- band[!is.na(band$has_secondary) & band$has_secondary, , drop = FALSE]
+      ribbon <- if (nrow(d) == 0) NULL else
+        data.frame(date = d$date, ymin = pmax(0, d$mu - 2 * d$s), ymax = d$mu + d$cusum_thresh)
     }
-    exceed_mask <- !is.na(band$score_secondary) & band$score_secondary == 3
+    exceed_mask <- !is.na(band$score_secondary) & band$score_secondary >= 2
   } else if (method == "ensemble") {
     ribbon_label <- paste0(primary_ribbon_label, "（参考帯）")
     ribbon <- primary_ribbon()
     marker_label <- "超過（アンサンブル）"
-    exceed_mask <- !is.na(band$score_ensemble) & band$score_ensemble == 3
+    exceed_mask <- !is.na(band$score_ensemble) & band$score_ensemble >= 2
   } else {
     ribbon_label <- primary_ribbon_label
     ribbon <- primary_ribbon()
     marker_label <- "超過（主方式）"
-    exceed_mask <- !is.na(band$score_primary) & band$score_primary == 3
+    exceed_mask <- !is.na(band$score_primary) & band$score_primary >= 2
   }
 
   exceed <- if (any(exceed_mask)) {
@@ -703,7 +715,9 @@ excess_band_for_plot <- function(band, method = "primary", value_col = "reports_
     d
   } else NULL
 
-  list(ribbon = ribbon, ribbon_label = ribbon_label, exceed = exceed, marker_label = marker_label)
+  list(ribbon = ribbon, ribbon_label = ribbon_label,
+       ribbon_color = if (method %in% names(EXCESS_METHOD_COLORS)) unname(EXCESS_METHOD_COLORS[method]) else NULL,
+       exceed = exceed, marker_label = marker_label)
 }
 
 # 流行レベル判定の中核ロジック: 参考基準値（注意報/警報相当）・Rt値・IBS方式の
@@ -930,7 +944,7 @@ zensu_ibs_band <- function(cur_val, cur_date, cur_week, cur_year,
       c("0"="平均以下","1"="平均〜+1SD","2"="+1〜+2SD","3"="+2SD超過（2週連続）")[as.character(score)]
     detail <- if (!cb$has_hist) "過去データ不足"
               else if (!is.na(fb_score))
-                sprintf("%s（5年比較基準 %.2f±%.2f／トレンド回帰基準 %.2f±%.2f）",
+                sprintf("%s（5年比較基準 %.2f±%.2f／Farrington法基準 %.2f±%.2f）",
                         val_str(cur_val), cb$mu, cb$s, fb$mu, fb$s)
               else sprintf("%s（基準 %.2f±%.2f）", val_str(cur_val), cb$mu, cb$s)
     list(score = score, label = unname(label), detail = detail,
