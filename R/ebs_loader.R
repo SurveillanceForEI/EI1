@@ -2938,30 +2938,51 @@ fetch_twitter <- function(bearer_token, disease_ids = names(TWITTER_DISEASE_QUER
 GI_DISEASE_TAGS <- c("gi", "gi_rota", "ehec", "general")
 
 # テキストから症例数・患者数を抽出する
+#
+# マッチ位置の直前に「全国」「昨年」等の比較対象を示す語がある数値は除外する。
+# 記事は「全国では1000人の患者が報告されていますが、県内では3人です」のように
+# 全国合計・前年実績等の比較数値を併記することが多く、単純にmax()を取ると
+# 今回・当地の実際の症例数（3人）ではなく無関係な比較数値（1000人）を
+# 拾ってしまい、is_gi判定（case_n>=100→「高」）を大きく誤らせる
+# （2026-08-18 ユーザー指摘の精査で発覚。実例で「全国では1000人...県内では3人」
+# から1000が抽出されることを確認）。
+EXTRACT_CASE_COUNT_EXCLUDE_WORDS <- c("全国では", "全国で", "全国の", "全国合計",
+                                       "昨年は", "昨年", "前年", "去年", "前回", "前週")
+EXTRACT_CASE_COUNT_EXCLUDE_WINDOW <- 10L
+
 extract_case_count <- function(text) {
   # 日本語: 「XX人」「XX名」「XX例」「XX件」「XX患者」
   # 英語: "XX cases" "XX patients" "XX people"
+  # 数値部分は「\d[\d,]*」（1桁も許容）。従来「\d[\d,]+」（2文字目以降を必須）
+  # だったため、「3人の患者」のような1桁の症例数がまったく抽出できていなかった
+  # （2026-08-18 ユーザー指摘の精査で発覚）。
   patterns <- c(
-    "(\\d[\\d,]+)\\s*人(?:が|の|以上|超)",
-    "(\\d[\\d,]+)\\s*名(?:が|の|以上|超)",
-    "(\\d[\\d,]+)\\s*例(?:が|の|以上|超|報告)",
-    "(\\d[\\d,]+)\\s*件(?:が|の|以上|超|報告)",
-    "(\\d[\\d,]+)\\s*人?の患者",
-    "(\\d[\\d,]+)\\s*cases?",
-    "(\\d[\\d,]+)\\s*patients?",
-    "(\\d[\\d,]+)\\s*people\\s*(infected|affected|sick)"
+    "(\\d[\\d,]*)\\s*人(?:が|の|以上|超)",
+    "(\\d[\\d,]*)\\s*名(?:が|の|以上|超)",
+    "(\\d[\\d,]*)\\s*例(?:が|の|以上|超|報告)",
+    "(\\d[\\d,]*)\\s*件(?:が|の|以上|超|報告)",
+    "(\\d[\\d,]*)\\s*人?の患者",
+    "(\\d[\\d,]*)\\s*cases?",
+    "(\\d[\\d,]*)\\s*patients?",
+    "(\\d[\\d,]*)\\s*people\\s*(infected|affected|sick)"
   )
   nums <- c()
   for (pat in patterns) {
-    m <- regmatches(text, gregexpr(pat, text, perl=TRUE, ignore.case=TRUE))[[1]]
-    if (length(m) > 0) {
-      extracted <- gsub("[^0-9]", "", regmatches(m, regexpr("\\d[\\d,]*", m, perl=TRUE)))
-      extracted <- as.numeric(gsub(",", "", extracted))
-      nums <- c(nums, extracted[!is.na(extracted)])
+    loc <- gregexpr(pat, text, perl=TRUE, ignore.case=TRUE)[[1]]
+    if (loc[1] == -1L) next
+    lens <- attr(loc, "match.length")
+    for (i in seq_along(loc)) {
+      matched_str <- substr(text, loc[i], loc[i] + lens[i] - 1L)
+      num_str <- regmatches(matched_str, regexpr("\\d[\\d,]*", matched_str, perl=TRUE))
+      num <- suppressWarnings(as.numeric(gsub(",", "", num_str)))
+      if (is.na(num)) next
+      ctx <- substr(text, max(1L, loc[i] - EXTRACT_CASE_COUNT_EXCLUDE_WINDOW), loc[i] - 1L)
+      if (any(vapply(EXTRACT_CASE_COUNT_EXCLUDE_WORDS, function(w) grepl(w, ctx, fixed=TRUE), logical(1)))) next
+      nums <- c(nums, num)
     }
   }
   if (length(nums) == 0) return(NA_real_)
-  max(nums)  # 記事中の最大値を採用
+  max(nums)  # 除外後の記事中の最大値を採用
 }
 
 # ============================================================
