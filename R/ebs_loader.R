@@ -75,8 +75,26 @@ if (exists("COUNTRY_DB")) {
 .build_kw_pattern <- function(kws) paste0("(?:", paste(.escape_regex_lit(kws), collapse = "|"), ")")
 .build_kw_boundary_pattern <- function(kws) paste0("\\b(?:", paste(.escape_regex_lit(trimws(kws)), collapse = "|"), ")\\b")
 
-.JAPAN_KW_PATTERN            <- .build_kw_pattern(.JAPAN_KW_LOADER)
-.OVERSEAS_KW_PATTERN         <- .build_kw_pattern(.OVERSEAS_KW_LOADER)
+# 短い（2〜5文字）英数字のみの略語・国名（"UAE","DRC","Mali","Oman"等）は、
+# fixed部分一致だと英単語の内部にたまたま出現して誤マッチしやすい
+# （例: "Oman" ⊂ "woman"、"Mali" ⊂ "malignant"）。tag_diseases()のkeyword_matches()
+# と同じ考え方で、そうした短い英数字トークンだけ単語境界(\b)付きにし、
+# それ以外（日本語や3文字超の英語フレーズ）は従来どおり境界なしの部分一致とする
+# （日本語はスペース区切りが無く\bが単語内部で成立しないため、日本語キーワードに
+# \bを付けると一致しなくなってしまう。実際に検証済み: "\bコンゴ\b"は
+# 「コンゴでエボラが流行」のような通常の地の文とは一致しない）。
+# 1本の正規表現にまとめる方式は変えない（記事数×キーワード数のループを避けるため）。
+.build_kw_pattern_smart <- function(kws) {
+  kws <- trimws(kws)
+  is_short_token <- grepl("^[A-Za-z0-9-]{2,5}$", kws)
+  parts <- ifelse(is_short_token,
+                   paste0("\\b", .escape_regex_lit(kws), "\\b"),
+                   .escape_regex_lit(kws))
+  paste0("(?:", paste(parts, collapse = "|"), ")")
+}
+
+.JAPAN_KW_PATTERN            <- .build_kw_pattern_smart(.JAPAN_KW_LOADER)
+.OVERSEAS_KW_PATTERN         <- .build_kw_pattern_smart(.OVERSEAS_KW_LOADER)
 .OVERSEAS_KW_BOUNDARY_PATTERN <- .build_kw_boundary_pattern(.OVERSEAS_KW_LOADER)
 .FP_WORDS_PATTERN <- if (exists(".COUNTRY_MATCH_FALSE_POSITIVE_WORDS"))
   .build_kw_pattern(.COUNTRY_MATCH_FALSE_POSITIVE_WORDS) else NULL
