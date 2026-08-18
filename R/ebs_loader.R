@@ -4993,11 +4993,7 @@ detect_lang <- function(text) {
 classify_signal <- function(text, disease_tags = NA) {
   tl <- tolower(text)
 
-  # ① 一般的な健康情報・予防啓発 → 問答無用で「参考」
-  is_generic <- any(sapply(GENERIC_HEALTH_KEYWORDS, function(k) grepl(tolower(k), tl, fixed=TRUE)))
-  if (is_generic) return("参考")
-
-  # ② 症例数による判定（消化器系疾患）
+  # ① 症例数による判定（消化器系疾患）
   case_n <- extract_case_count(text)
   is_gi <- !is.na(disease_tags) &&
     any(sapply(strsplit(as.character(disease_tags), ",")[[1]], function(t) trimws(t) %in% GI_DISEASE_TAGS))
@@ -5008,10 +5004,10 @@ classify_signal <- function(text, disease_tags = NA) {
     }
   }
 
-  # ③ 時制キーワードで「直近の流行状況」かどうか判定
+  # ② 時制キーワードで「直近の流行状況」かどうか判定
   has_temporal <- any(sapply(TEMPORAL_KEYWORDS, function(k) grepl(tolower(k), tl, perl=FALSE)))
 
-  # ④ シグナルキーワードでレベル判定
+  # ③ シグナルキーワードでレベル判定
   is_high   <- any(sapply(SIGNAL_KEYWORDS$high,   function(k) grepl(tolower(k), tl, fixed=TRUE)))
   is_medium <- any(sapply(SIGNAL_KEYWORDS$medium, function(k) grepl(tolower(k), tl, fixed=TRUE)))
   is_low    <- any(sapply(SIGNAL_KEYWORDS$low,    function(k) grepl(tolower(k), tl, fixed=TRUE)))
@@ -5020,6 +5016,14 @@ classify_signal <- function(text, disease_tags = NA) {
   if (is_medium && has_temporal)  return("中")
   if (is_medium)                  return("低")
   if (is_low)                     return("低")
+
+  # ④ 一般的な健康情報・予防啓発（③までで何のシグナルにも一致しなかった場合のみ
+  #    「参考」とする）。実際の警報記事の多くは末尾に「手洗い・うがいの徹底を」
+  #    等の定型的な予防啓発文言を含むため、この判定を③より先に行うと、
+  #    「急増」「警報」「死者」等の明確な警戒シグナルを含む記事まで一律
+  #    「参考」に格下げしてしまうバグがあった（2026-08-18 ユーザー指摘）。
+  is_generic <- any(sapply(GENERIC_HEALTH_KEYWORDS, function(k) grepl(tolower(k), tl, fixed=TRUE)))
+  if (is_generic) return("参考")
 
   # ⑤ 自治体等のプレスリリースに基づく症例発生報告（具体的な症例数の記載がある）は、
   #    シグナルキーワードに一致しなくても症例発生の一次情報である可能性が高いため、
