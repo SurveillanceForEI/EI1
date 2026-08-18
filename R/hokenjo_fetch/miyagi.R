@@ -27,15 +27,30 @@ fetch_miyagi <- function(pdf_url) {
   download.file(pdf_url, tmp, mode = "wb", quiet = TRUE)
   txt <- pdftools::pdf_text(tmp)[1]
 
-  # 週番号は本文中の「－ 第N週 －」表記、年は発行日の令和表記から取る
-  # （日付範囲は期間開始日が年またぎのことがあり、発行年とは限らないため）
+  # 週番号は本文中の「－ 第N週 －」表記から取る。年は「YYYY.MM.DD～YYYY.MM.DD」形式の
+  # 対象期間の「終了日」から取るのが正しい。以前は発行日の令和表記から取っていたが、
+  # 第52週号は年をまたいで翌年1月に発行されるため（例:「令和8年1月7日発行
+  # 2025.12.22～2025.12.28－第52週－」）、文書冒頭の「令和X年」は発行年（2026）を
+  # 指しており、対象期間の実際の年（2025）とズレて「2026年第52週」のように
+  # 誤ったweek_labelが付与されるバグがあった（2026-08-18 ユーザー指摘）。
+  # 終了日を使うのは、年またぎの第1週号（例:「2024.12.30～2025.1.5－第1週－」）を
+  # 他の都道府県と同じ慣例（週の年は開始日ではなく、通常は終了日が属する年）に
+  # 揃えるため（開始日を使うと第1週号がこのケースで2024年扱いになってしまい、
+  # 他都道府県の「XXXX年第1週」との整合が取れなくなる）。
   s <- chartr("０１２３４５６７８９", "0123456789", txt)
   s_flat <- gsub("\\s+", "", s)
   week_label <- NA_character_
   wnum_m <- regmatches(s_flat, regexec("第([0-9]+)週", s_flat))[[1]]
-  yr_m <- regmatches(s_flat, regexec("令和([0-9]+)年", s_flat))[[1]]
-  if (length(yr_m) == 2 && length(wnum_m) == 2) {
-    week_label <- sprintf("%d年第%s週", as.integer(yr_m[2]) + 2018L, wnum_m[2])
+  # 対象期間の終了日（西暦）を優先的に使う
+  period_m <- regmatches(s_flat, regexec("20[0-9]{2}[.][0-9]{1,2}[.][0-9]{1,2}[～~](20[0-9]{2})[.][0-9]{1,2}[.][0-9]{1,2}", s_flat))[[1]]
+  if (length(period_m) == 2 && length(wnum_m) == 2) {
+    week_label <- sprintf("%s年第%s週", period_m[2], wnum_m[2])
+  } else {
+    # フォールバック: 対象期間が見つからない場合のみ発行日の令和表記を使う
+    yr_m <- regmatches(s_flat, regexec("令和([0-9]+)年", s_flat))[[1]]
+    if (length(yr_m) == 2 && length(wnum_m) == 2) {
+      week_label <- sprintf("%d年第%s週", as.integer(yr_m[2]) + 2018L, wnum_m[2])
+    }
   }
 
   words <- pdf_words(tmp, page = 1)
