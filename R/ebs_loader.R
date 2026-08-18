@@ -104,7 +104,7 @@ if (exists("COUNTRY_DB")) {
 # だけでは海外記事と検出できず、誤って国内タブに表示されてしまう問題があった。
 # ソース自体が海外の政府機関・国際機関である場合は、記事内容に関わらず原則海外として扱う）
 .OVERSEAS_SOURCE_IDS_LOADER <- c(
-  "reliefweb", "who_eios", "who_don", "who_wer", "cdc", "ukhsa", "rki", "nicd",
+  "reliefweb", "who_eios", "who_don", "cdc", "ukhsa", "rki", "nicd",
   "taiwan_cdc", "china_cdc", "chp", "spf"
 )
 
@@ -280,7 +280,7 @@ is_overseas_article_vec <- function(titles, summaries, ebs_prefs = NA, source_id
 # WHO自身が発信した公式情報ではないため、あえて公式情報源には含めない
 OFFICIAL_EBS_SOURCE_IDS <- c(
   "mhlw", "jihs", "cdc", "reliefweb", "rki", "ukhsa", "nicd",
-  "taiwan_cdc", "china_cdc", "chp", "spf", "who_don", "who_wer"
+  "taiwan_cdc", "china_cdc", "chp", "spf", "who_don"
 )
 
 is_official_ebs_source <- function(source_id) {
@@ -1192,6 +1192,20 @@ fetch_who_wer_news <- function(timeout_sec = 15) {
     if (length(out) == 0) return(NULL)
     bind_rows(out)
   }, error = function(e) { message("WHO WER エラー: ", e$message); NULL })
+}
+
+# 今週のWER「Highlighted signals and events」でハイライトされた疾患の内部IDだけを
+# 抽出する（他ソース記事の補強フラグ判定に使う。ユーザー指示 2026-08-18:
+# WERそのものを記事一覧に加えるのではなく、他記事の参考・補強に使う）
+get_who_wer_highlighted_diseases <- function() {
+  wer <- fetch_who_wer_news()
+  if (is.null(wer) || nrow(wer) == 0) return(character(0))
+  hazards <- sub("^.*: ", "", wer$title)
+  ids <- unique(unlist(lapply(hazards, function(hz) {
+    tags <- tag_diseases(hz)
+    strsplit(tags, ",")[[1]]
+  })))
+  ids[ids != "other"]
 }
 
 # ============================================================
@@ -5395,13 +5409,12 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
     all_df <- bind_rows(all_df, don)
   }
 
-  # WHO Weekly Epidemiological Record（Highlighted signals and events、HTMLスクレイピング）
-  wer <- tryCatch(fetch_who_wer_news(), error = function(e) NULL)
-  if (!is.null(wer) && nrow(wer) > 0) {
-    if (!"retweet_count" %in% names(wer)) wer$retweet_count <- NA_integer_
-    if (!"like_count"    %in% names(wer)) wer$like_count    <- NA_integer_
-    all_df <- bind_rows(all_df, wer)
-  }
+  # WHO Weekly Epidemiological Record（Highlighted signals and events）は、
+  # それ自体を1件のEBS記事として一覧に混ぜるのではなく、他ソース由来の記事の
+  # 「補強フラグ」として使う（ユーザー指示 2026-08-18）。ここでは今週WHOが
+  # ハイライトした疾患IDの集合だけを取得しておき、後段のシグナル判定で
+  # disease_tagsと突き合わせる
+  who_wer_disease_ids <- tryCatch(get_who_wer_highlighted_diseases(), error = function(e) character(0))
 
   # ECDC ニュース（HTMLスクレイピング）
   ecdc <- tryCatch(fetch_ecdc_news(), error = function(e) NULL)
@@ -5578,6 +5591,25 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
   } else {
     all_df$signal_level  <- factor("FYI", levels = c("Signal High","Signal Low","FYI"))
     all_df$signal_weight <- sapply(all_df$signal_level, signal_weight)
+  }
+
+  # WHO WER補強フラグ: 今週WHOがHighlighted signalsとして取り上げた疾患を
+  # disease_tagsに含む記事は、シグナルレベルを1段階引き上げる
+  # （FYI→Signal Low→Signal High）。WER自体は記事として一覧に加えない
+  # （ユーザー指示 2026-08-18）。
+  if (length(who_wer_disease_ids) > 0 && nrow(all_df) > 0) {
+    who_wer_flag <- vapply(all_df$disease_tags, function(tags) {
+      any(strsplit(as.character(tags), ",")[[1]] %in% who_wer_disease_ids)
+    }, logical(1))
+    if (any(who_wer_flag)) {
+      lv <- as.character(all_df$signal_level)
+      bump <- c("FYI" = "Signal Low", "Signal Low" = "Signal High", "Signal High" = "Signal High")
+      lv[who_wer_flag] <- unname(bump[lv[who_wer_flag]])
+      all_df$signal_level <- factor(lv, levels = c("Signal High","Signal Low","FYI"))
+      all_df$signal_weight <- sapply(all_df$signal_level, signal_weight)
+      all_df$summary[who_wer_flag] <- paste0(
+        "【WHO WERで今週ハイライトされたシグナルと一致】", all_df$summary[who_wer_flag])
+    }
   }
 
   all_df <- all_df %>%
