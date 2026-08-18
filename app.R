@@ -1480,6 +1480,7 @@ function ebsUntranslateCards(containerId) {
               tags$tr(tags$td("厚生労働省（MHLW）"), tags$td("行政"), tags$td("日本語")),
               tags$tr(tags$td("JIHS（国立健康危機管理研究機構）"), tags$td("研究機関"), tags$td("日本語")),
               tags$tr(tags$td("WHO Disease Outbreak News"), tags$td("国際"), tags$td("英語")),
+              tags$tr(tags$td("WHO Weekly Epidemiological Record（Highlighted signals and events）"), tags$td("国際"), tags$td("英語")),
               tags$tr(tags$td("ProMED Mail"), tags$td("国際"), tags$td("英語")),
               tags$tr(tags$td("ECDC"), tags$td("国際"), tags$td("英語")),
               tags$tr(tags$td("CDC Health Alerts"), tags$td("国際"), tags$td("英語")),

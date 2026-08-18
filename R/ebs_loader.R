@@ -104,7 +104,7 @@ if (exists("COUNTRY_DB")) {
 # だけでは海外記事と検出できず、誤って国内タブに表示されてしまう問題があった。
 # ソース自体が海外の政府機関・国際機関である場合は、記事内容に関わらず原則海外として扱う）
 .OVERSEAS_SOURCE_IDS_LOADER <- c(
-  "reliefweb", "who_eios", "who_don", "cdc", "ukhsa", "rki", "nicd",
+  "reliefweb", "who_eios", "who_don", "who_wer", "cdc", "ukhsa", "rki", "nicd",
   "taiwan_cdc", "china_cdc", "chp", "spf"
 )
 
@@ -280,7 +280,7 @@ is_overseas_article_vec <- function(titles, summaries, ebs_prefs = NA, source_id
 # WHO自身が発信した公式情報ではないため、あえて公式情報源には含めない
 OFFICIAL_EBS_SOURCE_IDS <- c(
   "mhlw", "jihs", "cdc", "reliefweb", "rki", "ukhsa", "nicd",
-  "taiwan_cdc", "china_cdc", "chp", "spf", "who_don"
+  "taiwan_cdc", "china_cdc", "chp", "spf", "who_don", "who_wer"
 )
 
 is_official_ebs_source <- function(source_id) {
@@ -1092,6 +1092,106 @@ fetch_ecdc_news <- function(timeout_sec = 15, n_results = 20) {
     })
     bind_rows(Filter(Negate(is.null), rows)) %>% head(n_results)
   }, error = function(e) { message("ECDC エラー: ", e$message); NULL })
+}
+
+# ============================================================
+# WHO Weekly Epidemiological Record（WER）「Highlighted signals and events」
+# の「Selected new signals of potential public health events assessed」表
+# （HTMLスクレイピング）。WERは毎週金曜発行。最新号のURLはトップページの
+# 「Read the full HTML edition」リンクから解決する（号数のURLパターンが
+# 巻数・号数依存で単純な連番予測ができないため）。
+# ユーザー指示（2026-08-18）: 「Highlighted signals and events」の
+# 「Selected new signals of potential public health events assessed」に
+# 記載の地域・疾患をEBSの参考情報として毎回確認する。
+# ============================================================
+WHO_WER_INDEX_URL <- "https://www.who.int/publications/journals/weekly-epidemiological-record"
+
+fetch_who_wer_news <- function(timeout_sec = 15) {
+  message("WHO WER（週刊疫学記録）取得中...")
+  tryCatch({
+    idx_resp <- GET(WHO_WER_INDEX_URL, timeout(timeout_sec),
+                     add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(idx_resp) != 200) { message("WHO WER index: HTTP ", status_code(idx_resp)); return(NULL) }
+    idx_doc <- read_html(content(idx_resp, "text", encoding = "UTF-8"))
+    latest_link <- xml_find_first(idx_doc,
+      "//a[contains(., 'full HTML edition') or contains(., 'Read the full HTML')]")
+    issue_href <- if (!is.na(latest_link)) xml_attr(latest_link, "href") else NA_character_
+    if (is.na(issue_href) || nchar(issue_href) == 0) {
+      message("WHO WER: 最新号リンクが見つかりません"); return(NULL)
+    }
+    issue_url <- if (grepl("^https?://", issue_href)) issue_href else paste0("https://www.who.int", issue_href)
+
+    issue_resp <- GET(issue_url, timeout(timeout_sec),
+                       add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(issue_resp) != 200) { message("WHO WER issue: HTTP ", status_code(issue_resp)); return(NULL) }
+    doc <- read_html(content(issue_resp, "text", encoding = "UTF-8"))
+
+    # 号タイトル・対象週の文言（"Epidemiological Week 32 (3 August - 9 August 2026)"）から
+    # 対象週の終了日をpub_dateとして使う。取得できない場合はSys.Date()にフォールバックする
+    header_txt <- xml_text(xml_find_first(doc, "//body"))
+    wk_m <- regmatches(header_txt, regexpr(
+      "Epidemiological Week [0-9]+ ?\\([0-9]{1,2} [A-Za-z]+ ?[–-] ?[0-9]{1,2} [A-Za-z]+ [0-9]{4}\\)",
+      header_txt, perl = TRUE))
+    pub_date <- Sys.Date()
+    # as.Date(format="%B")はロケール依存（実行環境が日本語ロケールだと英語月名を
+    # 解釈できずNAになる）ため、ロケールに依存しない月名テーブルで手動変換する
+    .EN_MONTHS <- c(January=1, February=2, March=3, April=4, May=5, June=6,
+                     July=7, August=8, September=9, October=10, November=11, December=12)
+    if (length(wk_m) > 0) {
+      end_m <- regmatches(wk_m, regexpr("([0-9]{1,2}) ([A-Za-z]+) ([0-9]{4})\\)$", wk_m, perl = TRUE))
+      if (length(end_m) > 0) {
+        parts <- regmatches(end_m, regexec("([0-9]{1,2}) ([A-Za-z]+) ([0-9]{4})", end_m))[[1]]
+        if (length(parts) == 4 && parts[3] %in% names(.EN_MONTHS)) {
+          parsed <- suppressWarnings(as.Date(sprintf("%s-%02d-%02d",
+            parts[4], .EN_MONTHS[[parts[3]]], as.integer(parts[2]))))
+          if (!is.na(parsed)) pub_date <- parsed
+        }
+      }
+    }
+
+    # 「Region / Hazard」の2列表を、ヘッダーセルの文言で特定する（表の並び順が
+    # 号によって変わっても頑健に検出できるようにするため、固定インデックスではなく
+    # ヘッダーテキストで探す）
+    tables <- xml_find_all(doc, "//table[contains(@class,'wer-table')]")
+    target <- NULL
+    for (tb in tables) {
+      hdr <- xml_find_all(tb, ".//tr[1]/*")
+      hdr_txt <- trimws(xml_text(hdr))
+      if (length(hdr_txt) >= 2 && any(grepl("^Region$", hdr_txt, ignore.case = TRUE)) &&
+          any(grepl("^Hazard$", hdr_txt, ignore.case = TRUE))) { target <- tb; break }
+    }
+    if (is.null(target)) { message("WHO WER: Region/Hazard表が見つかりません"); return(NULL) }
+
+    data_rows <- xml_find_all(target, ".//tr[position()>1]")
+    out <- list()
+    for (r in data_rows) {
+      cells <- xml_find_all(r, "./*")
+      if (length(cells) < 2) next
+      region <- trimws(xml_text(cells[[1]]))
+      # <br>区切りの「• 疾患名」箇条書きをxml_text()すると改行が失われ結合してしまうため、
+      # 子ノード単位でテキストを集めて再分割する
+      hazard_html <- as.character(cells[[2]])
+      hazard_txt <- gsub("<br\\s*/?>", "\n", hazard_html, ignore.case = TRUE)
+      hazard_txt <- gsub("<[^>]+>", "", hazard_txt)
+      hazards <- trimws(gsub("^[••]\\s*", "", strsplit(hazard_txt, "\n")[[1]]))
+      hazards <- hazards[nzchar(hazards)]
+      if (length(hazards) == 0 || nchar(region) == 0) next
+      for (hz in hazards) {
+        out[[length(out) + 1]] <- tibble(
+          source_id   = "who_wer",
+          source_name = "WHO Weekly Epidemiological Record",
+          category    = "国際",
+          lang        = "en",
+          title       = sprintf("WHO WER Highlighted Signal — %s: %s", region, hz),
+          link        = issue_url,
+          pub_date    = pub_date,
+          summary     = sprintf("WHO Weekly Epidemiological Record「Highlighted signals and events」より。地域: %s／シグナル: %s", region, hz)
+        )
+      }
+    }
+    if (length(out) == 0) return(NULL)
+    bind_rows(out)
+  }, error = function(e) { message("WHO WER エラー: ", e$message); NULL })
 }
 
 # ============================================================
@@ -5293,6 +5393,14 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
     if (!"retweet_count" %in% names(don)) don$retweet_count <- NA_integer_
     if (!"like_count"    %in% names(don)) don$like_count    <- NA_integer_
     all_df <- bind_rows(all_df, don)
+  }
+
+  # WHO Weekly Epidemiological Record（Highlighted signals and events、HTMLスクレイピング）
+  wer <- tryCatch(fetch_who_wer_news(), error = function(e) NULL)
+  if (!is.null(wer) && nrow(wer) > 0) {
+    if (!"retweet_count" %in% names(wer)) wer$retweet_count <- NA_integer_
+    if (!"like_count"    %in% names(wer)) wer$like_count    <- NA_integer_
+    all_df <- bind_rows(all_df, wer)
   }
 
   # ECDC ニュース（HTMLスクレイピング）
