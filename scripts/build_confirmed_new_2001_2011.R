@@ -51,7 +51,17 @@ ZENSU_LABEL_ALIASES <- c(
   "後天性免疫不全症候群（ＨＩＶ感染症を含む）" = "aids",
   "水痘（入院例に限る。）" = "varicella_hosp"
 )
-TEITEN_LABEL_ALIASES <- c("感染性胃腸炎(ロタウイルス)" = "gi_rota")
+# 2001-2007年頃のシート名は現行のTEITEN_LABEL_MAPと表記が異なるものがあり、
+# 該当疾患が丸ごと取得漏れになっていた（実データ精査で発覚）:
+#  - 水痘: 古いシート名は「水　痘」（全角スペースが疾患名中に埋め込まれている）
+#  - 突発性発しん: 古いシート名は「突発性発疹」（「疹」表記、現行マップは「発しん」）
+#  - クラミジア肺炎: 古いシート名は「クラミジア肺炎(オウム病を除く)」の注記付き
+TEITEN_LABEL_ALIASES <- c(
+  "感染性胃腸炎(ロタウイルス)" = "gi_rota",
+  "水　痘" = "varicella",
+  "突発性発疹" = "roseola",
+  "クラミジア肺炎(オウム病を除く)" = "chlamydia"
+)
 STD_LABEL_MAP <- setNames(names(STD_DISEASE_CONFIG), sapply(STD_DISEASE_CONFIG, function(x) x$label))
 month_labels_zenkaku <- c("１月","２月","３月","４月","５月","６月","７月","８月","９月","１０月","１１月","１２月")
 to_hankaku <- function(x) chartr("０１２３４５６７８９", "0123456789", x)
