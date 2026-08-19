@@ -54,9 +54,24 @@ fetch_saitama <- function(pdf_url = NULL) {
 
     if (any(txt == "報") && any(txt == "告") && any(txt == "数")) {
       nums <- txt[!(txt %in% c("報", "告", "数"))]
+      # 「報告数」行と直後の保健所名行のy座標が非常に近い場合、
+      # group_words_into_rows()が両者を1行として結合してしまうことがある
+      # （例:「東松山」「秩父」「幸手」等で確認）。行はx座標順に並んでおり、
+      # 保健所名は最左列（x<100）にあるため、結合された場合は先頭側に
+      # 非数値（漢字等）トークンとして紛れ込む。切り出してcur_hokenjoに
+      # 設定する（切り出さないと当該保健所のデータが丸ごと失われてしまう）
+      is_num_tok <- grepl("^[0-9,]+(\\.[0-9]+)?$|^-$|^\\*$", nums)
+      leading_name <- character(0)
+      if (length(nums) > 0 && any(is_num_tok) && !all(is_num_tok)) {
+        first_num_idx <- min(which(is_num_tok))
+        if (first_num_idx > 1) {
+          leading_name <- nums[seq_len(first_num_idx - 1)]
+          nums <- nums[first_num_idx:length(nums)]
+        }
+      }
       if (length(nums) >= 15) {
         cur_counts <- nums
-        cur_hokenjo <- NULL
+        cur_hokenjo <- if (length(leading_name) > 0) leading_name else NULL
       }
       next
     }
