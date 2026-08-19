@@ -20,7 +20,16 @@
                        "クラミジア肺炎（オウム病を除く）", "感染性胃腸炎（ロタウイルス）")
 
 .kanagawa_exclude <- c("全県", "県域")
-.kanagawa_center_suffix <- c("秦野センター", "三崎センター", "足柄上センター", "大和センター")
+# センター（支所）は親事務所とは別の市区町村を管轄する別管区のため、
+# 保健所境界データも親事務所とは別ポリゴンとして扱う（ユーザー指示）。
+# 例:「平塚保健福祉事務所」は平塚市・大磯町・二宮町・寒川町、
+# 「同 秦野センター」は秦野市・伊勢原市というように管轄が完全に分かれる。
+.kanagawa_center_rename <- c(
+  "平塚秦野センター" = "秦野",
+  "鎌倉三崎センター" = "三浦",
+  "小田原足柄上センター" = "足柄上",
+  "厚木大和センター" = "大和"
+)
 .kanagawa_name_fix <- c("茅ケ崎市" = "茅ヶ崎市")
 
 fetch_kanagawa <- function(pdf_url = NULL) {
@@ -127,11 +136,9 @@ fetch_kanagawa <- function(pdf_url = NULL) {
   df <- do.call(rbind, list(df1, df2, df3, df4, df5))
   df <- df[!is.null(df$hokenjo) & !is.na(df$hokenjo), ]
 
-  # サブセンターを親事務所へ合算（例: "鎌倉三崎センター" → "鎌倉"）
-  for (suf in .kanagawa_center_suffix) {
-    hit <- grepl(paste0(suf, "$"), df$hokenjo)
-    df$hokenjo[hit] <- sub(paste0(suf, "$"), "", df$hokenjo[hit])
-  }
+  # センターは親事務所とは別管区として扱う（合算しない）
+  df$hokenjo <- ifelse(df$hokenjo %in% names(.kanagawa_center_rename),
+                        .kanagawa_center_rename[df$hokenjo], df$hokenjo)
   df$hokenjo <- ifelse(df$hokenjo %in% names(.kanagawa_name_fix), .kanagawa_name_fix[df$hokenjo], df$hokenjo)
 
   agg <- aggregate(cbind(count, rate) ~ hokenjo + disease, data = df, FUN = function(x) sum(x, na.rm = TRUE), na.action = na.pass)
