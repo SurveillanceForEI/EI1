@@ -6127,10 +6127,34 @@ server <- function(input, output, session) {
     wks <- hokenjo_available_week_nums()
     if (length(wks) < 2) return(NULL)
     tagList(
-      sliderInput("hokenjo_week_idx", "表示週",
-                  min = 1, max = length(wks), value = length(wks),
-                  step = 1, sep = "", ticks = FALSE, width = "100%")
+      fluidRow(
+        column(1, style="padding-top:22px;padding-right:2px;",
+          actionButton("hokenjo_week_prev", NULL, icon = icon("caret-left"), width = "100%",
+                       title = "1週戻る")),
+        column(10,
+          sliderInput("hokenjo_week_idx", "表示週",
+                      min = 1, max = length(wks), value = length(wks),
+                      step = 1, sep = "", ticks = FALSE, width = "100%",
+                      animate = animationOptions(interval = 800, loop = FALSE))),
+        column(1, style="padding-top:22px;padding-left:2px;",
+          actionButton("hokenjo_week_next", NULL, icon = icon("caret-right"), width = "100%",
+                       title = "1週進む"))
+      )
     )
+  })
+
+  # スライダー横の「1週戻る／進む」ボタン。細かいドラッグ操作が難しいという
+  # フィードバックを受けて追加。範囲外（最初/最後の週）では何もしない
+  observeEvent(input$hokenjo_week_prev, {
+    idx <- input$hokenjo_week_idx
+    if (is.null(idx)) return()
+    updateSliderInput(session, "hokenjo_week_idx", value = max(1, idx - 1))
+  })
+  observeEvent(input$hokenjo_week_next, {
+    idx <- input$hokenjo_week_idx
+    wks <- hokenjo_available_week_nums()
+    if (is.null(idx) || length(wks) < 2) return()
+    updateSliderInput(session, "hokenjo_week_idx", value = min(length(wks), idx + 1))
   })
 
   # 選択中のインデックスを実際の「年*100+週番号」キーに変換する
