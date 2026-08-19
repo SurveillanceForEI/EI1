@@ -6380,6 +6380,21 @@ server <- function(input, output, session) {
     }
 
     national_ok <- st$status == "no_pref" && !is.null(hokenjo_national_map_data())
+    # 都道府県ごとに週報の公表タイミングが数日〜1週間程度ずれるため、
+    # 直近週ほど一部の県しかまだ公表していないことがある。塗り分けできた
+    # 都道府県数が極端に少ない場合は、データ欠落ではなく公表待ちである旨を
+    # 案内する（ユーザーから「全国にすると特定の1県しか色がつかない」との
+    # 指摘があり追加）
+    national_sparse_note <- NULL
+    if (national_ok) {
+      nd <- hokenjo_national_map_data()
+      n_prefs <- length(unique(nd$pref))
+      if (n_prefs <= 5) {
+        national_sparse_note <- sprintf(
+          "※ 表示中の週は、都道府県ごとの週報公表タイミングのずれにより、現時点でまだ%d都道府県分しか取得できていません（%s）。多くの都道府県分を見るには、表示週を1つ前に戻してください。",
+          n_prefs, paste(sort(unique(nd$pref)), collapse="、"))
+      }
+    }
     msg <- switch(st$status,
       no_pref = if (national_ok) NULL else "「全国」選択時に地図で塗り分けられる保健所別データが見つかりませんでした。都道府県を選択すると、その県内の保健所別マップが表示されます。",
       not_teiten = "保健所別マップは「定点把握」の週次疾患のみ対応しています（現在は全数把握モードです）。",
@@ -6402,6 +6417,10 @@ server <- function(input, output, session) {
       if (national_ok) {
         tags$div(style="color:#345;background:#eef4ff;border:1px solid #cdddf5;border-radius:4px;padding:8px 12px;font-size:0.85em;margin-bottom:8px;",
           "「全国」選択中は全都道府県の保健所単位で地図を塗り分け、グラフには上位20保健所を表示しています。都道府県を選択すると、その県のみのマップ・グラフに切り替わります。")
+      },
+      if (!is.null(national_sparse_note)) {
+        tags$div(style="color:#8a6d1a;background:#fff8e1;border:1px solid #f0dfa0;border-radius:4px;padding:8px 12px;font-size:0.85em;margin-bottom:8px;",
+          national_sparse_note)
       },
       if (!is.null(msg)) {
         tags$div(style="color:#a55;background:#fff6f6;border:1px solid #f0d0d0;border-radius:4px;padding:8px 12px;font-size:0.88em;margin-bottom:8px;",
