@@ -6509,19 +6509,18 @@ server <- function(input, output, session) {
       ) %>%
       addLegend(pal = pal, values = c(0, max_val), title = metric_label, position = "bottomright")
 
-    # 選択県の外周を太線で強調し、他県との境目を分かりやすくする
-    if (!is.null(JAPAN_MAP)) {
-      sel_idx <- which(JAPAN_MAP$pref_name == st$pref)
-      sel_geo <- if (length(sel_idx) > 0) {
-        sf::st_sf(pref_name = JAPAN_MAP$pref_name[sel_idx],
-                   geometry = sf::st_geometry(JAPAN_MAP)[sel_idx])
-      } else NULL
-      if (!is.null(sel_geo) && nrow(sel_geo) > 0) {
-        m <- m %>% addPolylines(
-          data = sf::st_boundary(sel_geo),
-          color = "#c0392b", weight = 4, opacity = 0.9
-        )
-      }
+    # 選択県の外周を太線で強調し、他県との境目を分かりやすくする。
+    # JAPAN_MAP（都道府県境界データ）はhokenjo_boundaries（保健所境界データ）とは
+    # 別ソースのため単純に重ねると境界線がずれる。選択県自身の保健所ポリゴンを
+    # 結合（union）して外周を取ることで、色塗り部分と完全に一致させる。
+    sel_outline <- tryCatch({
+      sf::st_boundary(sf::st_union(sf::st_make_valid(sf::st_geometry(d))))
+    }, error = function(e) NULL)
+    if (!is.null(sel_outline)) {
+      m <- m %>% addPolylines(
+        data = sel_outline,
+        color = "#c0392b", weight = 4, opacity = 0.9
+      )
     }
 
     # パン・ズームは常に選択県のみを基準にする（他県は表示範囲に含めない）
