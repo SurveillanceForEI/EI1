@@ -2549,7 +2549,7 @@ server <- function(input, output, session) {
     sel <- map_selected_date()
     if (is.null(sel)) return(zensu_latest_week())
     d %>%
-      filter(disease == input$zensu_disease_ts, date == sel) %>%
+      filter(disease == input$zensu_disease_ts, date == sel, pref_name != "全国") %>%
       group_by(pref_name) %>%
       summarise(cases = sum(cases, na.rm = TRUE), .groups = "drop")
   })
@@ -4481,7 +4481,7 @@ server <- function(input, output, session) {
   zensu_latest_week <- reactive({
     d <- ZENSU_DATA
     if (is.null(d) || nrow(d) == 0) return(NULL)
-    d <- d %>% filter(disease == input$zensu_disease_ts)
+    d <- d %>% filter(disease == input$zensu_disease_ts, pref_name != "全国")
     if (nrow(d) == 0) return(NULL)
     ly <- max(d$year, na.rm = TRUE)
     lw <- max(d$week[d$year == ly], na.rm = TRUE)
@@ -4497,7 +4497,7 @@ server <- function(input, output, session) {
     if (is.null(d) || nrow(d) == 0) return(NULL)
     dr <- input$date_range
     d %>%
-      filter(disease == input$zensu_disease_ts,
+      filter(disease == input$zensu_disease_ts, pref_name != "全国",
              date >= dr[1], date <= dr[2]) %>%
       group_by(pref_name) %>%
       summarise(cumulative = sum(cases, na.rm = TRUE), .groups = "drop") %>%
@@ -4532,9 +4532,9 @@ server <- function(input, output, session) {
     if (is_zensu) {
       d <- ZENSU_DATA
       if (is.null(d) || nrow(d) == 0) return(1)
-      # 都道府県×週 の症例数の最大値
+      # 都道府県×週 の症例数の最大値（全国合算行は比較対象外）
       mx <- d %>%
-        filter(disease == input$zensu_disease_ts) %>%
+        filter(disease == input$zensu_disease_ts, pref_name != "全国") %>%
         group_by(pref_name, date) %>%
         summarise(cases = sum(cases, na.rm = TRUE), .groups = "drop") %>%
         pull(cases) %>% max(na.rm = TRUE)
@@ -5768,7 +5768,7 @@ server <- function(input, output, session) {
     if (is.null(zd) || nrow(zd) == 0)
       return(plot_ly() %>% add_annotations(text="データなし", showarrow=FALSE))
     cutoff1y <- Sys.Date() - 365
-    d <- zd %>% filter(disease == input$zensu_disease_ts, date >= cutoff1y) %>%
+    d <- zd %>% filter(disease == input$zensu_disease_ts, pref_name != "全国", date >= cutoff1y) %>%
       group_by(pref_code, pref_name, date, week, year) %>%
       summarise(cases=sum(cases, na.rm=TRUE), .groups="drop") %>%
       mutate(week_label = paste0(year, "-W", sprintf("%02d", week)))
@@ -5791,7 +5791,7 @@ server <- function(input, output, session) {
     zd <- ZENSU_DATA
     if (is.null(zd) || nrow(zd) == 0)
       return(plot_ly() %>% add_annotations(text="データなし", showarrow=FALSE))
-    d <- zd %>% filter(disease == input$zensu_disease_ts) %>%
+    d <- zd %>% filter(disease == input$zensu_disease_ts, pref_name != "全国") %>%
       left_join(PREF_MASTER %>% select(pref_code, region), by = "pref_code") %>%
       group_by(region,date) %>%
       summarise(cases=sum(cases, na.rm=TRUE), .groups="drop")
