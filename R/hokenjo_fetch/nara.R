@@ -139,5 +139,25 @@ fetch_nara <- function(pdf_url, page = 2) {
     }
     i <- i + 1
   }
-  do.call(rbind, out)
+  df <- do.call(rbind, out)
+
+  # 保健所境界データでは「中和（東）」「中和（西）」を単一の「中和」保健所
+  # として扱っているため、この2区分を合算しないと地図上で「中和」に一切
+  # データが乗らない（＝常にデータなし表示になる）バグがあった。
+  # 定点数を count/rate から逆算して合算し、rateを再計算する
+  chuwa <- df[df$hokenjo %in% c("中和（東）", "中和（西）"), ]
+  other <- df[!(df$hokenjo %in% c("中和（東）", "中和（西）")), ]
+  if (nrow(chuwa) > 0) {
+    merged <- do.call(rbind, lapply(split(chuwa, chuwa$disease), function(sub) {
+      cnt <- if (all(is.na(sub$count))) NA_real_ else sum(sub$count, na.rm = TRUE)
+      teiten <- ifelse(!is.na(sub$count) & !is.na(sub$rate) & sub$rate > 0, sub$count / sub$rate, NA_real_)
+      total_teiten <- sum(teiten, na.rm = TRUE)
+      rte <- if (!is.na(cnt) && total_teiten > 0) round(cnt / total_teiten, 2)
+             else if (!is.na(cnt) && cnt == 0) 0 else NA_real_
+      data.frame(pref = "奈良県", week_label = sub$week_label[1], hokenjo = "中和",
+                 disease = sub$disease[1], count = cnt, rate = rte, stringsAsFactors = FALSE)
+    }))
+    df <- rbind(other, merged)
+  }
+  df
 }
