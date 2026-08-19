@@ -173,37 +173,54 @@ save_ebs_cache <- function(data, cache_path = EBS_STARTUP_CACHE) {
     saveRDS(data, cache_path)
   }, error = function(e) message("キャッシュ保存エラー: ", e$message))
 }
-cat("全数把握 データ取得中...\n")
-ZENSU_DATA <- tryCatch(load_all_zensu_cached(), error=function(e) { message("全数 ERROR:", e$message); NULL })
-tryCatch(
-  record_data_change("zensu", compute_recent_signature(ZENSU_DATA, "date", 90)),
-  error = function(e) NULL
-)
-cat("IASR データ取得中...\n")
-IASR_DATA <- tryCatch(load_all_iasr(), error=function(e) { message("IASR ERROR:", e$message); NULL })
-tryCatch(
-  record_data_change("iasr", compute_recent_signature(IASR_DATA, "date", 180)),
-  error = function(e) NULL
-)
-cat("ARI病原体 データ読み込み中（キャッシュ）...\n")
-ARI_PATHOGEN_DATA <- tryCatch(load_ari_pathogen_cached(), error=function(e) { message("ARI病原体 ERROR:", e$message); NULL })
-tryCatch(
-  record_data_change("ari_pathogen", compute_recent_signature(ARI_PATHOGEN_DATA$counts, "date", 180)),
-  error = function(e) NULL
-)
-cat("入院サーベイランス データ読み込み中（キャッシュ）...\n")
-HOSP_DATA <- tryCatch(load_hosp_cached(), error=function(e) { message("入院サーベイランス ERROR:", e$message); NULL })
-tryCatch(
-  record_data_change("hosp", compute_recent_signature(HOSP_DATA, "date", 180)),
-  error = function(e) NULL
-)
-cat("月報疾患 データ読み込み中（キャッシュ）...\n")
-STD_DATA <- tryCatch(load_std_cached(), error=function(e) { message("月報疾患 ERROR:", e$message); NULL })
-tryCatch(
-  record_data_change("std", compute_recent_signature(STD_DATA, "date", 400)),
-  error = function(e) NULL
-)
-cat("準備完了\n")
+# 全数把握・IASR・ARI病原体・入院サーベイランス・月報疾患の5データソースは、
+# 起動時に同期的に読み込むとPosit Connect Cloudの起動タイムアウト
+# （ワーカーが60秒以内に応答しないとデプロイ失敗になる）を超えることが
+# あったため、later::later()でイベントループ開始後（＝httpuvがリッスンを
+# 開始した後）に非同期で読み込むよう変更した。読み込み完了までの間は
+# 各タブがNULL（データなし表示）になるが、アプリ全体の該当箇所は元々
+# is.null()チェックでガードされているため描画エラーにはならず、
+# 読み込み完了後にそのタブを開けば正しいデータが表示される。
+ZENSU_DATA <- NULL
+IASR_DATA <- NULL
+ARI_PATHOGEN_DATA <- NULL
+HOSP_DATA <- NULL
+STD_DATA <- NULL
+cat("準備完了（残りのデータは起動後にバックグラウンドで読み込みます）\n")
+
+later::later(function() {
+  cat("全数把握 データ取得中...\n")
+  ZENSU_DATA <<- tryCatch(load_all_zensu_cached(), error=function(e) { message("全数 ERROR:", e$message); NULL })
+  tryCatch(
+    record_data_change("zensu", compute_recent_signature(ZENSU_DATA, "date", 90)),
+    error = function(e) NULL
+  )
+  cat("IASR データ取得中...\n")
+  IASR_DATA <<- tryCatch(load_all_iasr(), error=function(e) { message("IASR ERROR:", e$message); NULL })
+  tryCatch(
+    record_data_change("iasr", compute_recent_signature(IASR_DATA, "date", 180)),
+    error = function(e) NULL
+  )
+  cat("ARI病原体 データ読み込み中（キャッシュ）...\n")
+  ARI_PATHOGEN_DATA <<- tryCatch(load_ari_pathogen_cached(), error=function(e) { message("ARI病原体 ERROR:", e$message); NULL })
+  tryCatch(
+    record_data_change("ari_pathogen", compute_recent_signature(ARI_PATHOGEN_DATA$counts, "date", 180)),
+    error = function(e) NULL
+  )
+  cat("入院サーベイランス データ読み込み中（キャッシュ）...\n")
+  HOSP_DATA <<- tryCatch(load_hosp_cached(), error=function(e) { message("入院サーベイランス ERROR:", e$message); NULL })
+  tryCatch(
+    record_data_change("hosp", compute_recent_signature(HOSP_DATA, "date", 180)),
+    error = function(e) NULL
+  )
+  cat("月報疾患 データ読み込み中（キャッシュ）...\n")
+  STD_DATA <<- tryCatch(load_std_cached(), error=function(e) { message("月報疾患 ERROR:", e$message); NULL })
+  tryCatch(
+    record_data_change("std", compute_recent_signature(STD_DATA, "date", 400)),
+    error = function(e) NULL
+  )
+  cat("バックグラウンドデータ読み込み完了\n")
+}, delay = 0)
 
 CURRENT_YEAR <- if (!is.null(SURV_DATA)) max(SURV_DATA$year, na.rm=TRUE) else as.integer(format(Sys.Date(),"%Y"))
 CURRENT_WEEK <- if (!is.null(SURV_DATA)) { SURV_DATA %>% filter(year==CURRENT_YEAR) %>% pull(week) %>% max(na.rm=TRUE) } else 1L
