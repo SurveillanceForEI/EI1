@@ -52,11 +52,13 @@
   out <- list()
   for (k in seq_along(diseases)) {
     col <- disease_cols[k]
+    # CSVのセルが空欄（報告なし=0件）の場合はNAではなく0として扱う（ユーザー指示）
+    cnt <- parse_hokenjo_number(d_count[last_row, col]); if (is.na(cnt)) cnt <- 0
+    rte <- parse_hokenjo_number(d_rate[last_row, col]);  if (is.na(rte)) rte <- 0
     out[[k]] <- data.frame(
       pref = "福井県", week_label = week_label, hokenjo = hokenjo,
       disease = diseases[k],
-      count = parse_hokenjo_number(d_count[last_row, col]),
-      rate  = parse_hokenjo_number(d_rate[last_row, col]),
+      count = cnt, rate = rte,
       stringsAsFactors = FALSE
     )
   }
@@ -99,11 +101,13 @@ fetch_fukui <- function() {
     week_label <- paste0(week_txt, " (", trimws(d_rate[i, 3]), ")")
     for (k in seq_along(diseases)) {
       col <- disease_cols[k]
+      # CSVのセルが空欄（報告なし=0件）の場合はNAではなく0として扱う（ユーザー指示）
+      cnt <- parse_hokenjo_number(d_count[i, col]); if (is.na(cnt)) cnt <- 0
+      rte <- parse_hokenjo_number(d_rate[i, col]);  if (is.na(rte)) rte <- 0
       out[[length(out) + 1]] <- data.frame(
         pref = "福井県", week_label = week_label, week_num = week_num, hokenjo = hokenjo,
         disease = diseases[k],
-        count = parse_hokenjo_number(d_count[i, col]),
-        rate  = parse_hokenjo_number(d_rate[i, col]),
+        count = cnt, rate = rte,
         stringsAsFactors = FALSE
       )
     }

@@ -86,6 +86,9 @@ fetch_nara <- function(pdf_url, page = 2) {
         if (any(is_paren(nxt$text))) rate_row <- nxt[is_paren(nxt$text), ]
       }
 
+      # セル自体が省略されている（トークンが無い）保健所は「報告なし=0件」
+      # として扱う（ユーザー指示）。count/rateどちらもトークンが見つからない
+      # 列は0で埋める
       if (!is.null(count_row)) {
         for (k in seq_len(nrow(count_row))) {
           col <- assign_col(count_row$x[k])
@@ -94,6 +97,13 @@ fetch_nara <- function(pdf_url, page = 2) {
             pref = "奈良県", week_label = week_label, hokenjo = col, disease = dname,
             count = parse_hokenjo_number(count_row$text[k]), rate = NA_real_,
             stringsAsFactors = FALSE
+          )
+        }
+        found_cols <- vapply(seq_len(nrow(count_row)), function(k) assign_col(count_row$x[k]), character(1))
+        for (col in setdiff(names(NARA_COLS), found_cols)) {
+          out[[length(out) + 1]] <- data.frame(
+            pref = "奈良県", week_label = week_label, hokenjo = col, disease = dname,
+            count = 0, rate = NA_real_, stringsAsFactors = FALSE
           )
         }
       }
@@ -110,6 +120,18 @@ fetch_nara <- function(pdf_url, page = 2) {
             out[[length(out) + 1]] <- data.frame(
               pref = "奈良県", week_label = week_label, hokenjo = col, disease = dname,
               count = NA_real_, rate = rv, stringsAsFactors = FALSE
+            )
+          }
+        }
+        found_cols_rate <- vapply(seq_len(nrow(rate_row)), function(k) assign_col(rate_row$x[k]), character(1))
+        for (col in setdiff(names(NARA_COLS), found_cols_rate)) {
+          idx <- which(vapply(out, function(o) isTRUE(o$hokenjo == col) && isTRUE(o$disease == dname), logical(1)))
+          if (length(idx) > 0) {
+            out[[idx[length(idx)]]]$rate <- 0
+          } else {
+            out[[length(out) + 1]] <- data.frame(
+              pref = "奈良県", week_label = week_label, hokenjo = col, disease = dname,
+              count = 0, rate = 0, stringsAsFactors = FALSE
             )
           }
         }

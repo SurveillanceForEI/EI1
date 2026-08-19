@@ -78,6 +78,12 @@ fetch_akita <- function(pdf_url = "https://idsc.pref.akita.jp/kss/RAPIDS.pdf") {
     for (k in seq_len(n_regions)) {
       cnt <- vals[paste(region_names[k], "count", sep = "|")]
       rte <- vals[paste(region_names[k], "rate", sep = "|")]
+      # トークンが1つも無かった保健所（空欄）は「報告なし=0件」として扱う
+      # （ユーザー指示）。「＊」（非定点医療機関のため対象外）は明示的な
+      # トークンとして残っており、この時点でNAではないためここでは
+      # 0埋めされず、parse_hokenjo_number()で従来通りNA判定される
+      if (is.na(cnt)) cnt <- "0"
+      if (is.na(rte)) rte <- "0"
       out[[length(out) + 1]] <- data.frame(
         pref = "秋田県", week_label = week_label, hokenjo = region_names[k],
         disease = disease,

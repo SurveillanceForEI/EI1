@@ -60,6 +60,10 @@ fetch_mie <- function(url = "https://www.kenkou.pref.mie.jp/weekly_fp_new.html")
     for (h in names(hokenjo_cols)) {
       rate_val <- parse_hokenjo_number(target[r, hokenjo_cols[[h]]])
       n_teiten <- if (!is.null(teiten_vals)) teiten_vals[[h]] else NA_real_
+      # セルが空欄（報告なし=0件）の場合はNAではなく0として扱う（ユーザー指示）。
+      # ただし、そもそも当該カテゴリの定点医療機関が無い（n_teitenがNA/0）
+      # 保健所は「対象外」であり0件とは異なるため、その場合はNAのままにする
+      if (is.na(rate_val) && !is.na(n_teiten) && n_teiten > 0) rate_val <- 0
       count_val <- if (!is.na(rate_val) && !is.na(n_teiten)) round(rate_val * n_teiten) else NA_real_
       out[[length(out) + 1]] <- data.frame(
         pref = "三重県", week_label = week_label, hokenjo = h,

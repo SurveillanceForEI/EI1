@@ -76,8 +76,13 @@ fetch_shizuoka <- function(pdf_url = "https://www.pref.shizuoka.jp/_res/projects
       if (!ok) next
 
       # 疾患名: ヘッダー行(hy)より上、hy-30～hy-1 の範囲のテキストを列範囲ごとに集約
+      # 週番号が1桁（第1週〜第9週）のとき、pdftoolsの単語分割で「1週」のように
+      # 数字と「週」が1トークンに結合されることがあり、これがexclude_labelsの
+      # 完全一致（"週"単体のみ）をすり抜けて疾患名の先頭に混入するバグがあった
+      # （例:「ＲＳウイルス感染症」→「1週ＲＳウイルス感染症」）。
+      # 「第」「N週」の組み合わせも含めて正規表現で除外する
       name_zone <- words[words$y >= hy - 45 & words$y < hy & !(words$text %in% exclude_labels) &
-                           !grepl("^[0-9]+$", words$text), ]
+                           !grepl("^[0-9]+$", words$text) & !grepl("^第?[0-9]*週$", words$text), ]
 
       n_disease <- length(rate_xs)
       col_lo <- count_xs - 20

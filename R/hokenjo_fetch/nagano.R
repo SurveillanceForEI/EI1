@@ -74,8 +74,10 @@ fetch_nagano <- function(pdf_url = "https://www.pref.nagano.lg.jp/shippei-kansen
             lo <- bounds[k]; hi <- bounds[k + 1]
             cnt_tok <- count_row$text[count_row$x >= lo & count_row$x < hi]
             rate_tok <- rate_row$text[rate_row$x >= lo & rate_row$x < hi]
-            cnt_val <- if (length(cnt_tok) > 0) parse_hokenjo_number(cnt_tok[1]) else NA_real_
-            rate_val <- if (length(rate_tok) > 0) parse_hokenjo_number(rate_tok[1]) else NA_real_
+            # セル自体が省略されている（トークンが無い）保健所は
+            # 「報告なし=0件」として扱う（ユーザー指示）
+            cnt_val <- if (length(cnt_tok) > 0) parse_hokenjo_number(cnt_tok[1]) else 0
+            rate_val <- if (length(rate_tok) > 0) parse_hokenjo_number(rate_tok[1]) else 0
             out[[length(out) + 1]] <- data.frame(
               pref = "長野県", week_label = week_label, hokenjo = hokenjo_order[k],
               disease = disease, count = cnt_val, rate = rate_val,
@@ -147,10 +149,14 @@ fetch_nagano_weekly_report <- function(pdf_url, year = NA_integer_, week_num = N
   n <- length(all_x)
   lo_bound <- c(all_x[1] - 8, (all_x[-n] + all_x[-1]) / 2)
   hi_bound <- c((all_x[-n] + all_x[-1]) / 2, all_x[n] + 12)
+  # セル自体が省略されている（トークンが無い）保健所は「報告なし=0件」
+  # として扱う（ユーザー指示）。定点数(sentinel_vals)が0/NAのままなら
+  # 後段のrate計算で従来通りrate=NAとなるため、この0埋めがrateの
+  # 妥当性を損なうことはない
   get_val_at <- function(row_words, target_x) {
     idx <- which(all_x == target_x)
     tok <- row_words$text[row_words$x >= lo_bound[idx] & row_words$x < hi_bound[idx]]
-    if (length(tok) == 0) return(NA_real_)
+    if (length(tok) == 0) return(0)
     parse_hokenjo_number(tok[1])
   }
 

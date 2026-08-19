@@ -81,10 +81,14 @@ fetch_niigata <- function(pdf_url = NULL) {
       if (disease != "" && !is.null(cur_count)) {
         for (ci in seq_along(col_names)) {
           if (col_names[ci] == "県計") next
+          # 数値セル自体が省略されている（トークンが無い）保健所は
+          # 「報告なし=0件」として扱う（ユーザー指示）
+          cnt_v <- if (is.na(cur_count[ci])) 0 else cur_count[ci]
+          rte_v <- if (is.na(vec[ci])) 0 else vec[ci]
           out[[length(out) + 1]] <- data.frame(
             pref = "新潟県", week_label = week_label,
             hokenjo = col_names[ci], disease = disease,
-            count = cur_count[ci], rate = vec[ci],
+            count = cnt_v, rate = rte_v,
             stringsAsFactors = FALSE
           )
         }
