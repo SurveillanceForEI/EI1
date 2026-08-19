@@ -6206,6 +6206,44 @@ server <- function(input, output, session) {
     build_hokenjo_map_data(src, st$pref, st$disease, HOKENJO_NAME_MAP)
   })
 
+  # 選択県の地図に周辺県（陸続き隣接県）の保健所別データも比較用に色塗り表示する。
+  # 疾患名の名寄せ・対象週の絞り込みは全国モード（hokenjo_national_map_data）と
+  # 同じロジックを隣接県だけに限定して適用する（隣接県側で疾患が未公表・
+  # 該当週データなしの場合はその県だけ結果から除外され、後段でグレーの
+  # 輪郭のみにフォールバックする）
+  hokenjo_neighbor_map_data <- reactive({
+    st <- hokenjo_status()
+    if (st$status != "ok" || is.null(HOKENJO_CURRENT) || is.null(HOKENJO_HISTORY)) return(NULL)
+    neighbor_names <- PREF_NEIGHBORS[[st$pref]]
+    if (is.null(neighbor_names) || length(neighbor_names) == 0) return(NULL)
+
+    wk_key <- hokenjo_selected_week_key()
+    target_year <- if (!is.null(wk_key)) wk_key %/% 100L else NA_integer_
+    target_week <- if (!is.null(wk_key)) wk_key %% 100L else NA_integer_
+
+    pieces <- lapply(neighbor_names, function(p) {
+      matched <- resolve_hokenjo_disease(HOKENJO_HISTORY, p, st$label)
+      if (is.null(matched)) return(NULL)
+      if (!is.null(wk_key)) {
+        src <- HOKENJO_HISTORY[HOKENJO_HISTORY$pref == p &
+                                 HOKENJO_HISTORY$disease == matched &
+                                 !is.na(HOKENJO_HISTORY$week_num) &
+                                 HOKENJO_HISTORY$week_num == target_week &
+                                 !is.na(HOKENJO_HISTORY$hokenjo_year) &
+                                 HOKENJO_HISTORY$hokenjo_year == target_year, ]
+      } else {
+        src <- HOKENJO_CURRENT[HOKENJO_CURRENT$pref == p, ]
+      }
+      d <- tryCatch(build_hokenjo_map_data(src, p, matched, HOKENJO_NAME_MAP), error = function(e) NULL)
+      if (is.null(d) || nrow(d) == 0) return(NULL)
+      d$pref <- p
+      d
+    })
+    pieces <- Filter(Negate(is.null), pieces)
+    if (length(pieces) == 0) return(NULL)
+    do.call(rbind, pieces)
+  })
+
   # 保健所別データの一括ダウンロード（画面の都道府県・疾患・週選択とは無関係に、
   # 取得できている全都道府県・全疾患・全週のデータを一つのCSVにまとめて出力する）
   output$hokenjo_bulk_dl <- downloadHandler(
@@ -6415,28 +6453,47 @@ server <- function(input, output, session) {
 
     m <- leaflet() %>% addTiles(options = tileOptions(opacity = 0.5))
 
-    # 選択県の位置関係が分かるよう、陸続きの隣接県を背景に薄く重ねる
-    # （データの色分けはせず、輪郭のみのグレー表示。パン・ズームには影響させない）
+    # 選択県との比較用に、陸続きの隣接県も同じ指標・同じ配色で保健所単位で
+    # 色塗りする（選択県より少し薄いopacityで背景であることを示す）。
+    # 疾患が未公表・該当週データなしで色塗りできない隣接県は、位置関係だけ
+    # 分かるようグレーの輪郭のみにフォールバックする。
     st <- hokenjo_status()
     if (st$status == "ok" && !is.null(JAPAN_MAP)) {
       neighbor_names <- PREF_NEIGHBORS[[st$pref]]
       if (!is.null(neighbor_names) && length(neighbor_names) > 0) {
-        # 単純な `[` 添字だと1行になった場合にsfのgeometry列属性が壊れる
-        # 環境依存バグがあるため、geometryを明示的に取り出して組み立て直す
-        nb_idx <- which(JAPAN_MAP$pref_name %in% neighbor_names)
-        neighbor_geo <- if (length(nb_idx) > 0) {
-          sf::st_sf(pref_name = JAPAN_MAP$pref_name[nb_idx],
-                     geometry = sf::st_geometry(JAPAN_MAP)[nb_idx])
-        } else NULL
-        if (!is.null(neighbor_geo) && nrow(neighbor_geo) > 0) {
+        nb_colored <- hokenjo_neighbor_map_data()
+        covered_prefs <- if (!is.null(nb_colored)) unique(nb_colored$pref) else character(0)
+
+        if (!is.null(nb_colored) && nrow(nb_colored) > 0 && metric %in% names(nb_colored)) {
           m <- m %>% addPolygons(
-            data = neighbor_geo,
-            fillColor = "#dcdcdc", fillOpacity = 0.35,
-            color = "#999999", weight = 1,
-            label = ~pref_name,
+            data = nb_colored,
+            fillColor = ~pal(get(metric)), fillOpacity = 0.45,
+            color = "#999999", weight = 0.6,
+            label = ~paste0(pref, " ", hokenjo, ": ", ifelse(is.na(get(metric)), "データなし", round(get(metric), 2))),
             labelOptions = labelOptions(style = list("font-size" = "12px")),
             options = pathOptions(interactive = TRUE)
           )
+        }
+
+        uncovered_names <- setdiff(neighbor_names, covered_prefs)
+        if (length(uncovered_names) > 0) {
+          # 単純な `[` 添字だと1行になった場合にsfのgeometry列属性が壊れる
+          # 環境依存バグがあるため、geometryを明示的に取り出して組み立て直す
+          nb_idx <- which(JAPAN_MAP$pref_name %in% uncovered_names)
+          neighbor_geo <- if (length(nb_idx) > 0) {
+            sf::st_sf(pref_name = JAPAN_MAP$pref_name[nb_idx],
+                       geometry = sf::st_geometry(JAPAN_MAP)[nb_idx])
+          } else NULL
+          if (!is.null(neighbor_geo) && nrow(neighbor_geo) > 0) {
+            m <- m %>% addPolygons(
+              data = neighbor_geo,
+              fillColor = "#dcdcdc", fillOpacity = 0.35,
+              color = "#999999", weight = 1,
+              label = ~paste0(pref_name, "（データなし）"),
+              labelOptions = labelOptions(style = list("font-size" = "12px")),
+              options = pathOptions(interactive = TRUE)
+            )
+          }
         }
       }
     }
