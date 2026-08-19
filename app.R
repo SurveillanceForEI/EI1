@@ -6291,15 +6291,21 @@ server <- function(input, output, session) {
     target_year <- if (!is.null(wk_key)) wk_key %/% 100L else NA_integer_
     target_week <- if (!is.null(wk_key)) wk_key %% 100L else NA_integer_
 
+    # 対象週のデータを先に1回だけ絞り込んでおく。以前は都道府県ごとに
+    # HOKENJO_HISTORY（72万行超）を毎回フィルタしており、これが県数分
+    # （最大46回）繰り返されることでスライダー/再生ボタンの描出遅延の
+    # 支配的な要因になっていた（1回あたり約45ms×46件で2秒超）。
+    # 先に週で絞り込めば、以降の県ごとのフィルタは大幅に縮小された
+    # 部分集合に対してのみ行われるため高速になる
+    week_src <- if (!is.null(wk_key)) {
+      HOKENJO_HISTORY[!is.na(HOKENJO_HISTORY$week_num) & HOKENJO_HISTORY$week_num == target_week &
+                        !is.na(HOKENJO_HISTORY$hokenjo_year) & HOKENJO_HISTORY$hokenjo_year == target_year, ]
+    } else NULL
+
     pieces <- lapply(names(matches), function(p) {
       matched <- matches[[p]]
       if (!is.null(wk_key)) {
-        src <- HOKENJO_HISTORY[HOKENJO_HISTORY$pref == p &
-                                 HOKENJO_HISTORY$disease == matched &
-                                 !is.na(HOKENJO_HISTORY$week_num) &
-                                 HOKENJO_HISTORY$week_num == target_week &
-                                 !is.na(HOKENJO_HISTORY$hokenjo_year) &
-                                 HOKENJO_HISTORY$hokenjo_year == target_year, ]
+        src <- week_src[week_src$pref == p & week_src$disease == matched, ]
       } else {
         src <- HOKENJO_CURRENT[HOKENJO_CURRENT$pref == p, ]
       }
@@ -6356,7 +6362,9 @@ server <- function(input, output, session) {
   # 名寄せし、build_hokenjo_map_data()で各県の保健所別ポリゴンを作った上で
   # 全県分を結合し、全国地図を保健所単位で塗り分ける
   # （グラフは全国横断では意味を持たないため出さない）
-  hokenjo_national_map_data <- reactive({
+  # 疾患名の名寄せ結果は選択疾患が変わらない限り週を送っても変わらないため、
+  # 全国モードでも隣接県表示と同様に別reactiveへ分離してキャッシュする
+  hokenjo_national_disease_match <- reactive({
     pref <- input$pref_filter
     if (!is.null(pref) && pref != "" && pref != "全国") return(NULL)
     if (!is.null(input$ts_mode) && input$ts_mode == "zensu") return(NULL)
@@ -6370,23 +6378,33 @@ server <- function(input, output, session) {
     } else NA_character_
     if (is.na(label)) return(NULL)
 
+    prefs <- unique(as.character(HOKENJO_CURRENT$pref))
+    # 疾患名の名寄せは常にHOKENJO_HISTORY（全期間データ）に対して行う
+    # （都道府県によって週ごとに疾患の生表記が変わることがあるため）
+    matches <- lapply(prefs, function(p) resolve_hokenjo_disease(HOKENJO_HISTORY, p, label))
+    names(matches) <- prefs
+    Filter(Negate(is.null), matches)
+  })
+
+  hokenjo_national_map_data <- reactive({
+    matches <- hokenjo_national_disease_match()
+    if (is.null(matches) || length(matches) == 0) return(NULL)
+
     wk_key <- hokenjo_selected_week_key()
     target_year <- if (!is.null(wk_key)) wk_key %/% 100L else NA_integer_
     target_week <- if (!is.null(wk_key)) wk_key %% 100L else NA_integer_
 
-    prefs <- unique(as.character(HOKENJO_CURRENT$pref))
-    pieces <- lapply(prefs, function(p) {
-      # 疾患名の名寄せは常にHOKENJO_HISTORY（全期間データ）に対して行う
-      # （都道府県によって週ごとに疾患の生表記が変わることがあるため）
-      matched <- resolve_hokenjo_disease(HOKENJO_HISTORY, p, label)
-      if (is.null(matched)) return(NULL)
+    # 対象週のデータを先に1回だけ絞り込んでおく（都道府県ごとにHOKENJO_HISTORY
+    # 全体を毎回フィルタすると47県分で数秒かかり描出遅延の主因になっていた）
+    week_src <- if (!is.null(wk_key)) {
+      HOKENJO_HISTORY[!is.na(HOKENJO_HISTORY$week_num) & HOKENJO_HISTORY$week_num == target_week &
+                        !is.na(HOKENJO_HISTORY$hokenjo_year) & HOKENJO_HISTORY$hokenjo_year == target_year, ]
+    } else NULL
+
+    pieces <- lapply(names(matches), function(p) {
+      matched <- matches[[p]]
       if (!is.null(wk_key)) {
-        src <- HOKENJO_HISTORY[HOKENJO_HISTORY$pref == p &
-                                 HOKENJO_HISTORY$disease == matched &
-                                 !is.na(HOKENJO_HISTORY$week_num) &
-                                 HOKENJO_HISTORY$week_num == target_week &
-                                 !is.na(HOKENJO_HISTORY$hokenjo_year) &
-                                 HOKENJO_HISTORY$hokenjo_year == target_year, ]
+        src <- week_src[week_src$pref == p & week_src$disease == matched, ]
       } else {
         src <- HOKENJO_CURRENT
       }
