@@ -6244,24 +6244,38 @@ server <- function(input, output, session) {
     build_hokenjo_map_data(src, st$pref, st$disease, HOKENJO_NAME_MAP)
   })
 
-  # 選択県の地図に、他の都道府県のうち保健所別データが取得できている
-  # 全ての都道府県を比較用に色塗り表示する（隣接県に限らない）。
-  # 疾患名の名寄せ・対象週の絞り込みは全国モード（hokenjo_national_map_data）と
-  # 同じロジックを選択県以外の全県に適用する（疾患が未公表・該当週データ
-  # なしの県は結果から除外され、後段でグレーの輪郭のみにフォールバックする）
-  hokenjo_other_prefs_map_data <- reactive({
+  # 疾患名の都道府県ごとの名寄せ結果（pref→週報側の生の疾患名）は、
+  # 選択中の疾患が変わらない限り表示週を送っても変化しないにもかかわらず、
+  # 以前は表示週を1つ動かすたびに全都道府県分（最大46件）を再計算しており、
+  # これがスライダー/再生ボタンの描出遅延の一因になっていた。疾患選択が
+  # 変わったときだけ再計算するreactiveとして分離する
+  hokenjo_other_prefs_disease_match <- reactive({
     st <- hokenjo_status()
     if (st$status != "ok" || is.null(HOKENJO_CURRENT) || is.null(HOKENJO_HISTORY)) return(NULL)
     other_names <- setdiff(unique(as.character(HOKENJO_CURRENT$pref)), st$pref)
     if (length(other_names) == 0) return(NULL)
+    matches <- lapply(other_names, function(p) resolve_hokenjo_disease(HOKENJO_HISTORY, p, st$label))
+    names(matches) <- other_names
+    Filter(Negate(is.null), matches)
+  })
+
+  # 選択県の地図に、他の都道府県のうち保健所別データが取得できている
+  # 全ての都道府県を比較用に色塗り表示する（隣接県に限らない）。
+  # 対象週の絞り込みは全国モード（hokenjo_national_map_data）と同じ
+  # ロジックを選択県以外の全県に適用する（疾患が未公表・該当週データ
+  # なしの県は結果から除外され、後段でグレーの輪郭のみにフォールバックする）
+  hokenjo_other_prefs_map_data <- reactive({
+    st <- hokenjo_status()
+    if (st$status != "ok" || is.null(HOKENJO_CURRENT) || is.null(HOKENJO_HISTORY)) return(NULL)
+    matches <- hokenjo_other_prefs_disease_match()
+    if (is.null(matches) || length(matches) == 0) return(NULL)
 
     wk_key <- hokenjo_selected_week_key()
     target_year <- if (!is.null(wk_key)) wk_key %/% 100L else NA_integer_
     target_week <- if (!is.null(wk_key)) wk_key %% 100L else NA_integer_
 
-    pieces <- lapply(other_names, function(p) {
-      matched <- resolve_hokenjo_disease(HOKENJO_HISTORY, p, st$label)
-      if (is.null(matched)) return(NULL)
+    pieces <- lapply(names(matches), function(p) {
+      matched <- matches[[p]]
       if (!is.null(wk_key)) {
         src <- HOKENJO_HISTORY[HOKENJO_HISTORY$pref == p &
                                  HOKENJO_HISTORY$disease == matched &

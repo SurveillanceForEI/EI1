@@ -121,13 +121,24 @@ hokenjo_available_diseases <- function(current_data, pref) {
   sort(unique(current_data$disease[current_data$pref == pref]))
 }
 
-# 都道府県の境界GeoJSONを読み込む（st_read）。ファイルが無ければNULL
+# 都道府県の境界GeoJSONを読み込む（st_read）。ファイルが無ければNULL。
+# 保健所別マップの「全国モード」「選択県以外の全都道府県を色塗り表示」機能は
+# 表示週を1つ動かすたびに毎回全都道府県分（最大47件）を再読み込みしており、
+# ディスクI/O・GeoJSONパースのコストがスライダー/再生ボタンの描出遅延の
+# 主因になっていた。境界の形状（ジオメトリ）自体は週を変えても変化しない
+# ため、プロセス内メモリにキャッシュして2回目以降のディスク読み込みを
+# 省略する（セッションをまたいでも同一Rプロセス内では有効）
+.HOKENJO_BOUNDARY_CACHE <- new.env(parent = emptyenv())
 load_hokenjo_boundary <- function(pref) {
+  cached <- .HOKENJO_BOUNDARY_CACHE[[pref]]
+  if (!is.null(cached)) return(cached)
   slug <- .PREF_SLUG[[pref]]
   if (is.null(slug)) return(NULL)
   path <- file.path("data/geo/hokenjo_boundaries", paste0(slug, ".geojson"))
   if (!file.exists(path)) return(NULL)
-  tryCatch(sf::st_read(path, quiet = TRUE), error = function(e) NULL)
+  result <- tryCatch(sf::st_read(path, quiet = TRUE), error = function(e) NULL)
+  if (!is.null(result)) .HOKENJO_BOUNDARY_CACHE[[pref]] <- result
+  result
 }
 
 # 週報側の保健所名を境界側の名称に正規化する（hokenjo_name_map.csvの
