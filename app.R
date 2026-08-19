@@ -1206,8 +1206,8 @@ function ebsUntranslateCards(containerId) {
               "ステップ2: 最終スコア（水準スコア・②Rtが利用可能な場合のみ。片方だけならその値をそのまま使用）"),
             tags$div(HTML("\\[ S_{\\text{final}} = \\mathrm{round}\\bigl(0.5 \\cdot S_{\\text{level}} + 0.5 \\cdot S_{②} \\bigr) \\]")),
             tags$div(style="font-size:0.82em;color:#555;",
-              "レベル対応: ", tags$code("0"), "=基準以下　", tags$code("1"), "=流行期（レベル1）　",
-              tags$code("2"), "=注意（レベル2）　", tags$code("3"), "=警戒（レベル3）",
+              "フェーズ対応: ", tags$code("0"), "=基準以下　", tags$code("1"), "=流行期（フェーズ1）　",
+              tags$code("2"), "=注意（フェーズ2）　", tags$code("3"), "=警戒（フェーズ3）",
               tags$br(), "①②③すべて欠損の場合は「―」（判定対象外）")
           ),
           tags$div(style="background:#f4f4f4;border-left:4px solid #7f8c8d;padding:8px 12px;margin-bottom:8px;font-size:0.9em;",
@@ -2907,7 +2907,7 @@ server <- function(input, output, session) {
 
       # Rt推定対象外・公式閾値なしのため、IBS（月次±2SD判定）のみで評価
       score <- compute_alert_score(value=NA_real_, thresh=NULL, rt_value=NA_real_, ibs_score=band$score)
-      labels <- c("基準以下", "流行期（レベル1）", "注意（レベル2）", "警戒（レベル3）")
+      labels <- c("基準以下", "流行期（フェーズ1）", "注意（フェーズ2）", "警戒（フェーズ3）")
       level <- if (is.na(score)) "―" else labels[score + 1]
       col <- alert_color(level)
 
@@ -2962,7 +2962,7 @@ server <- function(input, output, session) {
         if (nrow(rd)==0) NA_real_ else rd$rt[1]
       }, error=function(e) NA_real_)
       score <- compute_alert_score(value=NA_real_, thresh=NULL, rt_value=rt_latest, ibs_score=band$score)
-      labels <- c("基準以下", "流行期（レベル1）", "注意（レベル2）", "警戒（レベル3）")
+      labels <- c("基準以下", "流行期（フェーズ1）", "注意（フェーズ2）", "警戒（フェーズ3）")
       level <- if (is.na(score)) "―" else labels[score + 1]
       col <- alert_color(level)
       n_inputs <- sum(!is.na(band$score), !is.na(rt_latest))
@@ -4952,7 +4952,7 @@ server <- function(input, output, session) {
       select(疾患,全国平均=国平均,最大値,最多都道府県,Rt,IBS,警戒レベル) %>%
       datatable(options=list(dom="t",pageLength=10),rownames=FALSE) %>%
       formatStyle("警戒レベル",backgroundColor=styleEqual(
-        c("警戒（レベル3）","注意（レベル2）","流行期（レベル1）","基準以下"),
+        c("警戒（フェーズ3）","注意（フェーズ2）","流行期（フェーズ1）","基準以下"),
         c("#fadbd8","#fdebd0","#fef9e7","#d5f5e3")))
   })
 

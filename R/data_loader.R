@@ -818,13 +818,13 @@ classify_alert <- function(value, disease_id, rt_value = NULL, ibs_score = NULL,
   thresh <- DISEASE_CONFIG[[disease_id]]$alert_threshold
 
   score <- compute_alert_score(value, thresh, rt_value, ibs_score, group_weights, level_weights)
-  labels <- c("基準以下", "流行期（レベル1）", "注意（レベル2）", "警戒（レベル3）")
+  labels <- c("基準以下", "流行期（フェーズ1）", "注意（フェーズ2）", "警戒（フェーズ3）")
   ifelse(is.na(score), "―", labels[score + 1])
 }
 
 alert_color <- function(level) {
-  col <- c("警戒（レベル3）"="#c0392b","注意（レベル2）"="#e67e22",
-           "流行期（レベル1）"="#f1c40f","基準以下"="#27ae60","―"="#95a5a6")[as.character(level)]
+  col <- c("警戒（フェーズ3）"="#c0392b","注意（フェーズ2）"="#e67e22",
+           "流行期（フェーズ1）"="#f1c40f","基準以下"="#27ae60","―"="#95a5a6")[as.character(level)]
   ifelse(is.na(col), "#95a5a6", col)
 }
 
