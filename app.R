@@ -6413,8 +6413,37 @@ server <- function(input, output, session) {
     pal <- colorNumeric(c("#ffffcc", "#fd8d3c", "#800026"), c(0, max_val * 1.1), na.color = "#cccccc")
     metric_label <- if (metric == "rate") "定点当たり報告数" else "報告数"
 
-    m <- leaflet(d) %>% addTiles(options = tileOptions(opacity = 0.5)) %>%
+    m <- leaflet() %>% addTiles(options = tileOptions(opacity = 0.5))
+
+    # 選択県の位置関係が分かるよう、陸続きの隣接県を背景に薄く重ねる
+    # （データの色分けはせず、輪郭のみのグレー表示。パン・ズームには影響させない）
+    st <- hokenjo_status()
+    if (st$status == "ok" && !is.null(JAPAN_MAP)) {
+      neighbor_names <- PREF_NEIGHBORS[[st$pref]]
+      if (!is.null(neighbor_names) && length(neighbor_names) > 0) {
+        # 単純な `[` 添字だと1行になった場合にsfのgeometry列属性が壊れる
+        # 環境依存バグがあるため、geometryを明示的に取り出して組み立て直す
+        nb_idx <- which(JAPAN_MAP$pref_name %in% neighbor_names)
+        neighbor_geo <- if (length(nb_idx) > 0) {
+          sf::st_sf(pref_name = JAPAN_MAP$pref_name[nb_idx],
+                     geometry = sf::st_geometry(JAPAN_MAP)[nb_idx])
+        } else NULL
+        if (!is.null(neighbor_geo) && nrow(neighbor_geo) > 0) {
+          m <- m %>% addPolygons(
+            data = neighbor_geo,
+            fillColor = "#dcdcdc", fillOpacity = 0.35,
+            color = "#999999", weight = 1,
+            label = ~pref_name,
+            labelOptions = labelOptions(style = list("font-size" = "12px")),
+            options = pathOptions(interactive = TRUE)
+          )
+        }
+      }
+    }
+
+    m <- m %>%
       addPolygons(
+        data = d,
         fillColor = ~pal(get(metric)), fillOpacity = 0.8,
         color = "#fff", weight = 1,
         highlight = highlightOptions(weight = 2, color = "#333", bringToFront = TRUE),
@@ -6423,10 +6452,31 @@ server <- function(input, output, session) {
       ) %>%
       addLegend(pal = pal, values = c(0, max_val), title = metric_label, position = "bottomright")
 
-    st <- hokenjo_status()
+    # 選択県の外周を太線で強調し、隣接県との境目を分かりやすくする
+    if (!is.null(JAPAN_MAP)) {
+      sel_idx <- which(JAPAN_MAP$pref_name == st$pref)
+      sel_geo <- if (length(sel_idx) > 0) {
+        sf::st_sf(pref_name = JAPAN_MAP$pref_name[sel_idx],
+                   geometry = sf::st_geometry(JAPAN_MAP)[sel_idx])
+      } else NULL
+      if (!is.null(sel_geo) && nrow(sel_geo) > 0) {
+        m <- m %>% addPolylines(
+          data = sf::st_boundary(sel_geo),
+          color = "#c0392b", weight = 4, opacity = 0.9
+        )
+      }
+    }
+
+    # パン・ズームは常に選択県のみを基準にする（隣接県は表示範囲に含めない）
     bounds <- if (st$status == "ok") HOKENJO_MAP_BOUNDS_OVERRIDE[[st$pref]] else NULL
     if (!is.null(bounds)) {
       m <- m %>% fitBounds(lng1 = bounds$lng1, lat1 = bounds$lat1, lng2 = bounds$lng2, lat2 = bounds$lat2)
+    } else {
+      bb <- sf::st_bbox(sf::st_zm(d))
+      if (all(is.finite(bb))) {
+        m <- m %>% fitBounds(lng1 = unname(bb["xmin"]), lat1 = unname(bb["ymin"]),
+                              lng2 = unname(bb["xmax"]), lat2 = unname(bb["ymax"]))
+      }
     }
     m
   })
