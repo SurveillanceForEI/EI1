@@ -368,21 +368,32 @@ ui <- dashboardPage(
             setTimeout(registerHokenjoWeekLabelHandler, 50);
             return;
           }
-          // 直近に受信したラベル表を保持し、現在の#hokenjo_week_idxが
-          // まだこのラベルで初期化されていなければ適用する。都道府県切替時は
-          // 「メッセージ受信」と「renderUIによるスライダー要素の再生成（古い
-          // 要素の破棄→新しい要素の生成）」の順序保証が無いため、メッセージ
-          // 到達時点でまだ古い（間もなく破棄される）要素にしか適用できない
-          // ケースがある。そのため一度適用して終わりにせず、DOM変化のたびに
-          // 「今のスライダーにまだ適用済みでなければ再適用」を試み続ける。
+          // 直近に受信したラベル表を保持し、#hokenjo_week_idxに適用する。
+          // 都道府県切替時は「メッセージ受信」と「renderUIによるスライダー
+          // 要素の再生成（古い要素の破棄→新しい要素の生成）」の順序保証が
+          // 無いため、メッセージ到達時点でまだ古い（間もなく破棄される）
+          // 要素にしか適用できないケースがある。そのため一度適用して
+          //終わりにせず、DOM変化のたびに再適用を試み続ける。
+          // さらに、スライダー横の「◀1週戻る/▶1週進む」ボタン
+          // （updateSliderInput経由）やShiny標準の再生ボタン（アニメーション）
+          // でスライダー値を動かすと、ion.rangeSliderの内部update()処理で
+          // prettify関数が外れて素の数値がハンドルに表示されてしまうことが
+          // あったため、prettify_enabledが既にtrueでも値変更のたびに
+          // 無条件で再適用する（重複適用しても副作用は無い）。
           // スライダーの値は実在する週だけを並べた配列への1始まりインデックス
           // なので、範囲内の値は必ず対応するラベルを持つ（空欄になることはない）。
+          // irs.update()はDOMを書き換えるため、無条件にMutationObserverの
+          // コールバックから呼ぶと「更新→DOM変化を検知→再度更新→…」の
+          // 無限ループになる。現在の表示ラベルが期待値と既に一致していれば
+          // 何もしないことでこれを防ぐ
           var currentLabels = null;
           var applyPrettify = function() {
             if (!currentLabels) return;
             var irs = $('#hokenjo_week_idx').data('ionRangeSlider');
-            if (!irs || irs.options.prettify_enabled) return;
+            if (!irs) return;
             var labels = currentLabels;
+            var expected = labels[irs.result.from] || '';
+            if (irs.result.from_pretty === expected) return;
             irs.update({
               prettify_enabled: true,
               prettify: function(num) { return labels[num] || ''; }
@@ -390,6 +401,9 @@ ui <- dashboardPage(
           };
           var observer = new MutationObserver(applyPrettify);
           observer.observe(document.documentElement, { childList: true, subtree: true });
+          $(document).on('change input', '#hokenjo_week_idx', function() {
+            setTimeout(applyPrettify, 0);
+          });
 
           Shiny.addCustomMessageHandler('hokenjo_week_labels', function(labels) {
             currentLabels = labels;
