@@ -73,6 +73,75 @@ fetch_toyama <- function(pdf_url = "https://www.pref.toyama.jp/documents/32640/t
   do.call(rbind, out)
 }
 
+# ============================================================
+# 富山県「厚生センター（保健所）管内別」ZIP（CSV5本入り）
+# https://www.pref.toyama.jp/1279/kansen/#c-1 の「厚生センター（保健所）
+# 管内別」リンク（ZIP）
+# 例: https://www.pref.toyama.jp/documents/32640/teiten_hc_{YEAR2桁}{WEEK}w.zip
+#
+# fetch_toyama()（PDF・最新週のみ）と異なり、このZIPには年初から該当週
+# までの「全週分」が1本のCSVにまとまって入っている（厚生センターごとに
+# 1ファイル、計5ファイル: 中部/新川/高岡/砺波/富山市）。そのためPDF方式より
+# 堅牢な上、最新週のZIPを1回取得するだけでその年の全週を一括取得できる。
+# CSVはShift-JIS。1〜2行目がタイトル・疾患名見出し（3列ごとに疾患名が
+# 繰り返し配置）、3行目が「報告数/定点数/定点あたり報告数」の列名見出し、
+# 4行目以降が「年,週,(疾患1: 報告数,定点数,定点あたり報告数),(疾患2: ...),...」
+# の実データ。
+# ============================================================
+
+.toyama_zip_hc_map <- c(
+  "chuubu" = "中部", "niikawa" = "新川", "takaoka" = "高岡",
+  "tonami" = "砺波", "toyamashi" = "富山市"
+)
+
+fetch_toyama_zip <- function(zip_url) {
+  tmp <- tempfile(fileext = ".zip")
+  download.file(zip_url, tmp, mode = "wb", quiet = TRUE)
+  ex <- tempfile()
+  dir.create(ex)
+  unzip(tmp, exdir = ex)
+  files <- list.files(ex, pattern = "\\.csv$", full.names = TRUE)
+  if (length(files) == 0) stop("富山県: ZIP内にCSVが見つかりません")
+
+  out <- list()
+  for (f in files) {
+    hc_key <- names(.toyama_zip_hc_map)[vapply(names(.toyama_zip_hc_map),
+                function(k) grepl(paste0("teiten_", k, "_"), basename(f)), logical(1))]
+    if (length(hc_key) == 0) next
+    hokenjo <- .toyama_zip_hc_map[[hc_key[1]]]
+
+    raw <- readLines(f, warn = FALSE)
+    raw <- iconv(raw, from = "shift-jis", to = "UTF-8", sub = "byte")
+
+    # 疾患名見出し行（2行目）は3列ごとに1つ疾患名が入り、残り2列は空欄
+    disease_row <- strsplit(raw[2], ",")[[1]]
+    diseases_raw <- disease_row[seq(3, length(disease_row), by = 3)]
+    diseases <- trimws(diseases_raw[nchar(trimws(diseases_raw)) > 0])
+    n_disease <- length(diseases)
+
+    data_lines <- raw[4:length(raw)]
+    data_lines <- data_lines[nzchar(trimws(data_lines))]
+
+    for (line in data_lines) {
+      vals <- strsplit(line, ",")[[1]]
+      year <- suppressWarnings(as.integer(vals[1]))
+      week <- suppressWarnings(as.integer(vals[2]))
+      if (is.na(year) || is.na(week)) next
+      week_label <- sprintf("%d年第%d週", year, week)
+      for (di in seq_len(n_disease)) {
+        base_idx <- 2 + (di - 1) * 3
+        cnt <- suppressWarnings(as.numeric(vals[base_idx + 1]))
+        rte <- suppressWarnings(as.numeric(vals[base_idx + 3]))
+        out[[length(out) + 1]] <- data.frame(
+          pref = "富山県", week_label = week_label, week_num = week,
+          hokenjo = hokenjo, disease = diseases[di],
+          count = cnt, rate = rte, stringsAsFactors = FALSE
+        )
+      }
+    }
+  }
+  do.call(rbind, out)
+}
 # fetch_toyama()は表内の最新週（右端列）のみを採用するが、実際には
 # 表に直近6週間分（同ページ内に横並び）が掲載されているため、
 # 過去分バックフィル用にその6週すべてを返すバリアント
