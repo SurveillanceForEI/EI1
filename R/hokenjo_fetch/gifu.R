@@ -61,18 +61,43 @@ fetch_gifu <- function(pdf_url = "https://www.pref.gifu.lg.jp/uploaded/attachmen
       bounds <- c(xs[1] - (xs[2] - xs[1]) / 2, (xs[1:(length(xs) - 1)] + xs[2:length(xs)]) / 2,
                   xs[length(xs)] + (xs[length(xs)] - xs[length(xs) - 1]) / 2)
 
-      data_toks <- words[abs(words$y - y_target) <= 3 & words$x >= bounds[1] & words$x < bounds[length(bounds)], ]
-      if (nrow(data_toks) == 0) next
+      # 「-」（数値なし＝0）は文字幅が狭く、列の境界線ちょうど付近に
+      # 描画されることがあり、上記boundsによる半開区間判定だと隣の列に
+      # 誤って割り当てられる（岐阜県で実際に発生：西濃列の「-」が
+      # 境界値と一致し関列に混入し、本来の関の値を上書きしていた）。
+      # 保健所別の値は常に8列ぶん（「-」も1トークンとして）揃うため、
+      # block内のx範囲でトークンをx昇順に並べ、8個ちょうど揃えば
+      # 位置ではなく出現順で直接対応させる方が確実
+      # 下限をbounds[1]にするのは、◆直下のブロック内には保健所別8列の
+      # 手前に「県全体」の値が1つあり（x0側に近い位置）、これを取り込むと
+      # 9個になって位置対応がずれるため。上限はboundsの右端(bounds[9])だと
+      # 一番右の列（飛騨）の値がわずかに外側にはみ出て漏れることがあるため、
+      # ブロックの右端(block_x_max)まで広げる
+      data_toks <- words[abs(words$y - y_target) <= 3 & words$x >= bounds[1] & words$x < block_x_max, ]
+      data_toks <- data_toks[order(data_toks$x), ]
 
-      for (k in seq_along(hokenjo_order)) {
-        lo <- bounds[k]; hi <- bounds[k + 1]
-        v <- data_toks$text[data_toks$x >= lo & data_toks$x < hi]
-        rate_val <- if (length(v) > 0) parse_hokenjo_number(v[1]) else NA_real_
-        out[[length(out) + 1]] <- data.frame(
-          pref = "岐阜県", week_label = week_label, hokenjo = hokenjo_order[k],
-          disease = disease, count = NA_real_, rate = rate_val,
-          stringsAsFactors = FALSE
-        )
+      if (nrow(data_toks) == length(hokenjo_order)) {
+        for (k in seq_along(hokenjo_order)) {
+          rate_val <- parse_hokenjo_number(data_toks$text[k])
+          out[[length(out) + 1]] <- data.frame(
+            pref = "岐阜県", week_label = week_label, hokenjo = hokenjo_order[k],
+            disease = disease, count = NA_real_, rate = rate_val,
+            stringsAsFactors = FALSE
+          )
+        }
+      } else if (nrow(data_toks) > 0) {
+        # トークン数が8個に揃わない想定外のレイアウトの場合のみ、
+        # 従来通り列境界での割り当てにフォールバックする
+        for (k in seq_along(hokenjo_order)) {
+          lo <- bounds[k]; hi <- bounds[k + 1]
+          v <- data_toks$text[data_toks$x >= lo & data_toks$x < hi]
+          rate_val <- if (length(v) > 0) parse_hokenjo_number(v[1]) else NA_real_
+          out[[length(out) + 1]] <- data.frame(
+            pref = "岐阜県", week_label = week_label, hokenjo = hokenjo_order[k],
+            disease = disease, count = NA_real_, rate = rate_val,
+            stringsAsFactors = FALSE
+          )
+        }
       }
     }
   }
