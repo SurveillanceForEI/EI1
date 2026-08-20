@@ -666,7 +666,9 @@ function ebsUntranslateCards(containerId) {
               tags$h5("保健所別（あるいは報告地域別）比較", style="font-weight:700;margin-top:6px;"),
               plotlyOutput("hokenjo_bar_plot", height="480px")
             )
-          )
+          ),
+          tags$h5("週別集計表（年始〜選択週、保健所別）", style="font-weight:700;margin-top:10px;"),
+          DTOutput("hokenjo_summary_table")
         )
       ),
 
@@ -6678,6 +6680,39 @@ server <- function(input, output, session) {
       labs(x = NULL, y = metric_label) +
       theme_minimal(base_size = 12)
     ggplotly(p, tooltip = "text")
+  })
+
+  # 保健所マップの下に出す集計表。地図・棒グラフは選択中の1週のみを
+  # 見せるため、年始から選択週までの推移を保健所別に俯瞰できるよう、
+  # 「週×保健所」のマトリクス表（選択中の疾患・指標）を別途用意する
+  hokenjo_summary_table_data <- reactive({
+    st <- hokenjo_status()
+    if (st$status != "ok" || is.null(HOKENJO_HISTORY)) return(NULL)
+
+    wk_key <- hokenjo_selected_week_key()
+    if (is.null(wk_key)) return(NULL)
+    target_year <- wk_key %/% 100L
+    target_week <- wk_key %% 100L
+
+    metric <- if (!is.null(input$hokenjo_metric)) input$hokenjo_metric else "rate"
+
+    sub <- HOKENJO_HISTORY[HOKENJO_HISTORY$pref == st$pref & HOKENJO_HISTORY$disease == st$disease &
+                             !is.na(HOKENJO_HISTORY$hokenjo_year) & HOKENJO_HISTORY$hokenjo_year == target_year &
+                             !is.na(HOKENJO_HISTORY$week_num) & HOKENJO_HISTORY$week_num <= target_week, ]
+    if (nrow(sub) == 0 || !(metric %in% names(sub))) return(NULL)
+
+    sub <- sub[!duplicated(sub[, c("week_num", "hokenjo")]), ]
+    wide <- tidyr::pivot_wider(sub[, c("week_num", "hokenjo", metric)],
+                                names_from = "hokenjo", values_from = dplyr::all_of(metric))
+    wide <- wide[order(wide$week_num), ]
+    names(wide)[names(wide) == "week_num"] <- "週"
+    wide
+  })
+
+  output$hokenjo_summary_table <- renderDT({
+    wide <- hokenjo_summary_table_data()
+    if (is.null(wide) || nrow(wide) == 0) return(NULL)
+    datatable(wide, rownames = FALSE, options = list(pageLength = 20, dom = "tip"))
   })
 }
 

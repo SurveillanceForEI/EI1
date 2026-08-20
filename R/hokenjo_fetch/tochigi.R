@@ -41,6 +41,11 @@ fetch_tochigi <- function(pdf_url = NULL) {
   rows <- group_words_into_rows(w, y_tol = 3)
 
   strip_mark <- function(s) gsub("^[●▲]", "", s)
+  # 「インフルエンザ」の脚注番号（本来は※3等の上付き注記）が、PDFのフォント
+  # エンコーディングの都合で単独の英字（例:「I」）として抽出され、疾病名に
+  # 結合されてしまう（「Iインフルエンザ」）ことがあるため、疾病名を組み立てる
+  # 際に単独の半角英字1文字のトークンは脚注記号とみなして除外する
+  is_footnote_marker <- function(x) grepl("^[A-Za-z]$", x)
 
   out <- list()
   cur_count <- NULL
@@ -61,6 +66,7 @@ fetch_tochigi <- function(pdf_url = NULL) {
       # 2025年前半の週報は疾病名が「報告数」と同じ行に並ぶレイアウトのため、
       # そのままだと名前が失われる。同一行の左側（x<x_min）にある名前トークンを拾っておく
       cur_name <- rr$text[rr$x < x_min & rr$x >= 80 & rr$text != "報告数"]
+      cur_name <- cur_name[!is_footnote_marker(cur_name)]
       next
     }
 
@@ -68,6 +74,7 @@ fetch_tochigi <- function(pdf_url = NULL) {
       cur_rate <- rr$text[in_range & rr$text != "定点当り"]
       cur_rate <- sapply(cur_rate, strip_mark, USE.NAMES = FALSE)
       name_extra <- rr$text[rr$x < x_min & rr$x >= 80 & !(rr$text %in% c("定点当り", "報告数"))]
+      name_extra <- name_extra[!is_footnote_marker(name_extra)]
       cur_name <- c(cur_name, name_extra)
       disease <- trimws(paste(cur_name, collapse = ""))
       if (disease != "" && !is.null(cur_count) && length(cur_rate) >= 5) {
@@ -88,6 +95,7 @@ fetch_tochigi <- function(pdf_url = NULL) {
 
     if (!is.null(cur_count)) {
       name_extra <- rr$text[rr$x < x_min & rr$x >= 80]
+      name_extra <- name_extra[!is_footnote_marker(name_extra)]
       cur_name <- c(cur_name, name_extra)
     }
   }
