@@ -433,6 +433,46 @@ resolve_hokenjo_pdf_url_for_pref <- function(pref) {
                            href_must_contain = href_must_contain, file_ext = file_ext)
 }
 
+# ============================================================
+# 「掲載ページのスクレイピングでは解決できないが、URL自体はyear/week
+# を埋め込むテンプレート（url_pattern）で機械的に組み立てられる」
+# 都道府県（京都府・兵庫県・佐賀県・山形県等）向けのヘルパー。
+#
+# 今日の日付からISO週（月曜始まり）の年・週番号を計算する。
+# ただし実際の公表は数日〜1週間程度遅れることが多いため、
+# probe_latest_week_fetch()と組み合わせ、計算した週から必要なら
+# 1週ずつ遡って実際に取得できる週を探すのが基本の使い方。
+# ============================================================
+
+current_iso_year_week <- function(d = Sys.Date()) {
+  monday_of_week1 <- function(y) {
+    b <- as.Date(sprintf("%d-01-04", y))
+    b - (as.integer(format(b, "%u")) - 1)
+  }
+  yr <- as.integer(format(d, "%Y"))
+  if (d < monday_of_week1(yr)) yr <- yr - 1L
+  if (d >= monday_of_week1(yr + 1L)) yr <- yr + 1L
+  wk <- as.integer(floor(as.numeric(d - monday_of_week1(yr)) / 7)) + 1L
+  list(year = yr, week = wk)
+}
+
+# fetch_week_fn(year, week) を、計算上の最新週から必要なら最大max_back
+# 週分だけ遡りながら試し、最初に成功（エラー無し・1行以上）した結果を
+# 返す。実際の公表ラグ（速報の反映が数日〜1週間遅れる）に対応するため。
+probe_latest_week_fetch <- function(fetch_week_fn, max_back = 3, start_year_week = NULL) {
+  yw <- if (is.null(start_year_week)) current_iso_year_week() else start_year_week
+  last_err <- NULL
+  for (back in 0:max_back) {
+    wk <- yw$week - back
+    yr <- yw$year
+    if (wk < 1) { yr <- yr - 1L; wk <- wk + 52L }
+    res <- tryCatch(fetch_week_fn(yr, wk), error = function(e) { last_err <<- e; NULL })
+    if (!is.null(res) && nrow(res) > 0) return(res)
+  }
+  if (!is.null(last_err)) stop(last_err)
+  stop("probe_latest_week_fetch: 直近", max_back + 1, "週分とも取得できませんでした")
+}
+
 # data.frame化（実装時の一覧確認・CSV出力用）
 hokenjo_sources_df <- function() {
   do.call(rbind, lapply(HOKENJO_DATA_SOURCES, function(x) {

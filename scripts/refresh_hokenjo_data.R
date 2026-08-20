@@ -36,7 +36,23 @@ HOKENJO_REFRESH_DISPATCH <- list(
   "北海道"   = function() fetch_hokkaido(),
   "青森県"   = function() fetch_aomori(.sample_url("青森県")),
   "秋田県"   = function() fetch_akita(),
-  "山形県"   = function() fetch_yamagata(ari_pdf_url = "https://www.eiken.yamagata.yamagata.jp/pdfshuho/2026/202632.pdf"),
+  "山形県"   = function() {
+    # 主要疾患データはfetch_yamagata()内部で年別CSV（週指定不要・常に最新）
+    # を参照するため自己解決するが、ARI（急性呼吸器感染症）だけは週報PDFの
+    # URLに週番号が必要なため、計算上の直近週から遡ってPDFが存在する
+    # 週を探す（見つからなければARI無しでも他疾患は取得できる設計）
+    yw <- current_iso_year_week()
+    ari_url <- NA_character_
+    for (back in 0:3) {
+      wk <- yw$week - back
+      cand <- sprintf("https://www.eiken.yamagata.yamagata.jp/pdfshuho/%d/%d%02d.pdf", yw$year, yw$year, wk)
+      if (!is.na(tryCatch({ download.file(cand, tempfile(), mode="wb", quiet=TRUE); cand }, error=function(e) NA))) {
+        ari_url <- cand
+        break
+      }
+    }
+    fetch_yamagata(year = yw$year, ari_pdf_url = if (is.na(ari_url)) NULL else ari_url)
+  },
   "福島県"   = function() fetch_fukushima(.sample_url("福島県")),
   "宮城県"   = function() fetch_miyagi(resolve_hokenjo_pdf_url_for_pref("宮城県")),
   "茨城県"   = function() fetch_ibaraki(.sample_url("茨城県")),
@@ -60,7 +76,7 @@ HOKENJO_REFRESH_DISPATCH <- list(
   "愛知県"   = function() fetch_aichi(.sample_url("愛知県")),
   "三重県"   = function() fetch_mie(),
   "滋賀県"   = function() fetch_shiga(.sample_url("滋賀県")),
-  "京都府"   = function() fetch_kyoto(2026, 32),
+  "京都府"   = function() probe_latest_week_fetch(function(y, w) fetch_kyoto(y, w)),
   "大阪府"   = function() fetch_osaka(.sample_url("大阪府")),
   "兵庫県"   = function() fetch_hyogo(2026, 32),
   "奈良県"   = function() fetch_nara(.sample_url("奈良県")),
@@ -75,7 +91,7 @@ HOKENJO_REFRESH_DISPATCH <- list(
   "愛媛県"   = function() fetch_ehime(.sample_url("愛媛県")),
   "高知県"   = function() fetch_kochi(.sample_url("高知県")),
   "福岡県"   = function() fetch_fukuoka(),
-  "佐賀県"   = function() fetch_saga(yw = "202632"),
+  "佐賀県"   = function() fetch_saga(yw = resolve_saga_latest_yw()),
   "長崎県"   = function() fetch_nagasaki(.sample_url("長崎県")),
   "熊本県"   = function() fetch_kumamoto(.sample_url("熊本県")),
   "大分県"   = function() fetch_oita(.sample_url("大分県")),

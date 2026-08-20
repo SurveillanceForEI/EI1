@@ -45,6 +45,18 @@
 # （数値行の後に続く注記行、例:「（オウム病を除く）」等が次の疾患名に
 # 混入するのを防ぐため）。
 
+# 佐賀県公開のAPI（年週一覧）から実際に存在する最新のyw（例:"202633"）を
+# 取得する。ハードコードした週を使うと、その週を過ぎた時点で自動更新が
+# 止まってしまうため（実際に202631で固定されたまま動かなくなっていた）
+resolve_saga_latest_yw <- function() {
+  if (!requireNamespace("httr", quietly = TRUE)) stop("httr パッケージが必要です")
+  if (!requireNamespace("jsonlite", quietly = TRUE)) stop("jsonlite パッケージが必要です")
+  r <- httr::GET("https://kansen.pref.saga.jp/api/report")
+  txt <- httr::content(r, as = "text", encoding = "UTF-8")
+  d <- jsonlite::fromJSON(txt)
+  sprintf("%06d", max(d$list$yw, na.rm = TRUE))
+}
+
 fetch_saga <- function(pdf_url = NULL, yw = NULL) {
   if (is.null(pdf_url)) {
     if (is.null(yw)) yw <- "202631"
