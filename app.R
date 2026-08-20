@@ -6683,36 +6683,46 @@ server <- function(input, output, session) {
   })
 
   # 保健所マップの下に出す集計表。地図・棒グラフは選択中の1週のみを
-  # 見せるため、年始から選択週までの推移を保健所別に俯瞰できるよう、
-  # 「週×保健所」のマトリクス表（選択中の疾患・指標）を別途用意する
+  # 見せるため、直近20週分の推移を保健所別に俯瞰できるよう、
+  # 「保健所×週」のマトリクス表（選択中の疾患・指標）を別途用意する
   hokenjo_summary_table_data <- reactive({
     st <- hokenjo_status()
     if (st$status != "ok" || is.null(HOKENJO_HISTORY)) return(NULL)
 
     wk_key <- hokenjo_selected_week_key()
     if (is.null(wk_key)) return(NULL)
-    target_year <- wk_key %/% 100L
-    target_week <- wk_key %% 100L
 
     metric <- if (!is.null(input$hokenjo_metric)) input$hokenjo_metric else "rate"
 
-    sub <- HOKENJO_HISTORY[HOKENJO_HISTORY$pref == st$pref & HOKENJO_HISTORY$disease == st$disease &
-                             !is.na(HOKENJO_HISTORY$hokenjo_year) & HOKENJO_HISTORY$hokenjo_year == target_year &
-                             !is.na(HOKENJO_HISTORY$week_num) & HOKENJO_HISTORY$week_num <= target_week, ]
+    sub <- HOKENJO_HISTORY[HOKENJO_HISTORY$pref == st$pref & HOKENJO_HISTORY$disease == st$disease, ]
     if (nrow(sub) == 0 || !(metric %in% names(sub))) return(NULL)
+    ok <- !is.na(sub$week_num) & !is.na(sub$hokenjo_year)
+    sub <- sub[ok, ]
+    sub$key <- hokenjo_year_week_key(sub$hokenjo_year, sub$week_num)
+    sub <- sub[sub$key <= wk_key, ]
+    if (nrow(sub) == 0) return(NULL)
 
-    sub <- sub[!duplicated(sub[, c("week_num", "hokenjo")]), ]
-    wide <- tidyr::pivot_wider(sub[, c("week_num", "hokenjo", metric)],
-                                names_from = "hokenjo", values_from = dplyr::all_of(metric))
-    wide <- wide[order(wide$week_num), ]
-    names(wide)[names(wide) == "week_num"] <- "週"
+    # 直近20週分（選択週を含む）のみに絞る
+    recent_keys <- sort(unique(sub$key), decreasing = TRUE)[seq_len(min(20, length(unique(sub$key))))]
+    sub <- sub[sub$key %in% recent_keys, ]
+
+    sub <- sub[!duplicated(sub[, c("key", "hokenjo")]), ]
+    sub$week_col <- paste0("第", sub$week_num, "週")
+    key_order <- sort(unique(sub$key))
+    col_levels <- vapply(key_order, function(k) paste0("第", k %% 100L, "週"), character(1))
+    sub$week_col <- factor(sub$week_col, levels = col_levels)
+
+    wide <- tidyr::pivot_wider(sub[, c("hokenjo", "week_col", metric)],
+                                names_from = "week_col", values_from = dplyr::all_of(metric))
+    wide <- wide[, c("hokenjo", col_levels)]
+    names(wide)[names(wide) == "hokenjo"] <- "保健所"
     wide
   })
 
   output$hokenjo_summary_table <- renderDT({
     wide <- hokenjo_summary_table_data()
     if (is.null(wide) || nrow(wide) == 0) return(NULL)
-    datatable(wide, rownames = FALSE, options = list(pageLength = 20, dom = "tip"))
+    datatable(wide, rownames = FALSE, options = list(pageLength = 20, dom = "tip", scrollX = TRUE))
   })
 }
 
