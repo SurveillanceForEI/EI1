@@ -421,7 +421,9 @@ HOKENJO_LANDING_PAGES <- list(
                 # 過去アーカイブが年号無しで並ぶ。年号付きパターンに限定する
                 # ことで、IDがファイル名に年を含まない（連番CMS ID）この
                 # サイトでも確実に最新号だけを拾える
-                pattern = "令和[0-9]+年第[0-9]+週", pick = "first")
+                pattern = "令和[0-9]+年第[0-9]+週", pick = "first"),
+  "岡山県" = list(url = "https://www.pref.okayama.jp/page/565068.html",
+                pattern = "週報", pick = "first")
 )
 
 resolve_hokenjo_pdf_url_for_pref <- function(pref) {
