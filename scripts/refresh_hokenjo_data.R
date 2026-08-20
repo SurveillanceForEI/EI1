@@ -68,6 +68,7 @@ HOKENJO_REFRESH_DISPATCH <- list(
   "鳥取県"   = function() fetch_tottori(.sample_url("鳥取県")),
   "島根県"   = function() fetch_shimane(.sample_url("島根県")),
   "岡山県"   = function() fetch_okayama(.sample_url("岡山県")),
+  "広島県"   = function() fetch_hiroshima(resolve_hokenjo_pdf_url_for_pref("広島県")),
   "山口県"   = function() fetch_yamaguchi(.sample_url("山口県")),
   "徳島県"   = function() fetch_tokushima(.sample_url("徳島県")),
   "香川県"   = function() fetch_kagawa(.sample_url("香川県")),

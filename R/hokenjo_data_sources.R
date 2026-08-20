@@ -370,7 +370,9 @@ resolve_hokenjo_pdf_url <- function(landing_url, link_text_pattern, pick = c("la
   doc <- rvest::read_html(landing_url)
   links <- rvest::html_elements(doc, "a")
   hrefs <- rvest::html_attr(links, "href")
-  texts <- rvest::html_text(links)
+  # 広島県のように全角数字（「第３２週」）で週番号を表記するページがあるため、
+  # マッチング・週番号抽出の前に全角数字を半角に正規化しておく
+  texts <- chartr("０１２３４５６７８９", "0123456789", rvest::html_text(links))
   is_target_ext <- grepl(paste0("\\.", file_ext, "$"), hrefs, ignore.case = TRUE)
   matched_idx <- which(is_target_ext & !is.na(hrefs) & grepl(link_text_pattern, texts))
   # 一覧ページが複数年分のアーカイブを1ページに掲載している場合、
@@ -412,7 +414,14 @@ HOKENJO_LANDING_PAGES <- list(
                 pattern = "^[0-9]+週", pick = "latest_week"),
   "富山県" = list(url = "https://www.pref.toyama.jp/1279/kansen/#c-1",
                 pattern = "厚生センター（保健所）管内別", pick = "latest_week_href",
-                href_must_contain = "2026", file_ext = "zip")
+                href_must_contain = "2026", file_ext = "zip"),
+  "広島県" = list(url = "https://www.pref.hiroshima.lg.jp/site/hcdc/hidsc-kanzya-zyouhou-syuukaiseki.html",
+                # バックナンバー一覧の先頭に出る「令和８年第３２週」のような
+                # 令和年号付きの表記が最新号で、それ以降は「第１週」等の
+                # 過去アーカイブが年号無しで並ぶ。年号付きパターンに限定する
+                # ことで、IDがファイル名に年を含まない（連番CMS ID）この
+                # サイトでも確実に最新号だけを拾える
+                pattern = "令和[0-9]+年第[0-9]+週", pick = "first")
 )
 
 resolve_hokenjo_pdf_url_for_pref <- function(pref) {
