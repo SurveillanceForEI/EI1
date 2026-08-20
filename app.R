@@ -668,6 +668,15 @@ function ebsUntranslateCards(containerId) {
             )
           ),
           tags$h5("週別集計表（年始〜選択週、保健所別）", style="font-weight:700;margin-top:10px;"),
+          tags$style(HTML("
+            #hokenjo_summary_table table.dataTable thead th:first-child,
+            #hokenjo_summary_table table.dataTable tbody td:first-child {
+              position: sticky; left: 0; z-index: 2;
+              background-color: #fff;
+              box-shadow: 2px 0 3px -1px rgba(0,0,0,0.15);
+            }
+            #hokenjo_summary_table table.dataTable thead th:first-child { z-index: 3; }
+          ")),
           DTOutput("hokenjo_summary_table")
         )
       ),
@@ -6730,6 +6739,9 @@ server <- function(input, output, session) {
   output$hokenjo_summary_table <- renderDT({
     wide <- hokenjo_summary_table_data()
     if (is.null(wide) || nrow(wide) == 0) return(NULL)
+    # DTのFixedColumns拡張は、このバンドルされているDataTables本体との
+    # 組み合わせでJSエラーになり列固定が効かなかったため使わず、CSSの
+    # position:stickyで保健所列（1列目）を固定する（app.RのtagsでCSSを付与）
     datatable(wide, rownames = FALSE,
               options = list(pageLength = 20, dom = "tip", scrollX = TRUE),
               # 初期表示で横スクロールを右端（最新週の列）まで送っておく
