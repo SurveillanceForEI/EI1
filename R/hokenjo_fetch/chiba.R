@@ -24,7 +24,11 @@ fetch_chiba <- function(pdf_url = NULL) {
   target_pages <- integer(0)
   for (p in seq_len(n_pages)) {
     w <- pdftools::pdf_data(path)[[p]]
-    hdr_txt <- paste(w$text[w$y < 75], collapse = "")
+    # タイトル文言「保健所別、年齢群別報告数（男女合計）」はy=80付近に
+    # 印字されることがあり、以前のy<75という閾値では週によって取りこぼし、
+    # 該当ページが対象外扱いになって保健所別データが丸ごと欠落するバグが
+    # あった（2026年第20週等で確認）。y<90に広げて確実に含める
+    hdr_txt <- paste(w$text[w$y < 90], collapse = "")
     if (any(grepl("定点数", w$text)) && any(w$text == "合計") && grepl("年齢群別報告数", hdr_txt)) {
       target_pages <- c(target_pages, p)
     }
@@ -43,8 +47,15 @@ fetch_chiba <- function(pdf_url = NULL) {
     m <- regmatches(page_full_text, regexpr("20[0-9]{2}年第[0-9]+週", page_full_text))
     if (length(m) > 0 && nchar(m) > 0) week_label <- m
 
-    # 列順（x座標）を検出
-    hdr <- w[w$y >= 70 & w$y <= 84 & nchar(w$text) == 1, ]
+    # 列順（x座標）を検出。保健所名見出し行のyは週・ページによって70〜93付近を
+    # ばらつくため（「保健所別、年齢群別報告数」というタイトル行の直後のy位置が
+    # 一定でない）、以前のy<=84固定では週によってタイトル文言の残骸（「第」
+    # 「週」や週番号の数字）だけを拾って本来の保健所名列を取りこぼし、
+    # 該当ページ全体がデータなし扱いになるバグがあった（2026年第20週等で確認）。
+    # y範囲を広げつつ、タイトル文言由来のトークン（「第」「週」や数字）を
+    # 明示的に除外することで、両者を区別する
+    hdr <- w[w$y >= 70 & w$y <= 100 & nchar(w$text) == 1 &
+               !(w$text %in% c("第", "週")) & !grepl("^[0-9]+$", w$text), ]
     hdr <- hdr[order(hdr$x), ]
     col_x <- unique(hdr$x)
     col_x <- sort(col_x)
