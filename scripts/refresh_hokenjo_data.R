@@ -108,7 +108,7 @@ HOKENJO_REFRESH_DISPATCH <- list(
   "宮崎県"   = function() probe_latest_week_fetch(function(y, w)
     fetch_miyazaki(sprintf("https://www.pref.miyazaki.lg.jp/contents/org/fukushi/eikanken/center/infectious/pdf/%d%02d.pdf", y, w))),
   "鹿児島県" = function() fetch_kagoshima(.sample_url("鹿児島県")),
-  "沖縄県"   = function() fetch_okinawa("https://www.pref.okinawa.jp/_res/projects/default_project/_page_/001/006/484/syuuho0831.xlsx"),
+  "沖縄県"   = function() fetch_okinawa(resolve_hokenjo_pdf_url_for_pref("沖縄県")),
   "石川県"   = function() fetch_ishikawa()
 )
 

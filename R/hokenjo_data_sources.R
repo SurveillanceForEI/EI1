@@ -367,7 +367,7 @@ resolve_hokenjo_pdf_url <- function(landing_url, link_text_pattern, pick = c("la
                                      href_must_contain = NA_character_, file_ext = "pdf") {
   pick <- match.arg(pick)
   if (!requireNamespace("rvest", quietly = TRUE)) stop("rvest パッケージが必要です")
-  doc <- rvest::read_html(landing_url)
+  doc <- rvest::read_html(landing_url, encoding = "UTF-8")
   links <- rvest::html_elements(doc, "a")
   hrefs <- rvest::html_attr(links, "href")
   # 広島県のように全角数字（「第３２週」）で週番号を表記するページがあるため、
@@ -423,7 +423,9 @@ HOKENJO_LANDING_PAGES <- list(
                 # サイトでも確実に最新号だけを拾える
                 pattern = "令和[0-9]+年第[0-9]+週", pick = "first"),
   "岡山県" = list(url = "https://www.pref.okayama.jp/page/565068.html",
-                pattern = "週報", pick = "first")
+                pattern = "週報", pick = "first"),
+  "沖縄県" = list(url = "https://www.pref.okinawa.jp/iryokenko/shippeikansensho/1005861/1006484.html",
+                pattern = "定点当たり報告数グラフ19疾患分（保健所別", pick = "first", file_ext = "xlsx")
 )
 
 resolve_hokenjo_pdf_url_for_pref <- function(pref) {
