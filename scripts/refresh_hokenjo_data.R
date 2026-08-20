@@ -38,16 +38,19 @@ HOKENJO_REFRESH_DISPATCH <- list(
   "秋田県"   = function() fetch_akita(),
   "山形県"   = function() fetch_yamagata(ari_pdf_url = "https://www.eiken.yamagata.yamagata.jp/pdfshuho/2026/202632.pdf"),
   "福島県"   = function() fetch_fukushima(.sample_url("福島県")),
-  "宮城県"   = function() fetch_miyagi(.sample_url("宮城県")),
+  "宮城県"   = function() fetch_miyagi(resolve_hokenjo_pdf_url_for_pref("宮城県")),
   "茨城県"   = function() fetch_ibaraki(.sample_url("茨城県")),
   "栃木県"   = function() fetch_tochigi(.sample_url("栃木県")),
-  "群馬県"   = function() fetch_gunma(.sample_url("群馬県")),
+  "群馬県"   = function() fetch_gunma(resolve_hokenjo_pdf_url_for_pref("群馬県")),
   "埼玉県"   = function() fetch_saitama(.sample_url("埼玉県")),
-  "千葉県"   = function() fetch_chiba_graph(),
+  "千葉県"   = function() fetch_chiba(resolve_hokenjo_pdf_url_for_pref("千葉県")),
   "東京都"   = function() fetch_tokyo(.sample_url("東京都")),
   "神奈川県" = function() fetch_kanagawa(.sample_url("神奈川県")),
   "新潟県"   = function() fetch_niigata(.sample_url("新潟県")),
-  "富山県"   = function() fetch_toyama(.sample_url("富山県")),
+  "富山県"   = function() {
+    d <- fetch_toyama_zip(resolve_hokenjo_pdf_url_for_pref("富山県"))
+    d[d$week_num == max(d$week_num), ]  # currentは最新週のみでよい（履歴側は別途一括反映）
+  },
   "石川県"   = function() fetch_ishikawa(),
   "福井県"   = function() fetch_fukui(),
   "山梨県"   = function() fetch_yamanashi(.sample_url("山梨県")),

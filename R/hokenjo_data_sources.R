@@ -344,6 +344,86 @@ hokenjo_source_for_pref <- function(pref) {
   Find(function(x) x$pref == pref, HOKENJO_DATA_SOURCES)
 }
 
+# ============================================================
+# 「掲載ページのURLは固定だが、最新週のPDF添付ファイルのURLは
+# 毎週変わる」都道府県が多いことが判明したため、掲載ページを毎回
+# スクレイピングして最新週のPDFリンクを自動解決する汎用リゾルバ。
+#
+# 従来はHOKENJO_DATA_SOURCESのsample_urlやHOKENJO_REFRESH_DISPATCH
+# （scripts/refresh_hokenjo_data.R）に特定週のURLを直書きしており、
+# 該当週を過ぎると自動更新が止まってしまっていた（宮城県・千葉県・
+# 群馬県で実際に発覚）。
+#
+# pick="latest_week": リンクテキストから週番号（最初に現れる整数）を
+#   抽出し、最大のものを採用する（宮城県・千葉県のように、過去の
+#   全週分がアーカイブとして1ページに並ぶ場合。掲載順が新しい順/古い
+#   順のどちらでも週番号自体で判定するため安全）。
+# pick="first": リンクテキストパターンに最初にマッチしたものを採用
+#   する（群馬県のように、ページ自体が最新週のみを毎週差し替えて
+#   掲載する場合。週番号がリンクテキストに含まれない場合はこちら）。
+# ============================================================
+
+resolve_hokenjo_pdf_url <- function(landing_url, link_text_pattern, pick = c("latest_week", "first", "latest_week_href"),
+                                     href_must_contain = NA_character_, file_ext = "pdf") {
+  pick <- match.arg(pick)
+  if (!requireNamespace("rvest", quietly = TRUE)) stop("rvest パッケージが必要です")
+  doc <- rvest::read_html(landing_url)
+  links <- rvest::html_elements(doc, "a")
+  hrefs <- rvest::html_attr(links, "href")
+  texts <- rvest::html_text(links)
+  is_target_ext <- grepl(paste0("\\.", file_ext, "$"), hrefs, ignore.case = TRUE)
+  matched_idx <- which(is_target_ext & !is.na(hrefs) & grepl(link_text_pattern, texts))
+  # 一覧ページが複数年分のアーカイブを1ページに掲載している場合、
+  # 週番号だけでは古い年の「第52週」等を誤って最新扱いしてしまう
+  # ことがある（宮城県で実際に発覚）。href_must_containでファイル名
+  # 側に対象年が含まれることを要求し、年をまたいだ誤選択を防ぐ
+  if (!is.na(href_must_contain)) {
+    matched_idx <- matched_idx[grepl(href_must_contain, hrefs[matched_idx])]
+  }
+  if (length(matched_idx) == 0) {
+    stop(sprintf("resolve_hokenjo_pdf_url: '%s' にマッチする%sリンクが見つかりません（%s）",
+                 link_text_pattern, file_ext, landing_url))
+  }
+  best <- if (pick == "latest_week") {
+    wk_txt <- regmatches(texts[matched_idx], regexpr("[0-9]+", texts[matched_idx]))
+    wk <- suppressWarnings(as.integer(wk_txt))
+    matched_idx[which.max(wk)]
+  } else if (pick == "latest_week_href") {
+    # リンクテキストに週番号が含まれない場合（例: 富山県のZIPリンクは
+    # 「（ZIP：9KB）」等のファイルサイズ表記のみ）、ファイル名側から
+    # 「年+週」の数字列を拾って比較する（例: teiten_hc_202633w.zip → 202633）
+    wk_txt <- regmatches(hrefs[matched_idx], regexpr("[0-9]{6}", hrefs[matched_idx]))
+    wk <- suppressWarnings(as.integer(wk_txt))
+    matched_idx[which.max(wk)]
+  } else {
+    matched_idx[1]
+  }
+  xml2::url_absolute(hrefs[best], landing_url)
+}
+
+# 都道府県ごとの「掲載ページURL + リンクテキストの正規表現パターン
+# （+ 選択方法）」対応表。resolve_hokenjo_pdf_url_for_pref()で使う
+HOKENJO_LANDING_PAGES <- list(
+  "群馬県" = list(url = "https://www.pref.gunma.jp/page/3304.html",
+                pattern = "地域別疾病報告状況", pick = "first"),
+  "宮城県" = list(url = "https://www.pref.miyagi.jp/site/hokans/surveypdf-shuho.html",
+                pattern = "第[0-9]+週", pick = "latest_week", href_must_contain = "2026"),
+  "千葉県" = list(url = "https://www.pref.chiba.lg.jp/eiken/c-idsc/wr2026.html",
+                pattern = "^[0-9]+週", pick = "latest_week"),
+  "富山県" = list(url = "https://www.pref.toyama.jp/1279/kansen/#c-1",
+                pattern = "厚生センター（保健所）管内別", pick = "latest_week_href",
+                href_must_contain = "2026", file_ext = "zip")
+)
+
+resolve_hokenjo_pdf_url_for_pref <- function(pref) {
+  cfg <- HOKENJO_LANDING_PAGES[[pref]]
+  if (is.null(cfg)) stop(sprintf("%s: HOKENJO_LANDING_PAGESに未登録です", pref))
+  href_must_contain <- if (is.null(cfg$href_must_contain)) NA_character_ else cfg$href_must_contain
+  file_ext <- if (is.null(cfg$file_ext)) "pdf" else cfg$file_ext
+  resolve_hokenjo_pdf_url(cfg$url, cfg$pattern, pick = cfg$pick,
+                           href_must_contain = href_must_contain, file_ext = file_ext)
+}
+
 # data.frame化（実装時の一覧確認・CSV出力用）
 hokenjo_sources_df <- function() {
   do.call(rbind, lapply(HOKENJO_DATA_SOURCES, function(x) {
