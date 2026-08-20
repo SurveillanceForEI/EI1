@@ -6698,8 +6698,8 @@ server <- function(input, output, session) {
   # 保健所マップの下に出す集計表。地図・棒グラフは選択中の1週のみを
   # 見せるため、取得できている全期間の推移を保健所別に俯瞰できるよう、
   # 「保健所×週」のマトリクス表（選択中の疾患・指標）を別途用意する。
-  # 列は新しい週→古い週の順に並べ、横スクロールしなくても最新週が
-  # 見えるようにする
+  # 列は古い週→新しい週の順（時系列の見た目通り）に並べ、初期表示は
+  # renderDTのcallbackで横スクロールを右端（最新週）まで送っておく
   hokenjo_summary_table_data <- reactive({
     st <- hokenjo_status()
     if (st$status != "ok" || is.null(HOKENJO_HISTORY)) return(NULL)
@@ -6716,7 +6716,7 @@ server <- function(input, output, session) {
     sub <- sub[!duplicated(sub[, c("key", "hokenjo")]), ]
     # 年をまたぐと週番号が再利用されるため、列ラベルには年も含める
     sub$week_col <- paste0(sub$hokenjo_year, "年第", sub$week_num, "週")
-    key_order <- sort(unique(sub$key), decreasing = TRUE)  # 新しい週が左に来るよう降順
+    key_order <- sort(unique(sub$key))  # 古い週→新しい週の昇順（最新週が右端）
     col_levels <- vapply(key_order, function(k) paste0(k %/% 100L, "年第", k %% 100L, "週"), character(1))
     sub$week_col <- factor(sub$week_col, levels = col_levels)
 
@@ -6730,7 +6730,17 @@ server <- function(input, output, session) {
   output$hokenjo_summary_table <- renderDT({
     wide <- hokenjo_summary_table_data()
     if (is.null(wide) || nrow(wide) == 0) return(NULL)
-    datatable(wide, rownames = FALSE, options = list(pageLength = 20, dom = "tip", scrollX = TRUE))
+    datatable(wide, rownames = FALSE,
+              options = list(pageLength = 20, dom = "tip", scrollX = TRUE),
+              # 初期表示で横スクロールを右端（最新週の列）まで送っておく
+              callback = DT::JS(
+                "table.on('draw.dt init.dt', function() {",
+                "  var body = table.table().container().querySelector('.dataTables_scrollBody');",
+                "  if (body) body.scrollLeft = body.scrollWidth;",
+                "});",
+                "var body0 = table.table().container().querySelector('.dataTables_scrollBody');",
+                "if (body0) body0.scrollLeft = body0.scrollWidth;"
+              ))
   })
 }
 
