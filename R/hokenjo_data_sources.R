@@ -460,7 +460,11 @@ HOKENJO_LANDING_PAGES <- list(
   "鹿児島県" = list(url = "https://www.pref.kagoshima.jp/ae06/kenko-fukushi/kenko-iryo/kansen/hasseidoko/week/kannsenshuho8-1.html",
                 pattern = "第[0-9]+週報", pick = "latest_week"),
   "愛媛県" = list(url = "https://www.pref.ehime.jp/site/kanjyo/",
-                pattern = "週報（第[0-9]+週）", pick = "first")
+                pattern = "週報（第[0-9]+週）", pick = "first"),
+  # 「全数届出感染症累積患者報告数」PDFも同じ「第N週」表記を含むため、
+  # 「週報概要」に限定して保健所別データの本体PDFだけを拾う
+  "長崎県" = list(url = "https://www.pref.nagasaki.jp/doc/page-673274.html",
+                pattern = "第[0-9]+週.*週報概要", pick = "latest_week")
 )
 
 resolve_hokenjo_pdf_url_for_pref <- function(pref) {

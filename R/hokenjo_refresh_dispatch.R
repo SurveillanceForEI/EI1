@@ -100,7 +100,7 @@ HOKENJO_REFRESH_DISPATCH <- list(
   "高知県"   = function() fetch_kochi(resolve_hokenjo_pdf_url_for_pref("高知県")),
   "福岡県"   = function() fetch_fukuoka(),
   "佐賀県"   = function() fetch_saga(yw = resolve_saga_latest_yw()),
-  "長崎県"   = function() fetch_nagasaki(.sample_url("長崎県")),
+  "長崎県"   = function() fetch_nagasaki(resolve_hokenjo_pdf_url_for_pref("長崎県")),
   "熊本県"   = function() fetch_kumamoto(resolve_hokenjo_pdf_url_for_pref("熊本県")),
   "大分県"   = function() fetch_oita(resolve_hokenjo_pdf_url_for_pref("大分県")),
   "宮崎県"   = function() probe_latest_week_fetch(function(y, w)
