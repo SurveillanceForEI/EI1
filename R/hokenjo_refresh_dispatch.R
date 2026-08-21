@@ -80,7 +80,7 @@ HOKENJO_REFRESH_DISPATCH <- list(
   "京都府"   = function() probe_latest_week_fetch(function(y, w) fetch_kyoto(y, w)),
   "大阪府"   = function() probe_latest_week_fetch(function(y, w)
     fetch_osaka(sprintf("https://www.iph.pref.osaka.jp/infection/surv%02d/surv%dt.html", y %% 100, w))),
-  "兵庫県"   = function() fetch_hyogo(2026, 32),
+  "兵庫県"   = function() probe_latest_week_fetch(function(y, w) fetch_hyogo(y, w)),
   "奈良県"   = function() probe_latest_week_fetch(function(y, w)
     fetch_nara(sprintf("https://www.pref.nara.lg.jp/documents/4352/08%02d.pdf", w))),
   "和歌山県" = function() probe_latest_week_fetch(function(y, w)
