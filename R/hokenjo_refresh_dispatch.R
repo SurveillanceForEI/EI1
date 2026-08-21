@@ -66,7 +66,8 @@ HOKENJO_REFRESH_DISPATCH <- list(
   "石川県"   = function() fetch_ishikawa(),
   "福井県"   = function() fetch_fukui(),
   "山梨県"   = function() fetch_yamanashi(.sample_url("山梨県")),
-  "長野県"   = function() fetch_nagano(.sample_url("長野県")),
+  "長野県"   = function() probe_latest_week_fetch(function(y, w)
+    fetch_nagano(resolve_nagano_data_url(y, w))),
   "岐阜県"   = function() fetch_gifu(.sample_url("岐阜県")),
   "静岡県"   = function() probe_latest_week_fetch(function(y, w)
     fetch_shizuoka(sprintf("https://www.pref.shizuoka.jp/_res/projects/default_project/_page_/001/081/723/%didwr%d-2.pdf", y, w))),

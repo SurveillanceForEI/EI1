@@ -154,7 +154,7 @@ HOKENJO_DATA_SOURCES <- list(
                          "長野", "北信", "長野市", "松本市"),
       sample_url = "https://www.pref.nagano.lg.jp/shippei-kansen/kenko/kenko/kansensho/joho/documents/2026-32w_data_07m.pdf",
       archive_from = "2023",
-      notes = "週報・月報合併号、年齢階級別・保健所別定点数表も付属。最も詳細度が高い県の一つ"),
+      notes = "週報・月報合併号、年齢階級別・保健所別定点数表も付属。最も詳細度が高い県の一つ。ファイル名の命名規則が年・週によって揺れる（月合併号の\"_data_07m\"、誤字の\"_date.pdf\"等）ため、URL組み立てではなく掲載一覧ページをスクレイピングするresolve_nagano_data_url()で解決する。なお2025年第16週以降は保健所別内訳表自体が週報から無くなっており、その期間は取得不可"),
 
   .hj("岐阜県", "◎", "表（PDF）", 8,
       hokenjo_names = c("岐阜市", "岐阜", "西濃", "関", "可茂", "東濃", "恵那", "飛騨"),

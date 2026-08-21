@@ -9,6 +9,29 @@
 # pdf_text() の空白区切りでは列がズレる。pdf_data() の座標(x)を使い、
 # 各保健所の列範囲に含まれる値だけを拾う。
 
+# 長野県の週報PDFファイル名は年によって命名規則が揺れる（月合併号の
+# "_data_07m"、"_data-teisei"、"-02m_data"、さらに第1週だけ"_date.pdf"
+# という誤字まである）ため、URLパターンをsprintfで組み立てるのではなく、
+# 掲載一覧ページを直接スクレイピングして該当週の実際のリンクを取得する。
+# 各週は「第N週（xxxKB, 小さい方）」＝概要版と「第N週（xxxKB, 大きい方）」
+# ＝保健所別データ付き版の2本が並ぶため、後者（_infoが付かない方）を選ぶ
+resolve_nagano_data_url <- function(year, week) {
+  if (!requireNamespace("rvest", quietly = TRUE)) stop("rvest パッケージが必要です")
+  landing <- "https://www.pref.nagano.lg.jp/shippei-kansen/kenko/kenko/kansensho/joho/index.html"
+  doc <- rvest::read_html(landing, encoding = "UTF-8")
+  links <- rvest::html_elements(doc, "a")
+  hrefs <- rvest::html_attr(links, "href")
+  texts <- gsub("[\t\n]", "", rvest::html_text(links))
+  idx <- which(grepl("\\.pdf$", hrefs, ignore.case = TRUE) &
+                 grepl(sprintf("^第%d週", week), texts) &
+                 grepl(as.character(year), hrefs))
+  if (length(idx) == 0) stop(sprintf("長野県: %d年第%d週のリンクが見つかりません", year, week))
+  cand <- hrefs[idx]
+  cand <- cand[!grepl("_info\\.pdf$", cand)]
+  if (length(cand) == 0) cand <- hrefs[idx]
+  xml2::url_absolute(cand[length(cand)], landing)
+}
+
 fetch_nagano <- function(pdf_url = "https://www.pref.nagano.lg.jp/shippei-kansen/kenko/kenko/kansensho/joho/documents/2026-32w_data_07m.pdf") {
   if (!exists("pdf_words")) stop("pdf_table_utils.R を先に source してください")
 
