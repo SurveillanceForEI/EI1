@@ -157,48 +157,15 @@ for (pref in names(PATTERN_DISPATCH)) {
 
 # ---- ②それ以外の県：現状の「最新週のみ」ラッパーを流用し、
 #      まだ履歴に無い週であれば1件だけ追記する ----
-.sample_url <- function(pref) {
-  src <- Find(function(x) x$pref == pref, HOKENJO_DATA_SOURCES)
-  if (is.null(src)) NA_character_ else src$sample_url
-}
-
-OTHER_DISPATCH <- list(
-  "秋田県"   = function() fetch_akita(),
-  "山形県"   = function() fetch_yamagata(ari_pdf_url = "https://www.eiken.yamagata.yamagata.jp/pdfshuho/2026/202632.pdf"),
-  "福島県"   = function() fetch_fukushima(.sample_url("福島県")),
-  "宮城県"   = function() fetch_miyagi(.sample_url("宮城県")),
-  "栃木県"   = function() fetch_tochigi(.sample_url("栃木県")),
-  "群馬県"   = function() fetch_gunma(.sample_url("群馬県")),
-  "埼玉県"   = function() fetch_saitama(.sample_url("埼玉県")),
-  "千葉県"   = function() fetch_chiba_graph(),
-  "神奈川県" = function() fetch_kanagawa(.sample_url("神奈川県")),
-  "新潟県"   = function() fetch_niigata(.sample_url("新潟県")),
-  "富山県"   = function() fetch_toyama(.sample_url("富山県")),
-  "石川県"   = function() fetch_ishikawa(),
-  "福井県"   = function() fetch_fukui(),
-  "山梨県"   = function() fetch_yamanashi(.sample_url("山梨県")),
-  "長野県"   = function() fetch_nagano(.sample_url("長野県")),
-  "岐阜県"   = function() fetch_gifu(.sample_url("岐阜県")),
-  "静岡県"   = function() fetch_shizuoka(.sample_url("静岡県")),
-  "三重県"   = function() fetch_mie(),
-  "滋賀県"   = function() fetch_shiga(.sample_url("滋賀県")),
-  "奈良県"   = function() fetch_nara(.sample_url("奈良県")),
-  "和歌山県" = function() fetch_wakayama(.sample_url("和歌山県")),
-  "鳥取県"   = function() fetch_tottori(.sample_url("鳥取県")),
-  "島根県"   = function() fetch_shimane(.sample_url("島根県")),
-  "岡山県"   = function() fetch_okayama(.sample_url("岡山県")),
-  "山口県"   = function() fetch_yamaguchi(.sample_url("山口県")),
-  "徳島県"   = function() fetch_tokushima(.sample_url("徳島県")),
-  "香川県"   = function() fetch_kagawa(.sample_url("香川県")),
-  "愛媛県"   = function() fetch_ehime(.sample_url("愛媛県")),
-  "高知県"   = function() fetch_kochi(.sample_url("高知県")),
-  "福岡県"   = function() fetch_fukuoka(),
-  "長崎県"   = function() fetch_nagasaki(.sample_url("長崎県")),
-  "熊本県"   = function() fetch_kumamoto(.sample_url("熊本県")),
-  "大分県"   = function() fetch_oita(.sample_url("大分県")),
-  "鹿児島県" = function() fetch_kagoshima(.sample_url("鹿児島県")),
-  "沖縄県"   = function() fetch_okinawa("https://www.pref.okinawa.jp/_res/projects/default_project/_page_/001/006/484/syuuho0831.xlsx")
-)
+# 以前はここに①（PATTERN_DISPATCH）と重複する独自のstaleな
+# URL定義を持っていたが、片方だけ修正するともう片方が古いURL
+# （沖縄県の固定xlsx等、実際に404化していた）のまま取り残される
+# 事故が起きたため、scripts/refresh_hokenjo_data.Rと共有の
+# R/hokenjo_refresh_dispatch.R（HOKENJO_REFRESH_DISPATCH）を使う
+source("R/hokenjo_refresh_dispatch.R")
+OTHER_DISPATCH <- HOKENJO_REFRESH_DISPATCH[
+  setdiff(names(HOKENJO_REFRESH_DISPATCH), c(names(PATTERN_DISPATCH), "北海道"))
+]
 
 for (pref in names(OTHER_DISPATCH)) {
   res <- tryCatch(OTHER_DISPATCH[[pref]](), error = function(e) {
