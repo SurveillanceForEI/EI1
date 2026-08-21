@@ -43,7 +43,7 @@ HOKENJO_REFRESH_DISPATCH <- list(
     }
     fetch_yamagata(year = yw$year, ari_pdf_url = if (is.na(ari_url)) NULL else ari_url)
   },
-  "福島県"   = function() fetch_fukushima(.sample_url("福島県")),
+  "福島県"   = function() fetch_fukushima(resolve_hokenjo_pdf_url_for_pref("福島県")),
   "宮城県"   = function() fetch_miyagi(resolve_hokenjo_pdf_url_for_pref("宮城県")),
   "茨城県"   = function() probe_latest_week_fetch(function(y, w)
     fetch_ibaraki(sprintf("https://www.pref.ibaraki.jp/hokenfukushi/eiken/idwr/weekly/documents/%didwr%02d.pdf", y, w))),
@@ -65,39 +65,46 @@ HOKENJO_REFRESH_DISPATCH <- list(
   },
   "石川県"   = function() fetch_ishikawa(),
   "福井県"   = function() fetch_fukui(),
-  "山梨県"   = function() fetch_yamanashi(.sample_url("山梨県")),
+  "山梨県"   = function() probe_latest_week_fetch(function(y, w)
+    fetch_yamanashi(sprintf("https://www.pref.yamanashi.jp/documents/101494/%d%02dw.pdf", y, w))),
   "長野県"   = function() probe_latest_week_fetch(function(y, w)
     fetch_nagano(resolve_nagano_data_url(y, w))),
-  "岐阜県"   = function() fetch_gifu(.sample_url("岐阜県")),
+  "岐阜県"   = function() fetch_gifu(resolve_gifu_data_url()),
   "静岡県"   = function() probe_latest_week_fetch(function(y, w)
     fetch_shizuoka(sprintf("https://www.pref.shizuoka.jp/_res/projects/default_project/_page_/001/081/723/%didwr%d-2.pdf", y, w))),
+  # 愛知県: サイト全体がリダイレクトループ中で現状取得不可（2026-08確認）。
+  # URLパターン自体は分かっているので復旧後はprobe_latest_week_fetchに変更可能
   "愛知県"   = function() fetch_aichi(.sample_url("愛知県")),
   "三重県"   = function() fetch_mie(),
-  "滋賀県"   = function() fetch_shiga(.sample_url("滋賀県")),
+  "滋賀県"   = function() fetch_shiga(resolve_hokenjo_pdf_url_for_pref("滋賀県")),
   "京都府"   = function() probe_latest_week_fetch(function(y, w) fetch_kyoto(y, w)),
   "大阪府"   = function() probe_latest_week_fetch(function(y, w)
     fetch_osaka(sprintf("https://www.iph.pref.osaka.jp/infection/surv%02d/surv%dt.html", y %% 100, w))),
   "兵庫県"   = function() fetch_hyogo(2026, 32),
-  "奈良県"   = function() fetch_nara(.sample_url("奈良県")),
+  "奈良県"   = function() probe_latest_week_fetch(function(y, w)
+    fetch_nara(sprintf("https://www.pref.nara.lg.jp/documents/4352/08%02d.pdf", w))),
   "和歌山県" = function() probe_latest_week_fetch(function(y, w)
     fetch_wakayama(sprintf("https://www.pref.wakayama.lg.jp/prefg/031801/idsw/khdc/d00153694_d/fil/WIDR%d%02d.pdf", y, w))),
-  "鳥取県"   = function() fetch_tottori(.sample_url("鳥取県")),
-  "島根県"   = function() fetch_shimane(.sample_url("島根県")),
+  "鳥取県"   = function() probe_latest_week_fetch(function(y, w)
+    fetch_tottori(sprintf("https://www.pref.tottori.lg.jp/secure/519458/R%dW%02d_hp.pdf", y - 2018L, w))),
+  "島根県"   = function() probe_latest_week_fetch(function(y, w)
+    fetch_shimane(sprintf("https://pref.shimane.didss.dsvc.jp/files/report/week/weeklyreport_y%dw%02d.pdf", y, w))),
   "岡山県"   = function() fetch_okayama(resolve_hokenjo_pdf_url_for_pref("岡山県")),
   "広島県"   = function() fetch_hiroshima(resolve_hokenjo_pdf_url_for_pref("広島県")),
-  "山口県"   = function() fetch_yamaguchi(.sample_url("山口県")),
-  "徳島県"   = function() fetch_tokushima(.sample_url("徳島県")),
+  "山口県"   = function() probe_latest_week_fetch(function(y, w)
+    fetch_yamaguchi(sprintf("https://pref.yamaguchi.didss.dsvc.jp/files/report/week/weeklyreport_y%dw%02d.pdf", y, w))),
+  "徳島県"   = function() fetch_tokushima(resolve_hokenjo_pdf_url_for_pref("徳島県")),
   "香川県"   = function() probe_latest_week_fetch(function(y, w)
     fetch_kagawa(sprintf("https://www.pref.kagawa.lg.jp/documents/7135/%dsyuuhou%d.pdf", y, w))),
-  "愛媛県"   = function() fetch_ehime(.sample_url("愛媛県")),
-  "高知県"   = function() fetch_kochi(.sample_url("高知県")),
+  "愛媛県"   = function() fetch_ehime(resolve_hokenjo_pdf_url_for_pref("愛媛県")),
+  "高知県"   = function() fetch_kochi(resolve_hokenjo_pdf_url_for_pref("高知県")),
   "福岡県"   = function() fetch_fukuoka(),
   "佐賀県"   = function() fetch_saga(yw = resolve_saga_latest_yw()),
   "長崎県"   = function() fetch_nagasaki(.sample_url("長崎県")),
-  "熊本県"   = function() fetch_kumamoto(.sample_url("熊本県")),
-  "大分県"   = function() fetch_oita(.sample_url("大分県")),
+  "熊本県"   = function() fetch_kumamoto(resolve_hokenjo_pdf_url_for_pref("熊本県")),
+  "大分県"   = function() fetch_oita(resolve_hokenjo_pdf_url_for_pref("大分県")),
   "宮崎県"   = function() probe_latest_week_fetch(function(y, w)
     fetch_miyazaki(sprintf("https://www.pref.miyazaki.lg.jp/contents/org/fukushi/eikanken/center/infectious/pdf/%d%02d.pdf", y, w))),
-  "鹿児島県" = function() fetch_kagoshima(.sample_url("鹿児島県")),
+  "鹿児島県" = function() fetch_kagoshima(resolve_hokenjo_pdf_url_for_pref("鹿児島県")),
   "沖縄県"   = function() fetch_okinawa(resolve_hokenjo_pdf_url_for_pref("沖縄県"))
 )

@@ -103,3 +103,30 @@ fetch_gifu <- function(pdf_url = "https://www.pref.gifu.lg.jp/uploaded/attachmen
   }
   do.call(rbind, out)
 }
+
+# 岐阜県の週報バックナンバーページは表構成が「週・月|情報編|
+# データ・グラフ編（週報）（月報）|トピックス」で、リンクテキストが
+# 「[PDFファイル／xxxKB]」のみ（週番号を含まない）ため、汎用の
+# resolve_hokenjo_pdf_url()（リンクテキストのパターンマッチ）では
+# 拾えない。当年分の表（最新週が先頭行、"New!"付き）を直接たどり、
+# 各行の3列目（データ・グラフ編＝保健所別表付き）のリンクを取得する
+resolve_gifu_data_url <- function() {
+  if (!requireNamespace("rvest", quietly = TRUE)) stop("rvest パッケージが必要です")
+  landing <- "https://www.pref.gifu.lg.jp/page/107799.html"
+  doc <- rvest::read_html(landing, encoding = "UTF-8")
+  tbls <- rvest::html_elements(doc, "table")
+  for (tbl in tbls) {
+    rows <- rvest::html_elements(tbl, "tr")
+    for (r in rows) {
+      week_txt <- rvest::html_text(rvest::html_elements(r, "td")[1])
+      if (length(week_txt) == 0) next
+      if (!grepl("New!|New！", week_txt)) next
+      cells <- rvest::html_elements(r, "td")
+      if (length(cells) < 3) next
+      a3 <- rvest::html_elements(cells[[3]], "a")
+      if (length(a3) == 0) next
+      return(xml2::url_absolute(rvest::html_attr(a3[[1]], "href"), landing))
+    }
+  }
+  stop("岐阜県: 最新週（New!マーク付き）のリンクが見つかりません")
+}

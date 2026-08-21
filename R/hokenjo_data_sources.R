@@ -363,7 +363,7 @@ hokenjo_source_for_pref <- function(pref) {
 #   掲載する場合。週番号がリンクテキストに含まれない場合はこちら）。
 # ============================================================
 
-resolve_hokenjo_pdf_url <- function(landing_url, link_text_pattern, pick = c("latest_week", "first", "latest_week_href"),
+resolve_hokenjo_pdf_url <- function(landing_url, link_text_pattern, pick = c("latest_week", "first", "latest_week_href", "latest_id"),
                                      href_must_contain = NA_character_, file_ext = "pdf") {
   pick <- match.arg(pick)
   if (!requireNamespace("rvest", quietly = TRUE)) stop("rvest パッケージが必要です")
@@ -397,6 +397,15 @@ resolve_hokenjo_pdf_url <- function(landing_url, link_text_pattern, pick = c("la
     wk_txt <- regmatches(hrefs[matched_idx], regexpr("[0-9]{6}", hrefs[matched_idx]))
     wk <- suppressWarnings(as.integer(wk_txt))
     matched_idx[which.max(wk)]
+  } else if (pick == "latest_id") {
+    # 週番号自体が当年・前年で重複する（第1週〜第52週が2回並ぶ）ページで、
+    # かつ添付ファイルIDが6桁固定でない（7桁等）場合はlatest_week_hrefの
+    # 固定6桁抽出だと桁落ちして誤判定する（福島県・徳島県で実際に発覚）。
+    # アップロード順にID自体は単調増加するため、桁数を限定せず最長の
+    # 数字列を「ID」とみなして最大のものを選ぶ
+    id_txt <- regmatches(hrefs[matched_idx], gregexpr("[0-9]+", hrefs[matched_idx]))
+    id_val <- vapply(id_txt, function(x) if (length(x) == 0) NA_real_ else max(as.numeric(x)), numeric(1))
+    matched_idx[which.max(id_val)]
   } else {
     matched_idx[1]
   }
@@ -425,7 +434,33 @@ HOKENJO_LANDING_PAGES <- list(
   "岡山県" = list(url = "https://www.pref.okayama.jp/page/565068.html",
                 pattern = "週報", pick = "first"),
   "沖縄県" = list(url = "https://www.pref.okinawa.jp/iryokenko/shippeikansensho/1005861/1006484.html",
-                pattern = "定点当たり報告数グラフ19疾患分（保健所別", pick = "first", file_ext = "xlsx")
+                pattern = "定点当たり報告数グラフ19疾患分（保健所別", pick = "first", file_ext = "xlsx"),
+  # 福島県・徳島県は一覧ページに当年分＋前年分（第1週〜第52週）が
+  # 両方並んでおり、週番号だけで「最新」判定すると前年の第52週を
+  # 誤って選んでしまう（実際に発覚）。添付ファイルIDはアップロード
+  # 順に単調増加するため、週番号ではなくhref側の数字（ID）が最大の
+  # ものを選ぶlatest_week_hrefを使う
+  "福島県" = list(url = "https://www.pref.fukushima.lg.jp/sec/21910a/kansenshojoho.html",
+                pattern = "第[0-9]+週", pick = "latest_week_href"),
+  "滋賀県" = list(url = "https://www.pref.shiga.lg.jp/eiseikagaku/kansensyou/info/307997.html",
+                pattern = "第[0-9]+週", pick = "latest_week"),
+  # 徳島県は先頭に「週報第N週」という最新号だけの特別リンクが常に
+  # 掲載されており（アーカイブ一覧側の同週エントリよりもIDが小さい
+  # ことがあるためID基準では誤判定する）、このパターンに限定してfirstで拾う
+  "徳島県" = list(url = "https://www.pref.tokushima.lg.jp/ippannokata/kenko/kansensho/2005022800148",
+                pattern = "^週報第[0-9]+週", pick = "first"),
+  "高知県" = list(url = "https://www.pref.kochi.lg.jp/doc/2026011400132/",
+                pattern = "第[0-9]+週", pick = "latest_week"),
+  "熊本県" = list(url = "https://www.pref.kumamoto.jp/soshiki/30/51400.html",
+                pattern = "感染症発生動向", pick = "latest_id"),
+  # 大分県も当年分＋前年分（第1週〜第52週）が両方並ぶため、週番号
+  # ではなくID最大値で判定する（福島県・徳島県と同じ理由）
+  "大分県" = list(url = "https://www.pref.oita.jp/site/bosaianzen/shuuhou.html",
+                pattern = "第[0-9]+週", pick = "latest_id"),
+  "鹿児島県" = list(url = "https://www.pref.kagoshima.jp/ae06/kenko-fukushi/kenko-iryo/kansen/hasseidoko/week/kannsenshuho8-1.html",
+                pattern = "第[0-9]+週報", pick = "latest_week"),
+  "愛媛県" = list(url = "https://www.pref.ehime.jp/site/kanjyo/",
+                pattern = "週報（第[0-9]+週）", pick = "first")
 )
 
 resolve_hokenjo_pdf_url_for_pref <- function(pref) {
