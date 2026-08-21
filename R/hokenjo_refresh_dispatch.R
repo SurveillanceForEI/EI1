@@ -63,7 +63,28 @@ HOKENJO_REFRESH_DISPATCH <- list(
     d <- fetch_toyama_zip(resolve_hokenjo_pdf_url_for_pref("富山県"))
     d[d$week_num == max(d$week_num), ]  # currentは最新週のみでよい（履歴側は別途一括反映）
   },
-  "石川県"   = function() fetch_ishikawa(),
+  # 石川県: fetch_ishikawa()は常に2026年第32週の固定値（.ISHIKAWA_WEEK32_DATA、
+  # 検証用に手動抽出したもの）を返すだけで実際にはサイトから取得していない
+  # ため、OCRベースの実装であるfetch_ishikawa_history()を使う。1つのPDFに
+  # 直近5週分の推移表が載っているため、直近週から遡ってPDFが存在する週を
+  # 探し、その週のデータだけを取り出す。OCR特有の誤読で稀に桁が飛んだ
+  # 異常値（定点あたり報告数が数百等）が出ることがあるため、500超は
+  # 誤読とみなしNA化する
+  "石川県"   = function() {
+    yw <- current_iso_year_week()
+    for (back in 0:3) {
+      wk <- yw$week - back
+      if (wk < 1) break
+      url <- sprintf("https://www.pref.ishikawa.lg.jp/hokan/kansenjoho/stock/%d/documents/%d-%d.pdf", yw$year, yw$year, wk)
+      d <- tryCatch(fetch_ishikawa_history(url, year = yw$year), error = function(e) NULL)
+      if (is.null(d) || nrow(d) == 0) next
+      d2 <- d[!is.na(d$week_num) & d$week_num == wk, ]
+      if (nrow(d2) == 0) next
+      d2$rate[!is.na(d2$rate) & d2$rate > 500] <- NA
+      return(d2)
+    }
+    stop("石川県: 直近4週分とも取得できませんでした")
+  },
   "福井県"   = function() fetch_fukui(),
   "山梨県"   = function() probe_latest_week_fetch(function(y, w)
     fetch_yamanashi(sprintf("https://www.pref.yamanashi.jp/documents/101494/%d%02dw.pdf", y, w))),
