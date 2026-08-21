@@ -118,10 +118,10 @@ HOKENJO_DATA_SOURCES <- list(
       notes = "保健福祉事務所別。表1（国還元データ）・表2（速報）の2系統"),
 
   # ── 中部 ──────────────────────────────────────────────────
-  .hj("新潟県", "○〜◎", "表（PDF）", 14,
-      sample_url = "https://www.pref.niigata.lg.jp/uploaded/attachment/506688.pdf",
-      archive_from = "要確認",
-      notes = "地域振興局等管内別"),
+  .hj("新潟県", "○〜◎", "表（Excel）", 14,
+      sample_url = "https://www.pref.niigata.lg.jp/uploaded/attachment/507175.xlsx",
+      archive_from = "2025年第1週（要確認、それ以前は未調査）",
+      notes = "地域振興局等管内別。以前はPDF版のみだったが、2025年分から週報速報版ページ（shuho{令和年}{週}.html）にExcel版「5類感染症定点把握対象疾患報告数」も併載されるようになり、構造化データのため現在はこちらを使用（fetch_niigata_xlsx/resolve_niigata_xlsx_url）"),
 
   .hj("富山県", "◎", "表（PDF）", 5,
       hokenjo_names = c("砺波", "高岡", "富山市", "中部", "新川"),
