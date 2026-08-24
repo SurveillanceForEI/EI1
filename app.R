@@ -2282,8 +2282,11 @@ server <- function(input, output, session) {
     list(lo = Sys.Date() - period_days, hi = NULL)
   }
 
-  # EBSニュース（国内・海外）の現在のフィルタ状態を一目で分かるバッジ表示で返す
-  ebs_filter_status_badge <- function(show_all, period_val) {
+  # EBSニュース（国内・海外）の現在のフィルタ状態を一目で分かるバッジ表示で返す。
+  # pref_val は都道府県フィルタの現在値（国内EBSのみ。海外EBSは都道府県で
+  # 絞り込まないため呼び出し元でNULLを渡す）。ユーザー指示（2026-08-24）:
+  # EBSサマリーに疾患だけでなく選択中の都道府県も分かるようにする
+  ebs_filter_status_badge <- function(show_all, period_val, pref_val = NULL) {
     did <- sidebar_disease_id()
     period_lbl <- coalesce(EBS_PERIOD_LABELS[as.character(period_val)], "")
     if (isTRUE(show_all) || is.null(did) || did == "すべて") {
@@ -2298,8 +2301,24 @@ server <- function(input, output, session) {
                padding:2px 10px;font-size:0.78em;font-weight:700;margin-right:6px;",
         icon("filter"), " ", lbl, " で絞り込み中")
     }
+    # pref_val が NULL の場合（海外EBS等、都道府県フィルタが適用されない場合）は
+    # バッジ自体を出さない。それ以外は「全国」or 選択中の都道府県名を表示する
+    pref_badge <- if (is.null(pref_val)) {
+      NULL
+    } else if (nzchar(pref_val) && pref_val != "全国") {
+      tags$span(
+        style="display:inline-block;background:#16a085;color:#fff;border-radius:10px;
+               padding:2px 10px;font-size:0.78em;font-weight:700;margin-right:6px;",
+        icon("map-marker-alt"), " ", pref_val)
+    } else {
+      tags$span(
+        style="display:inline-block;background:#7f8c8d;color:#fff;border-radius:10px;
+               padding:2px 10px;font-size:0.78em;font-weight:700;margin-right:6px;",
+        icon("map-marker-alt"), " 全国")
+    }
     tags$div(style="margin-bottom:6px;",
       disease_badge,
+      pref_badge,
       tags$span(
         style="display:inline-block;background:#ecf0f1;color:#555;border-radius:10px;
                padding:2px 10px;font-size:0.78em;",
@@ -5264,7 +5283,7 @@ server <- function(input, output, session) {
     }
     tags$div(
       tags$div(style="font-size:0.78em;color:#888;margin-bottom:6px;", "EBS サマリー（国内）"),
-      ebs_filter_status_badge(ebs_show_all_flag(), input$ebs_period),
+      ebs_filter_status_badge(ebs_show_all_flag(), input$ebs_period, input$pref_filter),
       tags$div(style="font-size:0.75em;color:#999;margin-bottom:6px;",
                period_txt, "　※古い記事はリンク切れの場合があります",
                "　※シグナル判定は開発中のアルゴリズムのため精度が変動する場合があります"),
