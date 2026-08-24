@@ -10,6 +10,16 @@ library(tidyr)
 library(lubridate)
 library(httr)
 
+# JIHS週報CSVでは報告数0件のセルが「－」（全角・半角ダッシュ）で表記される。
+# 単純にas.numeric()すると"-"はNAになってしまい、0件と未報告（欠測）の
+# 区別がつかなくなるため、まず「－」を0に変換してから数値化する
+# （ユーザー指摘: 地域別比較の全疾患でデータ欠損が見られる、2026-08-24）
+.jihs_parse_num <- function(x) {
+  x <- trimws(as.character(x))
+  x[x %in% c("-", "―", "－")] <- "0"
+  suppressWarnings(as.numeric(x))
+}
+
 JIHS_BASE      <- "https://id-info.jihs.go.jp/surveillance/idwr/provisional"
 NIID_BASE      <- "https://id-info.jihs.go.jp/niid/images/idwr/sokuho"
 NIID_MAX_YEAR  <- 2022  # 2022年以前は旧NIIDパス、2023年以降は新JIHSパス
@@ -319,7 +329,7 @@ parse_teiten_csv <- function(text, year, week) {
 
     rows_list <- lapply(names(col_map), function(did) {
       ci  <- col_map[[did]]
-      val <- suppressWarnings(as.numeric(if (ci <= length(fields)) fields[ci] else NA_character_))
+      val <- .jihs_parse_num(if (ci <= length(fields)) fields[ci] else NA_character_)
       tibble(
         year             = as.integer(year),
         week             = as.integer(week),
@@ -368,7 +378,7 @@ parse_ari_csv <- function(text, year, week) {
       region_v    <- pref_row$region
     }
 
-    val <- suppressWarnings(as.numeric(gsub('"', "", fields[3])))
+    val <- .jihs_parse_num(gsub('"', "", fields[3]))
     tibble(
       year=as.integer(year), week=as.integer(week),
       date=week_start,
