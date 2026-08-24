@@ -120,7 +120,10 @@ fetch_ehime <- function(pdf_url) {
         for (ci in seq_len(nrow(cols))) {
           cx <- cols$x_center[ci]
           dcell <- drow[abs(drow$x - cx) < 12, ]
-          val <- if (nrow(dcell) > 0) dcell$text[1] else NA_character_
+          # セルに数値トークンが1つも無い場合は「－」と同じく報告数0を
+          # 意味する（PDF上、報告0件のセルは完全な空欄になることがある。
+          # ユーザー指示、2026-08-24）ため、NAでなく"0"扱いにする
+          val <- if (nrow(dcell) > 0) dcell$text[1] else "0"
           out[[length(out) + 1]] <- data.frame(
             hokenjo = hokenjo_order[ri], disease = cols$name[ci],
             value = val, stringsAsFactors = FALSE
