@@ -120,10 +120,12 @@ fetch_ehime <- function(pdf_url) {
         for (ci in seq_len(nrow(cols))) {
           cx <- cols$x_center[ci]
           dcell <- drow[abs(drow$x - cx) < 12, ]
-          # セルに数値トークンが1つも無い場合は「－」と同じく報告数0を
-          # 意味する（PDF上、報告0件のセルは完全な空欄になることがある。
-          # ユーザー指示、2026-08-24）ため、NAでなく"0"扱いにする
-          val <- if (nrow(dcell) > 0) dcell$text[1] else "0"
+          # 愛媛県の表では、セルが完全な空欄（トークンなし）の場合は報告数
+          # 0件を意味するが、「－」は他県の慣習（0件）とは異なり「対象外・
+          # データなし」を意味する。共有ヘルパーparse_hokenjo_number()は
+          # 「－」を0に変換してしまうため、ここでは「－」を空文字列に
+          # 置き換えてNA扱いにする（ユーザー指示、2026-08-24）
+          val <- if (nrow(dcell) == 0) "0" else if (dcell$text[1] == "-") "" else dcell$text[1]
           out[[length(out) + 1]] <- data.frame(
             hokenjo = hokenjo_order[ri], disease = cols$name[ci],
             value = val, stringsAsFactors = FALSE
