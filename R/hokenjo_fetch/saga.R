@@ -148,8 +148,10 @@ fetch_saga <- function(pdf_url = NULL, yw = NULL) {
         cell <- data_row[data_row$x >= bins[k] & data_row$x < bins[k + 1], ]
         cnt_tok <- if (nrow(cell) > 0) cell$text[vapply(cell$text, is_num_count, logical(1))] else character(0)
         rate_tok <- if (nrow(cell) > 0) cell$text[vapply(cell$text, is_num_rate, logical(1))] else character(0)
-        cnt <- if (length(cnt_tok) >= 1) parse_hokenjo_number(cnt_tok[1]) else NA_real_
-        rate <- if (length(rate_tok) >= 1) parse_hokenjo_number(rate_tok[1]) else NA_real_
+        # 報告数0件のセルはPDF上で空欄（トークンなし）になるため、NAでは
+        # なく0として扱う（ユーザー指示、2026-08-24）
+        cnt <- if (length(cnt_tok) >= 1) parse_hokenjo_number(cnt_tok[1]) else 0
+        rate <- if (length(rate_tok) >= 1) parse_hokenjo_number(rate_tok[1]) else 0
         out[[length(out) + 1]] <- data.frame(
           pref = "佐賀県", week_label = week_label, hokenjo = hokenjo[k],
           disease = dname, count = cnt, rate = rate, stringsAsFactors = FALSE
