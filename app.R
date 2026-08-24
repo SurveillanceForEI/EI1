@@ -246,20 +246,24 @@ DISEASE_GROUPS <- lapply(DISEASE_GROUPS, function(g) {
 # 定点把握 Rt 対象疾患（SIまたは潜伏期間推定値あり）
 # ARI（急性呼吸器感染症）は単一の病原体でなく多様な病原体を包含する症候群定義のため、
 # 単一のシリアルインターバル仮定に基づくRt推定は疫学的に妥当性が低く対象外とする
-# （2026-07-24 ユーザー指摘）
+# （2026-07-24 ユーザー指摘）。細菌性髄膜炎・無菌性髄膜炎・クラミジア肺炎は
+# 報告数が少なく散発的で、Rt推定（実効再生産数としての解釈）になじまないため
+# 対象外とする（2026-08-24 ユーザー指摘）
 RT_DISEASE_IDS <- c(
   "flu","rsv","gi","varicella","hfmd","mumps","mycop","covid",
   "phar_conj","strep","erythema","roseola","herp_ang",
-  "hem_conj","epid_conj","bact_mening","asep_mening",
-  "chlamydia","gi_rota"
+  "hem_conj","epid_conj",
+  "gi_rota"
 )
 RT_DISEASE_IDS <- RT_DISEASE_IDS[RT_DISEASE_IDS %in% names(DISEASE_CONFIG) &
                                    RT_DISEASE_IDS %in% names(SERIAL_INTERVALS)]
 RT_DISEASE_CHOICES <- setNames(RT_DISEASE_IDS,
   sapply(RT_DISEASE_IDS, function(x) DISEASE_CONFIG[[x]]$label))
 
-# 全数把握 Rt 対象疾患（SIまたは潜伏期間推定値あり）
-RT_ZENSU_IDS <- c("measles","rubella","pertussis","mpox","hep_a","dengue","igas","ehec")
+# 全数把握 Rt 対象疾患（SIまたは潜伏期間推定値あり）。劇症型溶血性レンサ球菌
+# 感染症（igas）は報告数が少なく散発的で、Rt推定になじまないため対象外
+# （2026-08-24 ユーザー指摘）
+RT_ZENSU_IDS <- c("measles","rubella","pertussis","mpox","hep_a","dengue","ehec")
 RT_ZENSU_IDS <- RT_ZENSU_IDS[RT_ZENSU_IDS %in% names(ZENSU_DISEASE_CONFIG) &
                                RT_ZENSU_IDS %in% names(SERIAL_INTERVALS)]
 RT_ZENSU_CHOICES <- setNames(RT_ZENSU_IDS,
@@ -1419,7 +1423,7 @@ function ebsUntranslateCards(containerId) {
           tags$table(class="table table-bordered table-sm", style="font-size:0.8em;",
             tags$thead(tags$tr(tags$th("疾患"), tags$th("平均(日)"), tags$th("SD(日)"), tags$th("区分"), tags$th("出典"))),
             tags$tbody(
-              lapply(names(SERIAL_INTERVALS), function(id) {
+              lapply(intersect(names(SERIAL_INTERVALS), c(RT_DISEASE_IDS, RT_ZENSU_IDS)), function(id) {
                 si  <- SERIAL_INTERVALS[[id]]
                 lbl <- if (id %in% names(DISEASE_CONFIG)) DISEASE_CONFIG[[id]]$label
                        else if (id %in% names(ZENSU_DISEASE_CONFIG)) ZENSU_DISEASE_CONFIG[[id]]$label
@@ -1446,10 +1450,11 @@ function ebsUntranslateCards(containerId) {
           tags$h5("Rt解釈が限定的な疾患"),
           tags$ul(
             tags$li(tags$strong("腸管出血性大腸菌（EHEC）: "), "症例の約80%は食品媒介（共通感染源）。Rtが1を超えても食品汚染源を反映している可能性があり、ヒト間伝播の指標としては過大推定になりやすい。"),
-            tags$li(tags$strong("細菌性髄膜炎: "), "散発性・稀少疾患のためCori法による週次Rt推定は統計的に不安定。接触者予防投薬により二次感染がほぼ防止される。"),
-            tags$li(tags$strong("劇症型溶血性レンサ球菌感染症: "), "家庭内二次アタックレート<0.22%と非常に低く、週次サーベイランスデータからのRt推定は解釈に注意が必要。"),
             tags$li(tags$strong("伝染性紅斑（リンゴ病）: "), "発疹出現時にはすでに感染性を失っている。報告データは過去2–3週の伝播を遅れて反映する。")
           ),
+          tags$p(style="font-size:0.85em;color:#888;",
+            "細菌性髄膜炎・無菌性髄膜炎・クラミジア肺炎・劇症型溶血性レンサ球菌感染症は",
+            "報告数が少なく散発的なため、Rt推定の対象から除外しています。"),
           tags$h5("注意事項"),
           tags$ul(
             tags$li("Rt推定には週次集計データを使用しており、日次データに比べて分解能が低くなります"),
