@@ -72,5 +72,28 @@ fetch_mie <- function(url = "https://www.kenkou.pref.mie.jp/weekly_fp_new.html")
       )
     }
   }
-  do.call(rbind, out)
+  df <- do.call(rbind, out)
+
+  # クラミジア肺炎・マイコプラズマ肺炎は「独自定点」と「基幹定点」の
+  # 両方で計上され、疾患名が同じまま(hokenjo, disease)の組が2行できて
+  # しまう（下流のマップ表示等は1保健所×1疾患=1行を前提としているため、
+  # 表示が不安定になる）。同一(hokenjo, disease)行は定点数を合算した上で
+  # count/rateを合算・再計算して1行にまとめる（2026-08-24 ユーザー指摘）
+  key <- paste(df$hokenjo, df$disease, sep = "")
+  dup_keys <- unique(key[duplicated(key)])
+  if (length(dup_keys) > 0) {
+    keep <- df[!(key %in% dup_keys), ]
+    merged <- do.call(rbind, lapply(dup_keys, function(k) {
+      sub <- df[key == k, ]
+      cnt <- if (all(is.na(sub$count))) NA_real_ else sum(sub$count, na.rm = TRUE)
+      teiten_each <- ifelse(!is.na(sub$count) & !is.na(sub$rate) & sub$rate > 0, sub$count / sub$rate, NA_real_)
+      total_teiten <- sum(teiten_each, na.rm = TRUE)
+      rte <- if (!is.na(cnt) && total_teiten > 0) round(cnt / total_teiten, 2)
+             else if (!is.na(cnt) && cnt == 0) 0 else NA_real_
+      data.frame(pref = "三重県", week_label = sub$week_label[1], hokenjo = sub$hokenjo[1],
+                 disease = sub$disease[1], count = cnt, rate = rte, stringsAsFactors = FALSE)
+    }))
+    df <- rbind(keep, merged)
+  }
+  df
 }
