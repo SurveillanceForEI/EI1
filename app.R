@@ -993,7 +993,7 @@ function ebsUntranslateCards(containerId) {
             tags$div(style="font-size:0.85em;color:#555;margin-bottom:6px;",
               icon("info-circle"), " 初期状態は全疾患を表示。疾患・都道府県で絞り込みたいときはサイドバーで選択"),
             selectInput("ebs_period","表示期間",
-              choices=c("直近24時間"=1,"直近3日"=3,"直近1週間"=7,"直近1か月"=30,
+              choices=c("昨日〜現在"=1,"直近3日"=3,"直近1週間"=7,"直近1か月"=30,
                         "直近3か月"=90,"直近6か月"=180,"直近1年"=365),
               selected=1),
             selectInput("ebs_page_size","表示件数",
@@ -1035,7 +1035,7 @@ function ebsUntranslateCards(containerId) {
             tags$div(style="font-size:0.85em;color:#555;margin-bottom:6px;",
               icon("info-circle"), " 初期状態は全疾患を表示。疾患で絞り込みたいときはサイドバーで選択"),
             selectInput("ebs_ov_period","表示期間",
-              choices=c("直近24時間"=1,"直近3日"=3,"直近1週間"=7,"直近1か月"=30,
+              choices=c("昨日〜現在"=1,"直近3日"=3,"直近1週間"=7,"直近1か月"=30,
                         "直近3か月"=90,"直近6か月"=180,"直近1年"=365),
               selected=1),
             selectInput("ebs_ov_page_size","表示件数",
@@ -2266,9 +2266,21 @@ server <- function(input, output, session) {
 
   # EBSニュース（国内・海外）の「表示期間」セレクタ用ラベル（値=日数）
   EBS_PERIOD_LABELS <- c(
-    "1"="直近24時間","3"="直近3日","7"="直近1週間","30"="直近1か月",
+    "1"="昨日〜現在","3"="直近3日","7"="直近1週間","30"="直近1か月",
     "90"="直近3か月","180"="直近6か月","365"="直近1年"
   )
+
+  # EBSニュースの期間フィルタでpub_dateに適用する下限を返す。pub_date列は
+  # 時刻を持たないDate型（日付のみ）のため、下限もDate型で揃える
+  # （POSIXctと比較すると型不一致で正しく絞り込めない）。「昨日〜現在」
+  # （旧「直近24時間」）は閲覧時刻からの単純な過去24時間ではなく、前日
+  # 以降（前日＋当日）を対象とする（毎日朝の自動取得サイクルに合わせ、
+  # 前日分を漏れなく含めるため）。それ以外の期間（3日/1週間等）も
+  # 同様に「今日からN日前の日付以降」で判定する
+  ebs_period_bounds <- function(period_days) {
+    if (is.null(period_days) || is.na(period_days)) return(NULL)
+    list(lo = Sys.Date() - period_days, hi = NULL)
+  }
 
   # EBSニュース（国内・海外）の現在のフィルタ状態を一目で分かるバッジ表示で返す
   ebs_filter_status_badge <- function(show_all, period_val) {
@@ -5144,9 +5156,10 @@ server <- function(input, output, session) {
       d <- d %>% filter(is_official_ebs_source(source_id))
     }
     period_days <- suppressWarnings(as.numeric(input$ebs_period))
-    if (!is.null(period_days) && !is.na(period_days)) {
-      cutoff_dt <- Sys.time() - as.difftime(period_days, units = "days")
-      d <- d %>% filter(is.na(pub_date) | pub_date >= cutoff_dt)
+    bounds <- ebs_period_bounds(period_days)
+    if (!is.null(bounds)) {
+      d <- d %>% filter(is.na(pub_date) | pub_date >= bounds$lo)
+      if (!is.null(bounds$hi)) d <- d %>% filter(is.na(pub_date) | pub_date < bounds$hi)
     }
     if (!ebs_show_all_flag()) {
       did <- sidebar_disease_id()
@@ -5369,9 +5382,10 @@ server <- function(input, output, session) {
       d <- d %>% filter(is_official_ebs_source(source_id))
     }
     period_days <- suppressWarnings(as.numeric(input$ebs_ov_period))
-    if (!is.null(period_days) && !is.na(period_days)) {
-      cutoff_dt <- Sys.time() - as.difftime(period_days, units = "days")
-      d <- d %>% filter(is.na(pub_date) | pub_date >= cutoff_dt)
+    bounds <- ebs_period_bounds(period_days)
+    if (!is.null(bounds)) {
+      d <- d %>% filter(is.na(pub_date) | pub_date >= bounds$lo)
+      if (!is.null(bounds$hi)) d <- d %>% filter(is.na(pub_date) | pub_date < bounds$hi)
     }
     if (!ebs_ov_show_all_flag()) {
       did <- sidebar_disease_id()

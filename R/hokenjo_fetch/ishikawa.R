@@ -141,6 +141,7 @@ ISHIKAWA_DISEASE_ORDER <- c(
 
   cnt_vals_all <- matrix(NA_real_, nrow = 5, ncol = 5)   # [hokenjo, week]
   rate_vals_all <- matrix(NA_real_, nrow = 5, ncol = 5)
+  rate_no_decimal <- matrix(FALSE, nrow = 5, ncol = 5)
 
   if (n_row >= 2) {
     gaps <- diff(ys)
@@ -159,9 +160,36 @@ ISHIKAWA_DISEASE_ORDER <- c(
       for (k in seq_len(nrow(rr))) {
         ci <- match_col(rr$xc[k])
         val <- suppressWarnings(as.numeric(rr$word[k]))
-        if (is_rate_slot) rate_vals_all[hj_idx, ci] <- val else cnt_vals_all[hj_idx, ci] <- val
+        # 小数点付きトークンとして認識されなかった（＝単なる整数として
+        # 読まれた）「定点あたり報告数」は、OCRが先頭の「0.」を読み
+        # 落として小数第2位までの値がそのまま整数として出力された誤読
+        # （例:「0.73」→「73」）の可能性があるため印を付けておき、
+        # 同じ疾患の他4保健所と比較して明らかな外れ値の場合のみ後段で
+        # NA化する（ARIのように定点あたり報告数が元々2桁になる疾患も
+        # あるため、値そのものの大小だけでは判定できない）
+        if (is_rate_slot) {
+          rate_vals_all[hj_idx, ci] <- val
+          if (!is.na(val) && !grepl("\\.", rr$word[k])) rate_no_decimal[hj_idx, ci] <- TRUE
+        } else {
+          cnt_vals_all[hj_idx, ci] <- val
+        }
       }
     }
+  }
+
+  # 小数点なしで読まれた「定点あたり報告数」のうち、同じ疾患・同じ週の
+  # 他の保健所の値と比べて明らかな外れ値（中央値の5倍超）になっている
+  # ものは、OCRが先頭の「0.」を読み落とした誤読とみなしNA化する
+  for (ci in 1:5) {
+    col_vals <- rate_vals_all[, ci]
+    flagged <- rate_no_decimal[, ci] & !is.na(col_vals)
+    if (!any(flagged)) next
+    others <- col_vals[!flagged & !is.na(col_vals)]
+    if (length(others) < 2) next
+    med_other <- stats::median(others)
+    if (med_other <= 0) next
+    bad <- flagged & !is.na(col_vals) & col_vals > med_other * 5
+    rate_vals_all[bad, ci] <- NA_real_
   }
 
   out <- list()
