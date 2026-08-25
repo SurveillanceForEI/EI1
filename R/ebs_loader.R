@@ -592,10 +592,61 @@ EBS_SOURCES <- list(
   # chinacdc・chp（香港）はRSS未提供のため、EBS_SOURCESには含めず
   # fetch_china_cdc_news() / fetch_chp_news()（後者はchromoteによるヘッドレスブラウザ取得）で個別取得する
   # ── 専門メディア ────────────────────────────────────────────
-  list(id="cidrap",  name="CIDRAP",                  lang="en", category="研究機関",
-       url="https://www.cidrap.umn.edu/rss.xml"),
+  # CIDRAPは旧来の"/rss.xml"（全記事横断フィードのつもりだったもの）が
+  # 実際には更新が止まった古いフィードで、2020〜2022年の記事しか返さず
+  # 一度も現在のキャッシュに記事が入っていなかった（2026-08-24 ユーザー
+  # 提供の参照ログとの突合で発覚）。CIDRAPは全記事横断のRSSを提供しておらず
+  # トピック別フィード（/news/{id}/rss）のみのため、主要な疾患・カテゴリの
+  # トピックフィードを個別に登録する
+  list(id="cidrap_public_health", name="CIDRAP: Public Health", lang="en", category="研究機関",
+       url="https://www.cidrap.umn.edu/news/91/rss"),
+  list(id="cidrap_emerging",      name="CIDRAP: Misc Emerging Topics", lang="en", category="研究機関",
+       url="https://www.cidrap.umn.edu/news/31175/rss"),
+  list(id="cidrap_vhf",           name="CIDRAP: Viral Hemorrhagic Fever", lang="en", category="研究機関",
+       url="https://www.cidrap.umn.edu/news/102/rss"),
+  list(id="cidrap_ebola",         name="CIDRAP: Ebola", lang="en", category="研究機関",
+       url="https://www.cidrap.umn.edu/news/64/rss"),
+  list(id="cidrap_marburg",       name="CIDRAP: Marburg", lang="en", category="研究機関",
+       url="https://www.cidrap.umn.edu/news/77/rss"),
+  list(id="cidrap_avian_flu",     name="CIDRAP: Avian Influenza", lang="en", category="研究機関",
+       url="https://www.cidrap.umn.edu/news/49/rss"),
+  list(id="cidrap_pandemic_flu",  name="CIDRAP: Pandemic Influenza", lang="en", category="研究機関",
+       url="https://www.cidrap.umn.edu/news/86/rss"),
+  list(id="cidrap_measles",       name="CIDRAP: Measles", lang="en", category="研究機関",
+       url="https://www.cidrap.umn.edu/news/78/rss"),
+  list(id="cidrap_cholera",       name="CIDRAP: Cholera", lang="en", category="研究機関",
+       url="https://www.cidrap.umn.edu/news/58/rss"),
+  list(id="cidrap_mpox",          name="CIDRAP: Mpox", lang="en", category="研究機関",
+       url="https://www.cidrap.umn.edu/news/230556/rss"),
+  list(id="cidrap_dengue",        name="CIDRAP: Dengue", lang="en", category="研究機関",
+       url="https://www.cidrap.umn.edu/news/61/rss"),
+  list(id="cidrap_malaria",       name="CIDRAP: Malaria", lang="en", category="研究機関",
+       url="https://www.cidrap.umn.edu/news/76/rss"),
+  list(id="cidrap_foodborne",     name="CIDRAP: Foodborne Disease", lang="en", category="研究機関",
+       url="https://www.cidrap.umn.edu/news/66/rss"),
+  list(id="cidrap_legionella",    name="CIDRAP: Legionella", lang="en", category="研究機関",
+       url="https://www.cidrap.umn.edu/news/111256/rss"),
+  list(id="cidrap_botulism",      name="CIDRAP: Botulism", lang="en", category="研究機関",
+       url="https://www.cidrap.umn.edu/news/52/rss"),
+  list(id="cidrap_mers",          name="CIDRAP: MERS-CoV", lang="en", category="研究機関",
+       url="https://www.cidrap.umn.edu/news/84/rss"),
+  list(id="cidrap_polio",         name="CIDRAP: Polio", lang="en", category="研究機関",
+       url="https://www.cidrap.umn.edu/news/90/rss"),
+  list(id="cidrap_yellow_fever",  name="CIDRAP: Yellow Fever", lang="en", category="研究機関",
+       url="https://www.cidrap.umn.edu/news/104/rss"),
+  list(id="cidrap_zika",          name="CIDRAP: Zika", lang="en", category="研究機関",
+       url="https://www.cidrap.umn.edu/news/100856/rss"),
+  list(id="cidrap_plague",        name="CIDRAP: Plague", lang="en", category="研究機関",
+       url="https://www.cidrap.umn.edu/news/88/rss"),
   list(id="ont",     name="Outbreak News Today",     lang="en", category="研究機関",
        url="https://outbreaknewstoday.com/feed/"),
+  # 米国CDC（参照ログとの突合で未カバーと判明したため追加、2026-08-24）
+  list(id="cdc_outbreaks", name="CDC Outbreaks (US Based)", lang="en", category="国際",
+       url="https://tools.cdc.gov/api/v2/resources/media/285676.rss"),
+  list(id="cdc_newsroom",  name="CDC Online Newsroom",      lang="en", category="国際",
+       url="https://tools.cdc.gov/api/v2/resources/media/132608.rss"),
+  list(id="afludiary", name="Avian Flu Diary（Crawford Kilian個人ブログ）", lang="en", category="研究機関",
+       url="https://afludiary.blogspot.com/feeds/posts/default?alt=rss"),
   # ── 日本メディア ────────────────────────────────────────────
   list(id="nhk",      name="NHK 健康・医療",          lang="ja", category="メディア",
        url="https://www3.nhk.or.jp/rss/news/cat6.xml"),
