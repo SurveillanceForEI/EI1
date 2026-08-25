@@ -113,7 +113,9 @@ fetch_chiba <- function(pdf_url = NULL) {
 
       if (is_total_row) {
         num_rows <- rr[rr$text != "合計", ]
-        vec <- rep(NA_real_, length(x_centers))
+        # 報告数0件のセルはPDF上で完全な空欄（トークンなし）になるため、
+        # NAでなく0で初期化する（他県と同様の慣習。ユーザー指摘、2026-08-24）
+        vec <- rep(0, length(x_centers))
         for (k in seq_len(nrow(num_rows))) {
           ci <- match_col(num_rows$x[k])
           vec[ci] <- parse_hokenjo_number(num_rows$text[k])
