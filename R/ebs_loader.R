@@ -5755,7 +5755,10 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
   # WHO WER補強フラグ: 今週WHOがHighlighted signalsとして取り上げた疾患を
   # disease_tagsに含む記事は、シグナルレベルを1段階引き上げる
   # （FYI→Signal Low→Signal High）。WER自体は記事として一覧に加えない
-  # （ユーザー指示 2026-08-18）。
+  # （ユーザー指示 2026-08-18）。以前はsummary先頭に「【WHO WERで今週
+  # ハイライトされたシグナルと一致】」と明記していたが、カード表示上
+  # 不要とのユーザー指示（2026-08-26）によりsummaryへの追記はやめ、
+  # signal_levelの引き上げのみ行う
   if (length(who_wer_disease_ids) > 0 && nrow(all_df) > 0) {
     who_wer_flag <- vapply(all_df$disease_tags, function(tags) {
       any(strsplit(as.character(tags), ",")[[1]] %in% who_wer_disease_ids)
@@ -5766,8 +5769,6 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
       lv[who_wer_flag] <- unname(bump[lv[who_wer_flag]])
       all_df$signal_level <- factor(lv, levels = c("Signal High","Signal Low","FYI"))
       all_df$signal_weight <- sapply(all_df$signal_level, signal_weight)
-      all_df$summary[who_wer_flag] <- paste0(
-        "【WHO WERで今週ハイライトされたシグナルと一致】", all_df$summary[who_wer_flag])
     }
   }
 
