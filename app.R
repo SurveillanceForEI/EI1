@@ -1132,7 +1132,7 @@ function ebsUntranslateCards(containerId) {
 
           # ── 目的 ──────────────────────────────────────────
           tags$div(
-            style="background:#eaf4fb;border-left:4px solid #2980b9;border-radius:4px;padding:14px 18px;margin-bottom:20px;",
+            style="background:#eaf4fb;border-left:4px solid #4b499c;border-radius:4px;padding:14px 18px;margin-bottom:20px;",
             tags$p(style="margin:0;",
               "本ダッシュボードは感染症サーベイランス情報の統合・可視化を目的とした研究用ツールです。",
               "公開データを自動集計し、定点把握・全数把握・病原体検出・EBSニュース・EBS Trendsを横断的に確認できる環境を提供しています。",
@@ -1597,7 +1597,7 @@ function ebsUntranslateCards(containerId) {
           tags$br(),
 
           # ── EBSニュース（海外）──────────────────────────────
-          tags$h4(id="notes-ebs-overseas", "■ EBSニュース（海外）タブ", style="border-bottom:2px solid #2980b9;padding-bottom:4px;color:#2c3e50;"),
+          tags$h4(id="notes-ebs-overseas", "■ EBSニュース（海外）タブ", style="border-bottom:2px solid #4b499c;padding-bottom:4px;color:#2c3e50;"),
           tags$ul(
             tags$li("全ソースのうち、タイトル・本文から海外の地名・国名のみ検出された記事を表示"),
             tags$li("Signal High / Signal Low / FYI の判定は国内タブと同じ基準"),
@@ -1694,7 +1694,7 @@ function ebsUntranslateCards(containerId) {
           tags$br(),
 
           # ── 入院サーベイランス ──────────────────────────────
-          tags$h4(id="notes-hosp", "■ 入院サーベイランスタブ", style="border-bottom:2px solid #2980b9;padding-bottom:4px;color:#2c3e50;"),
+          tags$h4(id="notes-hosp", "■ 入院サーベイランスタブ", style="border-bottom:2px solid #4b499c;padding-bottom:4px;color:#2c3e50;"),
           tags$h5("データソース"),
           tags$p("感染症発生動向調査週報（IDWR）　国立健康危機管理研究機構（JIHS）"),
           tags$ul(
@@ -2296,7 +2296,7 @@ server <- function(input, output, session) {
     period_lbl <- coalesce(EBS_PERIOD_LABELS[as.character(period_val)], "")
     if (isTRUE(show_all) || is.null(did) || did == "すべて") {
       disease_badge <- tags$span(
-        style="display:inline-block;background:#2980b9;color:#fff;border-radius:10px;
+        style="display:inline-block;background:#4b499c;color:#fff;border-radius:10px;
                padding:2px 10px;font-size:0.78em;font-weight:700;margin-right:6px;",
         icon("check"), " 全疾患を表示中")
     } else {
@@ -2341,7 +2341,7 @@ server <- function(input, output, session) {
         style = paste0(
           "display:inline-flex;align-items:center;gap:4px;",
           "background:#eaf3fb;border:1px solid #aac8e8;border-radius:4px;",
-          "padding:2px 8px;margin:2px 4px 2px 0;font-size:0.78em;color:#2c5f8a;"
+          "padding:2px 8px;margin:2px 4px 2px 0;font-size:0.78em;color:#1f1b79;"
         ),
         tags$span(style="color:#6c8fa8;font-weight:600;", paste0(label, ":")),
         tags$span(style="font-weight:500;", display)
@@ -2603,7 +2603,7 @@ server <- function(input, output, session) {
     is_std   <- !is_zensu && input$disease %in% names(STD_DISEASE_CONFIG)
     lbl <- if (is_std) format(sel, "%Y年%m月") else sprintf("%s（%s〜%s）", format(sel, "%Y年 第%W週"), format(sel, "%m/%d"), format(sel + 6, "%m/%d"))
     tags$div(
-      style = "font-size:0.85em;font-weight:600;color:#2c5f8a;margin-bottom:2px;",
+      style = "font-size:0.85em;font-weight:600;color:#1f1b79;margin-bottom:2px;",
       icon("calendar-week", style = "margin-right:4px;"),
       lbl
     )
@@ -2709,7 +2709,7 @@ server <- function(input, output, session) {
           summarise(reports = sum(reports, na.rm = TRUE), .groups = "drop") %>% arrange(date)
       }
       if (is.null(d) || nrow(d) == 0) return(tags$div(class="kpi-box",
-        tags$div(style="background:#2980b9;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
+        tags$div(style="background:#4b499c;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
         tags$div(class="kpi-value","―"),
         tags$div(class="kpi-label","月次報告数"),
         tags$div(class="kpi-delta flat","データなし")))
@@ -2724,7 +2724,7 @@ server <- function(input, output, session) {
       label <- paste0(if (is.null(pref)) "全国" else pref, " 月次報告数")
       col <- STD_DISEASE_CONFIG[[input$disease]]$color
       return(tags$div(class="kpi-box",
-        tags$div(style="background:#2980b9;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
+        tags$div(style="background:#4b499c;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
         tags$div(class="kpi-value", style=paste0("color:",col), sprintf("%d件", as.integer(val))),
         tags$div(class="kpi-label", paste0(label, sprintf(" (%d年%d月)", cur$year[1], cur$month[1]))),
         tags$div(class=paste("kpi-delta",dc), paste0("前月比 ",dt))))
@@ -2759,7 +2759,7 @@ server <- function(input, output, session) {
       dc <- if(is.na(delta_pct))"flat" else if(delta_pct>5)"up" else if(delta_pct < -5)"down" else "flat"
       dt <- if(is.na(delta_pct))"―" else sprintf("%+.1f%%", delta_pct)
       tags$div(class="kpi-box",
-        tags$div(style="background:#2980b9;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
+        tags$div(style="background:#4b499c;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
         tags$div(class="kpi-value", style=paste0("color:",DISEASE_CONFIG[[input$disease]]$color),
                  if(is.nan(val)) "―" else sprintf("%.2f", val)),
         tags$div(class="kpi-label", paste(label, wk_txt)),
@@ -2768,7 +2768,7 @@ server <- function(input, output, session) {
       # 全数把握モード：直近週報告数と前週差
       zd <- zensu_ts_filtered()
       if (is.null(zd) || nrow(zd) == 0) return(tags$div(class="kpi-box",
-        tags$div(style="background:#2980b9;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
+        tags$div(style="background:#4b499c;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
         tags$div(class="kpi-value","―"),
         tags$div(class="kpi-label","直近週 報告数"),
         tags$div(class="kpi-delta flat","データなし")))
@@ -2780,7 +2780,7 @@ server <- function(input, output, session) {
       dc <- if(is.na(diff_n))"flat" else if(diff_n>0)"up" else if(diff_n<0)"down" else "flat"
       dt <- if(is.na(diff_n))"―" else sprintf("%+d件", as.integer(diff_n))
       col <- ZENSU_DISEASE_CONFIG[[input$zensu_disease_ts]]$color
-      if (is.null(col)) col <- "#2980b9"
+      if (is.null(col)) col <- "#4b499c"
 
       # 季節性の有無に応じた評価方式で現在の状況を判定（zensu_ibs_band参照）
       band <- tryCatch({
@@ -2810,7 +2810,7 @@ server <- function(input, output, session) {
       method_txt <- if (is.null(band)) "" else if (identical(band$method,"seasonal")) "季節性あり" else "散発疾患向け"
 
       tags$div(class="kpi-box",
-        tags$div(style="background:#2980b9;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
+        tags$div(style="background:#4b499c;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
         tags$div(class="kpi-value", style=paste0("color:",col), cur_n),
         tags$div(class="kpi-label", "直近週 報告数"),
         tags$div(class=paste("kpi-delta",dc), paste0("前週差 ",dt)),
@@ -2838,7 +2838,7 @@ server <- function(input, output, session) {
     if (is.null(disease_label)) disease_label <- ""
     tags$div(class="kpi-box",
       if (nchar(disease_label) > 0)
-        tags$div(style="font-size:1.1em;font-weight:700;color:#2980b9;text-align:center;margin-bottom:4px;letter-spacing:0.03em;", disease_label),
+        tags$div(style="font-size:1.1em;font-weight:700;color:#4b499c;text-align:center;margin-bottom:4px;letter-spacing:0.03em;", disease_label),
       tags$div(class="kpi-value", style="color:#2c3e50;font-size:1.5em;", pref),
       tags$div(class="kpi-label", "表示地域"),
       tags$div(class="kpi-delta flat", paste0("データ時点: ", date_txt)))
@@ -2900,7 +2900,7 @@ server <- function(input, output, session) {
       # シリアルインターバル文献値が存在せず、月次データのため既存の
       # Rt推定ロジック（週次想定）を適用すると科学的に誤った値になるため対象外
       return(tags$div(class="kpi-box",
-        tags$div(style="background:#2980b9;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
+        tags$div(style="background:#4b499c;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
         tags$div(class="kpi-value","―"),
         tags$div(class="kpi-label","実効再生産数 Rt"),
         tags$div(class="kpi-delta flat","推定対象外（月報疾患）")))
@@ -2914,14 +2914,14 @@ server <- function(input, output, session) {
           filter(!is.na(rt)) %>% slice_tail(n=1)
       }, error=function(e) NULL)
       if (is.null(rd) || nrow(rd) == 0) return(tags$div(class="kpi-box",
-        tags$div(style="background:#2980b9;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
+        tags$div(style="background:#4b499c;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
         tags$div(class="kpi-value","―"),
         tags$div(class="kpi-label","実効再生産数 Rt（直近7週）"),
         tags$div(class="kpi-delta flat","推定対象外")))
       rv <- rd$rt[1]
       rc <- if(rv>1.2)"#e74c3c" else if(rv>1.0)"#e67e22" else "#27ae60"
       tags$div(class="kpi-box",
-        tags$div(style="background:#2980b9;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
+        tags$div(style="background:#4b499c;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
         tags$div(class="kpi-value",style=paste0("color:",rc),sprintf("%.2f",rv)),
         tags$div(class="kpi-label","実効再生産数 Rt（直近7週）"),
         tags$div(class=paste("kpi-delta",if(rv>1)"up" else "down"),
@@ -2934,13 +2934,13 @@ server <- function(input, output, session) {
                                     year=integer(), week=integer())
       )
       if(nrow(rd)==0) return(tags$div(class="kpi-box",
-        tags$div(style="background:#2980b9;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
+        tags$div(style="background:#4b499c;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
         tags$div(class="kpi-value","―"),tags$div(class="kpi-label","実効再生産数 Rt（直近7週）"),
         tags$div(class="kpi-delta flat","データ不足")))
       rv <- rd$rt[1]
       rc <- if(rv>1.2)"#e74c3c" else if(rv>1.0)"#e67e22" else "#27ae60"
       tags$div(class="kpi-box",
-        tags$div(style="background:#2980b9;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
+        tags$div(style="background:#4b499c;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
         tags$div(class="kpi-value",style=paste0("color:",rc),sprintf("%.2f",rv)),
         tags$div(class="kpi-label","実効再生産数 Rt（直近7週）"),
         tags$div(class=paste("kpi-delta",if(rv>1)"up" else "down"),
@@ -3095,7 +3095,7 @@ server <- function(input, output, session) {
       c("警報"="#c0392b","警戒"="#c0392b","注意報"="#e67e22","注意"="#e67e22",
         "流行期並み"="#f1c40f","平常"="#27ae60")[lbl]
     tags$div(class="kpi-box",
-      tags$div(style="background:#2980b9;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
+      tags$div(style="background:#4b499c;color:#fff;font-size:0.65em;font-weight:700;letter-spacing:0.08em;text-align:center;padding:2px 0;margin:-8px -12px 3px -12px;border-radius:4px 4px 0 0;", "IBS"),
       tags$div(class="kpi-value", style=paste0("color:",col,";font-size:1.6em;"),
         if (is.null(lbl)) "―" else lbl),
       tags$div(class="kpi-label",
@@ -3580,8 +3580,8 @@ server <- function(input, output, session) {
     cards <- lapply(res, function(r) {
       cfg <- lcfg[[as.character(r$act_level)]]
       type_col <- switch(r$type,
-        "定点"="#2980b9", "定点（月次）"="#9c27b0", "1類"="#8e0000", "2類"="#c0392b",
-        "3類"="#e67e22", "4類"="#f39c12", "5類全数"="#2980b9", "#7f8c8d")
+        "定点"="#4b499c", "定点（月次）"="#9c27b0", "1類"="#8e0000", "2類"="#c0392b",
+        "3類"="#e67e22", "4類"="#f39c12", "5類全数"="#4b499c", "#7f8c8d")
       cur_fmt <- if (r$type == "定点") sprintf("%.2f", coalesce(r$cur_val, 0))
                  else sprintf("%d件", as.integer(coalesce(r$cur_val, 0)))
 
@@ -5773,7 +5773,7 @@ server <- function(input, output, session) {
       filter(week <= 53)
 
     years <- sort(unique(d$year))
-    pal   <- colorRampPalette(c("#bdc3c7","#2980b9","#e74c3c"))(length(years))
+    pal   <- colorRampPalette(c("#bdc3c7","#4b499c","#e74c3c"))(length(years))
     col   <- DISEASE_CONFIG[[input$disease]]$color
     cur_yr <- max(years)
 
@@ -5814,9 +5814,9 @@ server <- function(input, output, session) {
       filter(week <= 53)
 
     years <- sort(unique(d$year))
-    pal   <- colorRampPalette(c("#bdc3c7","#2980b9","#e74c3c"))(length(years))
+    pal   <- colorRampPalette(c("#bdc3c7","#4b499c","#e74c3c"))(length(years))
     col   <- ZENSU_DISEASE_CONFIG[[input$zensu_disease_ts]]$color
-    if (is.null(col)) col <- "#2980b9"
+    if (is.null(col)) col <- "#4b499c"
     cur_yr <- max(years)
 
     p <- plot_ly()
@@ -5936,7 +5936,7 @@ server <- function(input, output, session) {
 
     did <- input$disease
     dconf <- STD_DISEASE_CONFIG[[did]]
-    col <- if (!is.null(dconf)) dconf$color else "#2980b9"
+    col <- if (!is.null(dconf)) dconf$color else "#4b499c"
 
     d_band <- compute_std_band(d, hist_all, "reports")
 
@@ -6026,9 +6026,9 @@ server <- function(input, output, session) {
       return(plot_ly() %>% add_annotations(text = "データなし", showarrow = FALSE))
 
     years  <- sort(unique(d$year))
-    pal    <- colorRampPalette(c("#bdc3c7","#2980b9","#e74c3c"))(length(years))
+    pal    <- colorRampPalette(c("#bdc3c7","#4b499c","#e74c3c"))(length(years))
     dconf  <- STD_DISEASE_CONFIG[[did]]
-    col    <- if (!is.null(dconf)) dconf$color else "#2980b9"
+    col    <- if (!is.null(dconf)) dconf$color else "#4b499c"
     cur_yr <- max(years)
 
     p <- plot_ly()

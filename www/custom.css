@@ -5,6 +5,75 @@ body {
   background-color: #f4f6f9;
 }
 
+/* ── カラーパレット（Lucky Point〜Chetwode Blue の紫系グラデーション） ── */
+:root {
+  --brand-darkest:  #1f1b79; /* Lucky Point */
+  --brand-dark:     #2c2b97; /* Bay of Many */
+  --brand-mid:      #4b499c; /* Victoria */
+  --brand-muted:    #5a5a87; /* Comet */
+  --brand-light:    #8b8bda; /* Chetwode Blue */
+}
+
+/* ヘッダー（AdminLTE skin-blue の既定の水色を上書き） */
+.skin-blue .main-header .logo {
+  background-color: var(--brand-darkest);
+}
+.skin-blue .main-header .logo:hover {
+  background-color: var(--brand-dark);
+}
+.skin-blue .main-header .navbar {
+  background-color: var(--brand-dark);
+}
+.skin-blue .main-header li.user-header {
+  background-color: var(--brand-darkest);
+}
+.skin-blue .main-header .navbar .sidebar-toggle:hover {
+  background-color: var(--brand-mid);
+}
+
+/* サイドバー */
+.skin-blue .main-sidebar,
+.skin-blue .left-side {
+  background-color: var(--brand-darkest);
+}
+.skin-blue .sidebar-menu > li.header {
+  background: var(--brand-dark);
+  color: var(--brand-light);
+}
+.skin-blue .sidebar-menu > li > a {
+  color: #dcdcf5;
+}
+.skin-blue .sidebar-menu > li:hover > a,
+.skin-blue .sidebar-menu > li.active > a {
+  color: #fff;
+  background: var(--brand-mid);
+  border-left-color: var(--brand-light);
+}
+.skin-blue .sidebar a {
+  color: #dcdcf5;
+}
+.skin-blue .treeview-menu > li > a {
+  color: #c9c9ec;
+}
+.skin-blue .treeview-menu > li.active > a,
+.skin-blue .treeview-menu > li > a:hover {
+  color: #fff;
+}
+
+/* ボックス・タブのアクセント */
+.box.box-primary {
+  border-top-color: var(--brand-mid);
+}
+.nav-tabs-custom > .nav-tabs > li.active {
+  border-top-color: var(--brand-mid);
+}
+a {
+  color: var(--brand-mid);
+}
+a:hover, a:focus {
+  color: var(--brand-darkest);
+}
+
 .skin-blue .main-header .logo {
   font-weight: 700;
   font-size: 14px;
@@ -98,7 +167,7 @@ body {
 /* データ出典バー */
 .data-source-bar {
   background: #ecf0f1;
-  border-left: 4px solid #3498db;
+  border-left: 4px solid #8b8bda;
   padding: 6px 12px;
   font-size: 0.78em;
   color: #555;
