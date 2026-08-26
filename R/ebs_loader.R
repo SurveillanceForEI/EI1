@@ -647,6 +647,15 @@ EBS_SOURCES <- list(
        url="https://tools.cdc.gov/api/v2/resources/media/132608.rss"),
   list(id="afludiary", name="Avian Flu Diary（Crawford Kilian個人ブログ）", lang="en", category="研究機関",
        url="https://afludiary.blogspot.com/feeds/posts/default?alt=rss"),
+  # 各国・国際機関の保健当局プレスリリース（参照ログとの突合で未カバーと
+  # 判明したため追加、2026-08-24）。韓国KDCA・タイDDC・ギリシャEODYは
+  # RSS未提供またはWAFによる直接アクセス拒否（403）のため見送り
+  list(id="uganda_moh", name="ウガンダ保健省", lang="en", category="国際",
+       url="https://health.go.ug/feed/"),
+  list(id="who_afro",   name="WHOアフリカ地域事務局", lang="en", category="国際",
+       url="https://www.afro.who.int/rss.xml"),
+  list(id="woah",       name="WOAH（世界動物保健機関）", lang="en", category="国際",
+       url="https://www.woah.org/en/feed/"),
   # ── 日本メディア ────────────────────────────────────────────
   # 参照ログとの突合で未カバーと判明したため追加（2026-08-24）
   list(id="kumanichi", name="熊本日日新聞",             lang="ja", category="メディア",
