@@ -648,6 +648,11 @@ EBS_SOURCES <- list(
   list(id="afludiary", name="Avian Flu Diary（Crawford Kilian個人ブログ）", lang="en", category="研究機関",
        url="https://afludiary.blogspot.com/feeds/posts/default?alt=rss"),
   # ── 日本メディア ────────────────────────────────────────────
+  # 参照ログとの突合で未カバーと判明したため追加（2026-08-24）
+  list(id="kumanichi", name="熊本日日新聞",             lang="ja", category="メディア",
+       url="https://kumanichi.com/rss.xml"),
+  list(id="chiba_shinchaku", name="千葉県 新着情報",     lang="ja", category="自治体",
+       url="https://www.pref.chiba.lg.jp/homepage/shinchaku/shinchaku.xml"),
   list(id="nhk",      name="NHK 健康・医療",          lang="ja", category="メディア",
        url="https://www3.nhk.or.jp/rss/news/cat6.xml"),
   list(id="nhk_sci",  name="NHK 科学・文化",          lang="ja", category="メディア",
