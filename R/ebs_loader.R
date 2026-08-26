@@ -1452,6 +1452,100 @@ fetch_france_spf_news <- function(timeout_sec = 15, n_results = 20) {
 }
 
 # ============================================================
+# 日本感染症学会 新着情報（HTMLスクレイピング。RSS未提供のため、トップページの
+# 「新着情報」欄（<dl class="pico_block_menu"> 内に <dt>日付</dt><dd><a>タイトル</a></dd>
+# が交互に並ぶ）を直接解析する。日付は「2026年8月24日NEW 学会から」のように
+# カテゴリ表記や「NEW」ラベルが続くことがあるため、先頭の年月日部分だけを抽出する
+# （参照ログとの突合で未カバーと判明、2026-08-24）
+# ============================================================
+KANSENSHO_URL <- "https://www.kansensho.or.jp/"
+
+fetch_kansensho_news <- function(timeout_sec = 15, n_results = 20) {
+  message("日本感染症学会 新着情報 取得中...")
+  tryCatch({
+    resp <- GET(KANSENSHO_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    dl <- xml_find_first(doc, "//dl[contains(@class,'pico_block_menu')]")
+    if (inherits(dl, "xml_missing")) return(NULL)
+    kids <- xml_children(dl)
+
+    rows <- list()
+    pending_date <- NA
+    for (i in seq_along(kids)) {
+      node <- kids[[i]]
+      nm <- xml_name(node)
+      txt <- trimws(gsub("\\s+", " ", xml_text(node)))
+      if (nm == "dt") {
+        m <- regmatches(txt, regexpr("[0-9]{4}年[0-9]{1,2}月[0-9]{1,2}日", txt))
+        pending_date <- if (length(m) > 0 && nchar(m) > 0) {
+          suppressWarnings(as.Date(gsub("年|月", "-", sub("日", "", m)), format = "%Y-%m-%d"))
+        } else NA
+      } else if (nm == "dd" && !is.na(pending_date)) {
+        a <- xml_find_first(node, ".//a")
+        if (!inherits(a, "xml_missing")) {
+          title <- trimws(gsub("\\s+", " ", xml_text(a)))
+          href  <- xml_attr(a, "href")
+          if (nchar(title) > 0 && !is.na(href)) {
+            rows[[length(rows) + 1]] <- tibble(
+              source_id   = "kansensho",
+              source_name = "日本感染症学会",
+              category    = "国内学会",
+              lang        = "ja",
+              title       = title,
+              link        = if (grepl("^https?://", href)) href else paste0("https://www.kansensho.or.jp", href),
+              pub_date    = pending_date,
+              summary     = NA_character_
+            )
+          }
+        }
+      }
+    }
+    bind_rows(rows) %>% distinct(link, .keep_all = TRUE) %>% arrange(desc(pub_date)) %>% head(n_results)
+  }, error = function(e) { message("日本感染症学会 エラー: ", e$message); NULL })
+}
+
+# ============================================================
+# 日本テレビ系列（NNN）ニュース「社会」カテゴリ一覧（HTMLスクレイピング。
+# 全国のNNN系列局（日テレ本体・道内外の地方局）の速報記事が集約されるページで、
+# RSS未提供のため直接解析する。一覧ページは「最新」のみを表示し個々の記事に
+# 日付表記が無い（末尾の時刻のみ）ため、取得日をpub_dateとして扱う）
+# ============================================================
+NTV_SOCIETY_URL <- "https://news.ntv.co.jp/category/society"
+
+fetch_ntv_news <- function(timeout_sec = 15, n_results = 30) {
+  message("日テレNEWS（社会） 取得中...")
+  tryCatch({
+    resp <- GET(NTV_SOCIETY_URL, timeout(timeout_sec),
+                add_headers("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    if (status_code(resp) != 200) return(NULL)
+    doc <- read_html(content(resp, "text", encoding = "UTF-8"))
+    links <- xml_find_all(doc, "//a[contains(@href,'/category/society/')]")
+    if (length(links) == 0) return(NULL)
+
+    rows <- lapply(links, function(a) {
+      title <- trimws(gsub("\\s+", " ", xml_text(a)))
+      href  <- xml_attr(a, "href")
+      if (nchar(title) == 0 || is.na(href)) return(NULL)
+      # 末尾の「HH:MM」時刻表記はタイトルに含める必要が無いため取り除く
+      title <- trimws(sub("[0-9]{1,2}:[0-9]{2}$", "", title))
+      tibble(
+        source_id   = "ntv_society",
+        source_name = "日テレNEWS（社会）",
+        category    = "メディア",
+        lang        = "ja",
+        title       = title,
+        link        = if (grepl("^https?://", href)) href else paste0("https://news.ntv.co.jp", href),
+        pub_date    = Sys.Date(),
+        summary     = NA_character_
+      )
+    })
+    bind_rows(Filter(Negate(is.null), rows)) %>% distinct(link, .keep_all = TRUE) %>% head(n_results)
+  }, error = function(e) { message("日テレNEWS エラー: ", e$message); NULL })
+}
+
+# ============================================================
 # 秋田県 報道発表資料（HTMLスクレイピング。RSS未提供のため年度別ページを直接解析する。
 # 年度が変わると新しいgenre IDのページが作られるため、親ページ(genre/11699)から
 # 「報道発表」を含むリンクのうち末尾の数字が最大のもの＝最新年度を動的に特定する）
@@ -5524,7 +5618,7 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
                    fetch_tsukuba_news, fetch_kanazawa_news, fetch_otsu_news, fetch_matsue_news,
                    fetch_neyagawa_news, fetch_hachinohe_news, fetch_saga_news, fetch_kawaguchi_news,
                    fetch_funabashi_news, fetch_arakawa_news, fetch_shibuya_news, fetch_shinagawa_news,
-                   fetch_fujisawa_news)) {
+                   fetch_fujisawa_news, fetch_kansensho_news, fetch_ntv_news)) {
     d <- tryCatch(fn(), error = function(e) NULL)
     if (!is.null(d) && nrow(d) > 0) {
       if (!"retweet_count" %in% names(d)) d$retweet_count <- NA_integer_
