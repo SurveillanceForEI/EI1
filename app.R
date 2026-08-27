@@ -1341,7 +1341,7 @@ function ebsUntranslateCards(containerId) {
             "単純な平均比較は年をまたぐ増加・減少傾向を無視してしまうため、回帰による補正で補完する狙いです。"
           ),
           tags$div(style="background:#f8f9fa;border-left:4px solid #f39c12;border-radius:4px;padding:10px 14px;margin:8px 0;",
-            tags$strong("Farrington法をかんたんに言うと: "),
+            tags$strong("Farrington法の概説: "),
             tags$p(style="margin:6px 0 0;",
               "使っているデータは主方式（5年比較）と同じ「同時期±2週×過去5年」分の報告数です。",
               "違いは比較の仕方で、主方式は「その5年分の平均値」を基準にしますが、",
@@ -1372,7 +1372,7 @@ function ebsUntranslateCards(containerId) {
           tags$div(HTML("\\[ C_t = \\max(0,\\ C_{t-1} + (x_t - \\mu - 0.5\\sigma)) \\]")),
           tags$div(HTML("\\[ \\text{score}_{\\text{CUSUM}} = \\begin{cases} 3 & (C_t \\geq 8\\sigma) \\\\ 2 & (C_t \\geq 4\\sigma) \\\\ 1 & (0 < C_t < 4\\sigma) \\\\ 0 & (C_t = 0) \\end{cases} \\]")),
           tags$div(style="background:#f8f9fa;border-left:4px solid #f39c12;border-radius:4px;padding:10px 14px;margin:8px 0;",
-            tags$strong("CUSUMをかんたんに言うと: "),
+            tags$strong("CUSUMの概説: "),
             tags$p(style="margin:6px 0 0;",
               "使っているデータは主方式（EARS C2）と同じ、直近2週を除いた過去7週間の報告数です。",
               "C2法は「今週だけ見て平常より明らかに多いか」を判定しますが、",
