@@ -385,12 +385,18 @@ check_unusual <- function(text) {
     "animal.*outbreak","livestock.*outbreak","poultry.*outbreak","wildlife.*outbreak",
     "mass.*die","mass death.*animal","死.*家禽","家畜.*感染拡大","野生動物.*アウトブレイク",
     "zoonotic spillover","spillover.*human","スピルオーバー",
+    # 排除・elimination達成国での再発（麻しん等）
+    "elimination.*country.*case","measles.*eliminat","re.?emergence.*eliminat",
+    "排除.*達成.*国","排除状態","エリミネーション.*国内",
+    # 散発例の継続的な積み上げ報道（日本の地方紙で麻しん等の輸入・散発例に多い表現）
+    "散発","散発例","[0-9０-９]+人目","今年.*[0-9０-９]+人目","本年度.*[0-9０-９]+例目",
     # 日本語
     # 「新型」は単独では「新型コロナ（COVID-19の定着した通称）」に常に含まれ
     # 誤検出の温床になるため、新規病原体を指す複合語のみを対象とする
     "新規","新型株","新型ウイルス","新型病原体","新型インフルエンザ","新たな株",
     "初確認","初めて.*報告","初.*症例","珍しい","予想外",
-    "未知","変異株","異常増加","過去最高","ベースライン.*超","クレード.*新"
+    "未知","変異株","異常増加","過去最高","ベースライン.*超","クレード.*新",
+    "原因不明"
   ))
 }
 
@@ -465,7 +471,13 @@ check_serious_country <- function(text, is_known_disease = FALSE) {
     "public health.*response","health.*authorities.*respond",
     "response.*ongoing","outbreak.*response","outbreak.*control",
     "アウトブレイク.*死亡","死亡.*アウトブレイク",
-    "集団感染.*拡大","感染拡大.*続"
+    "集団感染.*拡大","感染拡大.*続",
+    # 個別の重大症例（希少・重症病原体のヒト感染確認、少数例でも公衆衛生上重大）
+    # （参照ログで見逃しが多かったため2026-08-27追加）
+    "散発例","ヒト.*症例","human case","保健省.*発表","health ministry.*confirm",
+    "government.*confirm.*case","CDC声明","CDC.*statement","新たに.*例.*確認",
+    "国際緊急援助隊","医療チーム.*派遣","international.*emergency.*team.*dispatch",
+    "乳児.*確認","infant.*confirm"
   ))
 }
 
@@ -671,7 +683,24 @@ check_epidemic_prone <- function(text) {
     "\\bmers\\b","camel.*mers","mers.?cov",
     "\\bnipah\\b","bat.*virus.*human","animal.?human.*interface",
     "zoonotic.*human","zoonosis.*outbreak",
-    "鳥インフルエンザ","豚インフルエンザ","動物.*ヒト.*感染","人獣共通.*感染"
+    "鳥インフルエンザ","豚インフルエンザ","動物.*ヒト.*感染","人獣共通.*感染",
+    # WHO/IDSR等が定める代表的な「疫学的拡大リスクの高い感染症」
+    # （epidemic-prone diseases）。単なる病名だけで拡大可能性が高いと
+    # 判断できるため、伝播様式の説明語がなくても該当語のみで検出する
+    # （見逃しが多かったため2026-08-27追加）
+    "cholera","コレラ","\\bebola\\b","エボラ","marburg","マールブルグ",
+    "\\blassa\\b","ラッサ","crimean.congo","クリミア.コンゴ",
+    "measles","はしか","麻しん","麻疹","meningococcal","髄膜炎菌","侵襲性髄膜炎菌",
+    "yellow fever","黄熱","typhoid fever","腸チフス","diphtheria","ジフテリア",
+    "\\bplague\\b","ペスト","dengue","デング熱","chikungunya","チクングニア",
+    "relapsing fever","回帰熱","viral hemorrhagic fever","出血熱",
+    # 災害後の避難生活等、疫学的拡大リスクを高める環境要因
+    # （WHO/IDSRのepidemic-prone diseaseは病原体名だけでなく、
+    # 集団密集・衛生環境悪化など拡大リスク要因のある状況も含む。
+    # 参照ログで避難所関連記事が見逃されていたため2026-08-27追加）
+    "避難所","雑魚寝","集団生活","断水","衛生環境","衛生状態",
+    "shelter.*outbreak","displacement camp","refugee camp","evacuation center",
+    "overcrowd","密集.*生活","被災.*感染"
   ))
 }
 
@@ -693,7 +722,14 @@ check_mass_exposure <- function(text) {
     "restaurant.*outbreak","workplace.*outbreak","cruise.*ship.*outbreak",
     "wedding.*outbreak","festival.*case","gathering.*infection",
     "学校.*集団感染","施設.*集団発生","給食.*感染","クルーズ船.*感染",
-    "職場.*集団","老人ホーム.*感染","イベント.*集団感染"
+    "職場.*集団","老人ホーム.*感染","イベント.*集団感染",
+    # 病名自体が共通曝露源（食品・水・冷却塔・空調等）によることが定義上
+    # 明らかな疾患。伝播様式の説明語がなくても病名のみで検出する
+    # （見逃しが多かったため2026-08-27追加）
+    "legionell","レジオネラ","botulism","ボツリヌス","cyclospora","サイクロスポラ",
+    "salmonella","サルモネラ","hantavirus","ハンタウイルス","recall.*lettuce",
+    "recall.*produce","リコール.*食品","複数[の州国]{1,2}.*感染",
+    "multi.?state.*outbreak","multi.?country.*outbreak"
   ))
 }
 
@@ -709,6 +745,13 @@ check_high_profile <- function(text) {
     "ProMED.*alert","FAO.*warn","UNICEF.*outbreak",
     "MSF","Doctors Without Borders","médecins sans frontières",
     "IHR","PHEIC","international health regulations","国際保健規則",
+    # 国際機関・公的機関の関与（この時点で既に感染症文脈が確定しているため、
+    # 「警告・懸念」を伴わない単なる発表・声明・報告への言及でも対象とする。
+    # 見逃しが多かったため2026-08-27追加）
+    "\\bWHO\\b","\\bECDC\\b","\\bCDC\\b","africa cdc","WOAH","\\bUKHSA\\b",
+    # 国際緊急対応・複数国関与
+    "国際緊急援助隊","医療チーム.*派遣","international.*emergency.*team",
+    "multi.?country","複数国","multiple countries","several countries",
     # 国際的関心・懸念
     "international.*concern","global.*concern","worldwide.*spread",
     "global.*health.*threat","international.*alert",
