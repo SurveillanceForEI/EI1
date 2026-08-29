@@ -44,11 +44,14 @@ HOKENJO_DATA_SOURCES <- list(
       archive_from = "2004",
       notes = "全数把握疾患も保健所別記載。A型/B型別・年齢区分別表もあり"),
 
-  .hj("岩手県", "◎", "地図（GIF画像・実数値付き）", 10,
+  .hj("岩手県", "◎", "Excel（機械可読・保健所別シート）", 10,
       hokenjo_names = c("二戸", "久慈", "宮古", "釜石", "県央", "盛岡市", "中部", "大船渡", "奥州", "一関"),
-      sample_url = "https://www2.pref.iwate.jp/~hp1353/kansen/image/imagemenu.html",
-      archive_from = "2022",
-      notes = "疾患別に色分け地図＋実数値（例: 手足口病 二戸3.50等）。15疾患。画像は image/imageNN/img-XXXX.gif"),
+      sample_url = "https://www2.pref.iwate.jp/~hp1353/kansen/image/sokuhou.xlsx",
+      archive_from = "2026-08-29（最新週のみ、過去分は蓄積のみ）",
+      notes = paste0("分布図（image/imageNN/img-XXXX.gif、実数値付き地図）と同じ値を、",
+                      "「保健所」シートに機械可読な表として提供。列4-15が定点あたり報告数、",
+                      "列16-27が実数（同順: 岩手県計/盛岡市/県央/中部/(空列)/奥州/一関/大船渡/釜石/宮古/久慈/二戸）。",
+                      "最新週のみで年の記載がないため取得時点のシステム年を使用（R/hokenjo_fetch/iwate.R）")),
 
   .hj("宮城県", "○", "グラフ（棒グラフ、数値表なし）", 6,
       hokenjo_names = c("仙南", "塩釜", "大崎", "石巻", "気仙沼", "仙台"),

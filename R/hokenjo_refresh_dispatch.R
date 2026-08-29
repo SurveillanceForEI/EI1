@@ -59,6 +59,7 @@ HOKENJO_REFRESH_DISPATCH <- list(
     fetch_kanagawa(sprintf("https://www.pref.kanagawa.jp/sys/eiken/003_center/0001_weekly/pdf/wrR%02d_%d.pdf", y - 2018, w))),
   "新潟県"   = function() probe_latest_week_fetch(function(y, w)
     fetch_niigata_xlsx(resolve_niigata_xlsx_url(y - 2018L, w))),
+  "岩手県"   = function() fetch_iwate(),
   "富山県"   = function() {
     d <- fetch_toyama_zip(resolve_hokenjo_pdf_url_for_pref("富山県"))
     d[d$week_num == max(d$week_num), ]  # currentは最新週のみでよい（履歴側は別途一括反映）
