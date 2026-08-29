@@ -27,9 +27,13 @@ for (f in list.files(FETCH_DIR, pattern = "\\.R$", full.names = TRUE)) {
 }
 
 HISTORY_PATH <- "data/hokenjo_history.rds"
-CURRENT_YEAR <- 2026
-# 実行時点で何週まで発行されていそうか（安全側に最新既知週+1まで試す）
-MAX_WEEK <- 33
+CURRENT_YEAR <- as.integer(format(Sys.Date(), "%Y"))
+# 実行時点で何週まで発行されていそうかを実行日から動的に算出する
+# （固定値だと新しい週が公開されても永久に取得されなくなるバグの元になるため、
+# 2026-08-30に固定値33からの動的算出に変更した）。
+# ISO週番号（月曜始まり）+1週分のバッファを持たせ、まだ公開されていない週の
+# 空振り試行はエラーとして無視される想定
+MAX_WEEK <- as.integer(format(Sys.Date(), "%V")) + 1L
 
 # week_label文字列から週番号を抜き出す。県によって表記が異なるため
 # 複数パターンを順に試す（例: "2026年第32週", "令和８年第 32 週",
@@ -73,6 +77,13 @@ make_key <- function(pref, week_num, week_label) {
   if (length(m) > 0 && nzchar(m)) return(as.integer(sub("年", "", m)))
   m <- regmatches(s, regexec("令和\\s*([0-9]+)\\s*年", s))[[1]]
   if (length(m) == 2) return(as.integer(m[2]) + 2018L)
+  # 福井県「R. 7. 8.18」のような、漢字なしの略式和暦表記
+  m <- regmatches(s, regexec("R\\.?\\s*([0-9]+)\\s*\\.", s))[[1]]
+  if (length(m) == 2) return(as.integer(m[2]) + 2018L)
+  # 愛媛県「2025.8.18」のような、「年」の付かない西暦表記
+  # （末尾に週の日付範囲があるため、文中どこにあっても検出する）
+  m <- regmatches(s, regexpr("(?<![0-9])(20[0-9]{2})\\.[0-9]{1,2}\\.[0-9]{1,2}", s, perl = TRUE))
+  if (length(m) > 0 && nzchar(m)) return(as.integer(sub("\\..*", "", m)))
   NA_integer_
 }
 

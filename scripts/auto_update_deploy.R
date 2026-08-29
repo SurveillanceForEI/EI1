@@ -103,6 +103,12 @@ tryCatch({
       if (length(m) > 0 && nzchar(m)) return(as.integer(sub("年", "", m)))
       m <- regmatches(s, regexec("令和\\s*([0-9]+)\\s*年", s))[[1]]
       if (length(m) == 2) return(as.integer(m[2]) + 2018L)
+      # 福井県「R. 7. 8.18」のような、漢字なしの略式和暦表記
+      m <- regmatches(s, regexec("R\\.?\\s*([0-9]+)\\s*\\.", s))[[1]]
+      if (length(m) == 2) return(as.integer(m[2]) + 2018L)
+      # 愛媛県「2025.8.18」のような、「年」の付かない西暦表記
+      m <- regmatches(s, regexpr("(?<![0-9])(20[0-9]{2})\\.[0-9]{1,2}\\.[0-9]{1,2}", s, perl = TRUE))
+      if (length(m) > 0 && nzchar(m)) return(as.integer(sub("\\..*", "", m)))
       NA_integer_
     }
     yr <- vapply(h$week_label, .extract_year, integer(1))
