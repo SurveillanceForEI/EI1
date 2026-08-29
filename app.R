@@ -1144,7 +1144,7 @@ function ebsUntranslateCards(containerId) {
           # ── タブ構成 ──────────────────────────────────────
           tags$h4("■ タブ構成", style="border-bottom:2px solid #7f8c8d;padding-bottom:4px;color:#2c3e50;"),
           tags$p(style="font-size:0.85em;color:#888;margin-bottom:6px;",
-            "関連するタブを6つのグループにまとめ、グループ内はサブタブで切り替えます。"),
+            "以下、実際のタブ表示順に説明します。関連するタブは7つのグループにまとめ、グループ内はサブタブで切り替えます。"),
           tags$ul(
             tags$li(tags$strong("活動レベル一覧:"),
               tags$ul(
@@ -1158,6 +1158,7 @@ function ebsUntranslateCards(containerId) {
                 tags$li(tags$strong("複数疾患比較（定点）:"), "複数疾患の定点報告数を重ね合わせ表示"),
                 tags$li(tags$strong("実効再生産数 Rt:"), "Cori法によるRt推定")
               )),
+            tags$li(tags$strong("保健所別マップ:"), "選択中の都道府県・疾患について、保健所単位のデータを地図・グラフ・表で表示"),
             tags$li(tags$strong("病原体サーベイランス:"),
               tags$ul(
                 tags$li(tags$strong("病原体検出:"), "IASR（病原微生物検出情報）に基づく病原体検出状況"),
@@ -1175,27 +1176,85 @@ function ebsUntranslateCards(containerId) {
               )),
             tags$li(tags$strong("その他:"),
               tags$ul(
-                tags$li(tags$strong("Notes:"), "このページ（データソース・算出方法・注意事項の説明）")
+                tags$li(tags$strong("Notes:"), "このページ（データソース・算出方法・注意事項の説明）"),
+                tags$li(tags$strong("参考リンク:"), "国内外の感染症情報センター等へのリンク集")
               ))
           ),
           tags$br(),
 
-          # ── IBS（定点把握）────────────────────────────────
-          tags$h4(id="notes-ibs", "■定点把握疾患", style="border-bottom:2px solid #3498db;padding-bottom:4px;color:#2c3e50;"),
-          tags$h5("データソース"),
+          # ══════════════════════════════════════════════════
+          # ■ 活動レベル一覧（疾患別・都道府県別）＋ 統合活動レベルカード
+          # ══════════════════════════════════════════════════
+          tags$h4(id="notes-levels", "■ 活動レベル一覧（疾患別・都道府県別）", style="border-bottom:2px solid #6c3483;padding-bottom:4px;color:#2c3e50;"),
+          tags$p(
+            "各タブ上部・活動レベル一覧タブに表示される「活動レベル」（1〜4）は、",
+            tags$strong("定点把握（IBS）データとEBSニュースの両方"), "を用いて算出しています。",
+            "IBS成分（95%）には「流行曲線」タブで説明する2段階加重平均ロジック（注意報・警報基準値・Rt・過去5年比較の統合、詳細は",
+            tags$a(href="javascript:void(0)", onclick="goToNotes('notes-ibs')", "こちら"),
+            "）を適用し、EBS成分（5%）と合算して最終的な活動レベルを決定しています。",
+            "「活動レベル一覧（疾患別）」は選択中の都道府県について全疾患のレベルを、",
+            "「活動レベル一覧（都道府県別）」は選択中の疾患について全47都道府県のレベルをタイル表示します。"
+          ),
+          tags$h5(id="notes-integrated", "計算式"),
+          tags$div(style="background:#f8f9fa;border:1px solid #ddd;border-radius:6px;padding:12px 16px;margin-bottom:8px;",
+            tags$div(style="font-size:0.8em;color:#666;margin-bottom:4px;",
+              "IBS成分（0〜3点）: 「流行曲線」タブと同じ2段階加重平均で算出",
+              tags$br(),
+              "（③は直近2週の過去5年比較±SD、2週連続+2SD超過のみ3点。①②が利用可能ならさらに統合）"),
+            tags$div(style="font-size:0.8em;color:#666;margin-bottom:4px;",
+              "EBSスコア（0〜2点）: 今週シグナル（高×3＋低×2）と先週シグナルの変化率 ",
+              tags$em("r"), " から算出（", tags$em("r"), " < 20%→0点、20% ≤ ", tags$em("r"), " < 50%→1点、",
+              tags$em("r"), " ≥ 50%→2点。今週・先週とも記事なしの場合は0点）"),
+            tags$div(HTML("\\[ S_{\\text{EBS}}' = \\min(3,\\ 1.5 \\cdot S_{\\text{EBS}}) \\]")),
+            tags$div(HTML("\\[ S_{\\text{combined}} = 0.95 \\cdot S_{\\text{IBS}} + 0.05 \\cdot S_{\\text{EBS}}' \\]")),
+            tags$div(HTML("\\[ \\text{活動レベル} = \\min\\bigl(4,\\ \\max(1,\\ \\mathrm{round}(S_{\\text{combined}}) + 1) \\bigr) \\]")),
+            tags$div(style="font-size:0.82em;color:#555;",
+              "レベル対応: ", tags$code("1"), "=通常　", tags$code("2"), "=注意　",
+              tags$code("3"), "=警戒　", tags$code("4"), "=流行")
+          ),
+          tags$ul(
+            tags$li("いずれのタブも、期間スライダー（date_range）で選択した期間の末尾週を評価対象とします。"),
+            tags$li("タイルをクリックすると、その疾患・都道府県（もう一方の軸は現在の選択を維持）に絞り込んだ「流行曲線」タブへ移動します。")
+          ),
+          tags$br(),
+
+          # ══════════════════════════════════════════════════
+          # ■ 患者サーベイランス
+          # ══════════════════════════════════════════════════
+          tags$h4("■ 患者サーベイランス", style="border-bottom:2px solid #3498db;padding-bottom:4px;color:#2c3e50;"),
+
+          tags$h5(id="notes-zensu", "データソース（定点把握・全数把握・月報疾患 共通）"),
           tags$p("感染症発生動向調査週報（IDWR）速報／感染症発生動向調査事業年報　国立健康危機管理研究機構（JIHS）"),
           tags$ul(
-            tags$li("定点医療機関からの週次報告データ（定点あたり報告数）"),
-            tags$li("2001年〜概ね前年分までは事業年報の確定値、当年の未確定期間はIDWR週報の速報値（暫定値）を使用しています"),
-            tags$li("速報値は後日、事業年報の確定値で修正される場合があります（画面右上の「⚠ 速報値」「✓ 確定値」表示で判別できます）"),
-            tags$li("集計週は月曜〜日曜、報告週は翌週月曜基準で公表"),
-            tags$li("JIHSサイトでの公表: 原則毎週火曜日（祝祭日等の影響でずれる場合あり）"),
+            tags$li("2024年までは感染症発生動向調査事業年報の確定値、2025年以降はIDWR週報の速報値（暫定値）を使用（画面右上の「⚠ 速報値」「✓ 確定値」表示で判別可）"),
+            tags$li("集計週は月曜〜日曜、報告週は翌週月曜基準で公表。JIHSサイトでの公表は原則毎週火曜日（祝祭日等の影響でずれる場合あり）"),
             tags$li("本ダッシュボードのデータ更新: 毎日午前3時に自動取得（新週が公表されていれば差分取得）")
           ),
-          tags$h5("定点の種類（定点種別）"),
+          tags$table(class="table table-bordered table-sm", style="font-size:0.85em;",
+            tags$thead(tags$tr(tags$th("区分"), tags$th("報告方法"), tags$th("対象疾患（例）"))),
+            tags$tbody(
+              tags$tr(tags$td(tags$strong("定点把握")), tags$td("指定医療機関（定点）からの週次報告（定点あたり報告数）"),
+                       tags$td("インフルエンザ・新型コロナウイルス感染症・手足口病・感染性胃腸炎等")),
+              tags$tr(tags$td(tags$strong("全数把握")), tags$td("医師による全例報告（感染症法届出、保健所経由）。週次集計"),
+                       tags$td("麻疹・風疹・百日咳・梅毒・腸管出血性大腸菌感染症（O157等）・デング熱・エムポックス・結核・",
+                                "劇症型溶血性レンサ球菌感染症・侵襲性肺炎球菌感染症・レジオネラ症・A型肝炎・SFTS・エボラ出血熱")),
+              tags$tr(tags$td(tags$strong("月報疾患")), tags$td("性感染症定点・基幹定点からの報告を月1回程度まとめて公表"),
+                       tags$td("性器クラミジア・性器ヘルペス・尖圭コンジローマ・淋菌感染症（定点把握）／",
+                                "MRSA・薬剤耐性肺炎球菌感染症（基幹定点）"))
+            )
+          ),
+          tags$p(style="font-size:0.85em;color:#888;",
+            "※ 薬剤耐性緑膿菌感染症は2026年4月6日より全数把握対象（多剤耐性緑膿菌感染症）に変更されたため、それ以降は月報疾患タブでは扱っていません（全数把握タブを参照）。",
+            tags$br(),
+            "※ 月報は掲載号・掲載ページが月によって変動するため、未発行月・未取得月はグラフ上で欠測（線が途切れる）となります。"
+          ),
+
+          tags$h5("地域別比較タブ"),
+          tags$p("上記の定点把握データについて、都道府県別コロプレスマップ（直近週）・ランキング・ヒートマップ・地域別比較を表示します。データソース・注意事項は上記および下記「流行曲線」の内容と共通です。"),
+
+          tags$h5(id="notes-ibs", "流行曲線タブ：定点の種類（定点種別）"),
           tags$p(
-            "定点把握疾患は、全国に指定された医療機関（定点）から報告されます。疾患ごとに報告を担う定点の",
-            "種別が異なり、それぞれ全国の指定医療機関数（報告定点数）もおおむね決まっています（数はIDWR公表時点により変動）。"
+            "定点把握疾患は、疾患ごとに報告を担う定点の種別が異なり、それぞれ全国の指定医療機関数（報告定点数）もおおむね決まっています（数はIDWR公表時点により変動）。"
           ),
           tags$ul(
             tags$li(tags$strong("急性呼吸器感染症定点（内科系、全国約3,700カ所）: "),
@@ -1209,16 +1268,15 @@ function ebsUntranslateCards(containerId) {
               "マイコプラズマ肺炎・クラミジア肺炎等（このほか、入院サーベイランスタブで扱う",
               "インフルエンザ・新型コロナウイルス感染症の入院患者数も基幹定点からの報告）")
           ),
-          tags$h5("注意報・警報基準値について"),
+          tags$h5("注意報・警報基準値について【重要】"),
           tags$div(style="background:#fff8e1;border-left:4px solid #f39c12;padding:8px 12px;margin-bottom:8px;font-size:0.9em;",
             tags$strong("注意:"),
-            " 以下の基準値は、厚生労働科学研究「効果的な感染症サーベイランスの評価ならびに改良に関する研究」の研究班報告書（定点あたり報告数）に基づく",
+            " 本ダッシュボードで用いる基準値は、厚生労働科学研究「効果的な感染症サーベイランスの評価ならびに改良に関する研究」の",
             tags$strong("研究班報告ベースの基準値"), "であり、国（厚生労働省・JIHS等）が定める",
             tags$strong("公式の注意報・警報基準ではありません"), "。",
             "都道府県が実際に注意報・警報を発信する際は、これに加えて「基準値を超えた保健所の管轄人口の合計が都道府県全体人口の30%を超えた場合」等の人口按分条件も加味されるため、",
             "本ダッシュボードの判定はあくまで研究班報告ベースの簡易的な参考情報であり、公式の注意報・警報発令そのものではありません。"
           ),
-          tags$h5("「注意報」「警報」「終息」の解釈"),
           tags$ul(
             tags$li(tags$strong("注意報: "),
               "流行の発生前であれば「今後4週間以内に大きな流行が発生する可能性が高いこと」、",
@@ -1228,6 +1286,30 @@ function ebsUntranslateCards(containerId) {
             tags$li(tags$strong("警報終息基準値: "),
               "警報が発令された後、報告数がこの値を下回ると流行が収束しつつあると判断される水準です。")
           ),
+          tags$p(style="font-size:0.85em;color:#888;",
+            "以下は研究班報告書に記載された値の一覧です（詳細出典は割愛。", tags$strong("国の公式基準ではありません"), "）。"
+          ),
+          tags$table(class="table table-bordered table-sm", style="font-size:0.85em;",
+            tags$thead(tags$tr(tags$th("疾患"), tags$th("警報開始"), tags$th("警報終息"), tags$th("注意報開始"))),
+            tags$tbody(
+              tags$tr(tags$td("インフルエンザ"), tags$td("30"), tags$td("10"), tags$td("10")),
+              tags$tr(tags$td("咽頭結膜熱"), tags$td("3"), tags$td("1"), tags$td("―")),
+              tags$tr(tags$td("A群溶血性レンサ球菌咽頭炎"), tags$td("8"), tags$td("4"), tags$td("―")),
+              tags$tr(tags$td("感染性胃腸炎"), tags$td("20"), tags$td("12"), tags$td("―")),
+              tags$tr(tags$td("水痘"), tags$td("7"), tags$td("4"), tags$td("4")),
+              tags$tr(tags$td("手足口病"), tags$td("5"), tags$td("2"), tags$td("―")),
+              tags$tr(tags$td("伝染性紅斑"), tags$td("2"), tags$td("1"), tags$td("―")),
+              tags$tr(tags$td("ヘルパンギーナ"), tags$td("6"), tags$td("2"), tags$td("―")),
+              tags$tr(tags$td("流行性耳下腺炎"), tags$td("6"), tags$td("2"), tags$td("3")),
+              tags$tr(tags$td("急性出血性結膜炎"), tags$td("6"), tags$td("0.1"), tags$td("―")),
+              tags$tr(tags$td("流行性角結膜炎"), tags$td("8"), tags$td("4"), tags$td("―")),
+              tags$tr(tags$td("その他の疾患"), tags$td("―"), tags$td("―"), tags$td("―"))
+            )
+          ),
+          tags$p(style="font-size:0.85em;color:#888;",
+            "※ 研究班報告書には百日咳（警報開始1／終息0.1）も掲載されていますが、現行の感染症法では百日咳は全数把握対象疾患のため、",
+            "本ダッシュボードの定点把握基準値としては適用していません。"
+          ),
           tags$h5("判定方法（注意報・警報基準値・Rt・過去5年比較の統合、共線性に配慮した2段階加重平均）"),
           tags$p(
             "流行フェーズ（基準以下／流行期／注意／警戒の4段階）は、次の3つの指標をそれぞれ0〜3点でスコア化して算出しています。"
@@ -1235,15 +1317,13 @@ function ebsUntranslateCards(containerId) {
           tags$ul(
             tags$li(tags$strong("① 注意報・警報基準値（研究班報告ベース、定点あたり報告数）: "),
               "報告数が警報開始基準値以上→3点（警戒相当）、注意報開始基準値以上（設定がある疾患のみ）→2点（注意相当）、警報終息基準値以上→1点（流行期相当）、それ未満→0点。",
-              "研究班報告に注意報開始基準値の記載がない疾患は②の判定を省略しています（表中「―」）。基準値自体が設定されていない疾患はこの指標を評価から除外しています。"),
+              "注意報開始基準値の記載がない疾患は当該判定を省略（表中「―」）。基準値自体が設定されていない疾患はこの指標を評価から除外します。"),
             tags$li(tags$strong("② 実効再生産数（Rt）: "),
-              "Rt≧2.0→3点、Rt≧1.5→2点、Rt≧1.0→1点、Rt<1.0→0点。SI（シリアルインターバル/潜伏期間推定値）が定義されていない疾患はこの指標を評価から除外しています。"),
+              "Rt≧2.0→3点、Rt≧1.5→2点、Rt≧1.0→1点、Rt<1.0→0点。SI（シリアルインターバル/潜伏期間推定値）が定義されていない疾患はこの指標を評価から除外します。"),
             tags$li(tags$strong("③ IBS方式・過去5年比較（±SD、アンサンブル）: "),
-              "疾患ごとに季節性の強さを自動判定し、評価方式を切り替えています。季節性ありと判定された疾患は、同一週±2週・過去5年平均に対して+2SD以上→3点、+1SD以上→2点、平均以上→1点、平均未満→0点を主方式とし、トレンド回帰（Farrington法ライク）のスコアと平均して統合します。",
-              "定点あたり報告数が少なく季節性が乏しい疾患（咽頭結膜熱・手足口病など）は、この固定的な5年比較では基準値自体が不安定になるため、直近の推移と比較するEARS C2ライクな方式（＋CUSUM累積和）に自動的に切り替わります（詳細は",
-              tags$a(href="javascript:void(0)", onclick="goToNotes('notes-zensu-ibs')", "こちら"), "）。過去データが不足する場合はこの指標を評価から除外しています。")
+              "疾患ごとに季節性の強さを自動判定し、評価方式を切り替えます（詳細は次項）。過去データが不足する場合はこの指標を評価から除外します。")
           ),
-          tags$h5("計算式（現在の流行フェーズカード）"),
+          tags$h5("計算式（流行フェーズカード）"),
           tags$div(style="background:#f8f9fa;border:1px solid #ddd;border-radius:6px;padding:12px 16px;margin-bottom:8px;",
             tags$div(style="font-size:0.8em;color:#666;margin-bottom:4px;",
               "ステップ1: 水準スコア（①③が利用可能な場合のみ。片方だけならその値をそのまま使用）"),
@@ -1271,47 +1351,6 @@ function ebsUntranslateCards(containerId) {
             tags$br(),
             "この方式により、報告数自体はまだ基準値未満でも、Rtの上昇や過去5年からの逸脱が大きい場合には早期に高いフェーズとして表示されます。"
           ),
-          tags$p(style="font-size:0.85em;color:#888;",
-            "以下の基準値は研究班報告書に記載された値であり、",
-            tags$strong("国の公式基準ではありません"), "（詳細は上記「注意報・警報基準値について」参照）。"
-          ),
-          tags$table(class="table table-bordered table-sm", style="font-size:0.85em;",
-            tags$thead(tags$tr(tags$th("疾患"), tags$th("警報開始"), tags$th("警報終息"), tags$th("注意報開始"), tags$th("出典"))),
-            tags$tbody(
-              tags$tr(tags$td("インフルエンザ"), tags$td("30"), tags$td("10"), tags$td("10"), tags$td("研究班報告書")),
-              tags$tr(tags$td("咽頭結膜熱"), tags$td("3"), tags$td("1"), tags$td("―"), tags$td("研究班報告書")),
-              tags$tr(tags$td("A群溶血性レンサ球菌咽頭炎"), tags$td("8"), tags$td("4"), tags$td("―"), tags$td("研究班報告書")),
-              tags$tr(tags$td("感染性胃腸炎"), tags$td("20"), tags$td("12"), tags$td("―"), tags$td("研究班報告書")),
-              tags$tr(tags$td("水痘"), tags$td("7"), tags$td("4"), tags$td("4"), tags$td("研究班報告書")),
-              tags$tr(tags$td("手足口病"), tags$td("5"), tags$td("2"), tags$td("―"), tags$td("研究班報告書")),
-              tags$tr(tags$td("伝染性紅斑"), tags$td("2"), tags$td("1"), tags$td("―"), tags$td("研究班報告書")),
-              tags$tr(tags$td("ヘルパンギーナ"), tags$td("6"), tags$td("2"), tags$td("―"), tags$td("研究班報告書")),
-              tags$tr(tags$td("流行性耳下腺炎"), tags$td("6"), tags$td("2"), tags$td("3"), tags$td("研究班報告書")),
-              tags$tr(tags$td("急性出血性結膜炎"), tags$td("6"), tags$td("0.1"), tags$td("―"), tags$td("研究班報告書")),
-              tags$tr(tags$td("流行性角結膜炎"), tags$td("8"), tags$td("4"), tags$td("―"), tags$td("研究班報告書")),
-              tags$tr(tags$td("その他の疾患"), tags$td("―"), tags$td("―"), tags$td("―"), tags$td("基準値なし"))
-            )
-          ),
-          tags$p(style="font-size:0.85em;color:#888;",
-            "※ 研究班報告書には百日咳（警報開始1／終息0.1）も掲載されていますが、現行の感染症法では百日咳は全数把握対象疾患のため、",
-            "本ダッシュボードの定点把握基準値としては適用していません。"
-          ),
-          tags$br(),
-
-          # ── 全数把握疾患 ──────────────────────────────────
-          tags$h4(id="notes-zensu", "■ 全数把握疾患（地図・流行曲線）", style="border-bottom:2px solid #27ae60;padding-bottom:4px;color:#2c3e50;"),
-          tags$h5("データソース"),
-          tags$p("感染症発生動向調査　国立健康危機管理研究機構（JIHS）"),
-          tags$ul(
-            tags$li("全数把握対象疾患の医師による全例報告（感染症法届出）"),
-            tags$li("報告は診断した医師が保健所経由で届け出"),
-            tags$li("週次集計で公表"),
-            tags$li("2001年〜概ね前年分までは事業年報の確定値、当年の未確定期間はIDWR週報の速報値（暫定値）を使用しています"),
-            tags$li("JIHSサイトでの公表: 原則毎週火曜日（祝祭日等の影響でずれる場合あり）"),
-            tags$li("本ダッシュボードのデータ更新: 毎日午前3時に自動取得（新週が公表されていれば差分取得）")
-          ),
-          tags$h5("対象疾患（本ダッシュボード掲載）"),
-          tags$p("麻疹・風疹・百日咳・梅毒・腸管出血性大腸菌感染症（O157等）・デング熱・エムポックス・結核・劇症型溶血性レンサ球菌感染症・侵襲性肺炎球菌感染症・レジオネラ症・A型肝炎・SFTS・エボラ出血熱"),
 
           tags$h5(id="notes-zensu-ibs", "IBS評価方式の季節性自動判定（定点把握・全数把握 共通）"),
           tags$p(
@@ -1393,25 +1432,20 @@ function ebsUntranslateCards(containerId) {
           tags$br(),
 
           # ── 月報疾患 ────────────────────────────────────
-          tags$h4(id="notes-std", "■ 月報疾患（性感染症・薬剤耐性菌）", style="border-bottom:2px solid #9c27b0;padding-bottom:4px;color:#2c3e50;"),
-          tags$h5("データソース"),
-          tags$p("感染症発生動向調査週報（IDWR）　国立健康危機管理研究機構（JIHS）"),
-          tags$ul(
-            tags$li("性器クラミジア感染症・性器ヘルペスウイルス感染症・尖圭コンジローマ・淋菌感染症は定点把握（性感染症定点）、",
-              "メチシリン耐性黄色ブドウ球菌感染症・ペニシリン耐性肺炎球菌感染症は基幹定点からの報告"),
-            tags$li("週報（毎週発行）とは別に、月1回程度「月報」として都道府県別報告数がまとめて掲載される"),
-            tags$li("月報の掲載号・掲載ページは月によって変動するため、該当月のデータが見つかるまで各号を探索して取得している"),
-            tags$li("薬剤耐性緑膿菌感染症は2026年4月6日より全数把握対象疾患（多剤耐性緑膿菌感染症）に変更されたため、",
-              "それ以降の月報には掲載されず、本タブでは扱っていません（全数把握タブの「多剤耐性緑膿菌感染症」を参照）")
-          ),
+          tags$h5(id="notes-std", "月報疾患（性感染症・薬剤耐性菌）について"),
           tags$p(style="font-size:0.85em;color:#888;",
             "※ 月報が発行されなかった月・未取得の月はグラフ上で欠測（線が途切れる）となります。",
             "過去5年比較の帯は、同月・前後1か月分・過去5年間のデータのうち3年分以上取得できている月のみ表示しています。"),
           tags$br(),
 
+          # ── 複数疾患比較（定点） ─────────────────────────
+          tags$h5("複数疾患比較（定点）タブ"),
+          tags$p("上記の定点把握データを用い、複数疾患の定点報告数を1つのグラフに重ね合わせて表示します。データソース・注意事項は上記と共通です。"),
+          tags$br(),
+
           # ── 実効再生産数 Rt ────────────────────────────────
-          tags$h4(id="notes-rt", "■ 実効再生産数（Rt）", style="border-bottom:2px solid #e74c3c;padding-bottom:4px;color:#2c3e50;"),
-          tags$h5("推定方法"),
+          tags$h5(id="notes-rt", "実効再生産数（Rt）タブ"),
+          tags$h6("推定方法"),
           tags$p("Cori法（Wallinga & Teunis, 2004 改良版）に基づくベイズ推定を使用しています。"),
           tags$ul(
             tags$li("推定窓: 7日間（週次データのため1週）"),
@@ -1419,7 +1453,7 @@ function ebsUntranslateCards(containerId) {
             tags$li("最低データ要件: 15週以上の連続データ"),
             tags$li("Rt > 1.0: 流行拡大傾向、Rt < 1.0: 流行縮小傾向")
           ),
-          tags$h5("シリアルインターバル（SI）の出典（実際に使用しているデータ）"),
+          tags$h6("シリアルインターバル（SI）の出典（実際に使用しているデータ）"),
           tags$table(class="table table-bordered table-sm", style="font-size:0.8em;",
             tags$thead(tags$tr(tags$th("疾患"), tags$th("平均(日)"), tags$th("SD(日)"), tags$th("区分"), tags$th("出典"))),
             tags$tbody(
@@ -1438,7 +1472,7 @@ function ebsUntranslateCards(containerId) {
               })
             )
           ),
-          tags$h5("潜伏期間代用について"),
+          tags$h6("潜伏期間代用について"),
           tags$p(
             "査読済みのシリアルインターバル推定値が存在しない疾患については、潜伏期間データをSIの代替値として使用しています。",
             "この場合、Rt推定画面に「（潜伏期間より推定）」と表示されます。",
@@ -1447,7 +1481,7 @@ function ebsUntranslateCards(containerId) {
             tags$br(),
             tags$em("注: ベクター媒介感染症のSIはヒト間での直接伝播とは異なる解釈が必要です。")
           ),
-          tags$h5("Rt解釈が限定的な疾患"),
+          tags$h6("Rt解釈が限定的な疾患"),
           tags$ul(
             tags$li(tags$strong("腸管出血性大腸菌（EHEC）: "), "症例の約80%は食品媒介（共通感染源）。Rtが1を超えても食品汚染源を反映している可能性があり、ヒト間伝播の指標としては過大推定になりやすい。"),
             tags$li(tags$strong("伝染性紅斑（リンゴ病）: "), "発疹出現時にはすでに感染性を失っている。報告データは過去2–3週の伝播を遅れて反映する。")
@@ -1455,7 +1489,7 @@ function ebsUntranslateCards(containerId) {
           tags$p(style="font-size:0.85em;color:#888;",
             "細菌性髄膜炎・無菌性髄膜炎・クラミジア肺炎・劇症型溶血性レンサ球菌感染症は",
             "報告数が少なく散発的なため、Rt推定の対象から除外しています。"),
-          tags$h5("注意事項"),
+          tags$h6("注意事項"),
           tags$ul(
             tags$li("Rt推定には週次集計データを使用しており、日次データに比べて分解能が低くなります"),
             tags$li("95%信頼区間が広い場合はデータ不足の可能性があります"),
@@ -1465,7 +1499,7 @@ function ebsUntranslateCards(containerId) {
           tags$br(),
 
           # ── 短期予測 ────────────────────────────────────
-          tags$h4(id="notes-forecast", "■ 短期予測（4週先まで）", style="border-bottom:2px solid #8e44ad;padding-bottom:4px;color:#2c3e50;"),
+          tags$h5(id="notes-forecast", "短期予測（4週先まで、流行曲線タブ内）"),
           tags$p(
             "流行曲線タブの「予測を表示」をオンにすると、直近の実測データから4週先までの参考予測を",
             "紫色の破線・帯（予測区間の目安）で重ねて表示します。追加のパッケージを使わず、",
@@ -1492,7 +1526,7 @@ function ebsUntranslateCards(containerId) {
               "上記3手法のうち算出できたものの単純平均です。個々の手法の誤差や前提の偏りを緩和し、",
               "より安定した予測になる傾向があります。")
           ),
-          tags$h5("季節性の反映について"),
+          tags$h6("季節性の反映について"),
           tags$p(
             "IBS方式・過去5年比較の季節性自動判定（",
             tags$a(href="javascript:void(0)", onclick="goToNotes('notes-zensu-ibs')", "詳細"),
@@ -1518,7 +1552,108 @@ function ebsUntranslateCards(containerId) {
           ),
           tags$br(),
 
-          # ── EBS ──────────────────────────────────────────
+          # ══════════════════════════════════════════════════
+          # ■ 保健所別マップ
+          # ══════════════════════════════════════════════════
+          tags$h4(id="notes-hokenjo", "■ 保健所別マップ", style="border-bottom:2px solid #16a085;padding-bottom:4px;color:#2c3e50;"),
+          tags$h5("データソース"),
+          tags$p("各都道府県が公表する感染症週報等（保健所別・報告区分別の内訳）"),
+          tags$ul(
+            tags$li("選択中の都道府県・疾患について、その都道府県の週報から取得した保健所（または報告区分）単位のデータを地図・グラフ・表で表示"),
+            tags$li("都道府県ごとに集計単位（保健所単位／市区町村単位等）・報告数と定点あたり報告数のいずれを公表しているかが異なります")
+          ),
+          tags$div(style="background:#fff8e1;border-left:4px solid #f39c12;padding:8px 12px;margin-bottom:8px;font-size:0.9em;",
+            tags$strong("注意（重要・データの限界）: "),
+            tags$ul(style="margin-bottom:0;",
+              tags$li("保健所別データは、都道府県公式サイトが公表する週報等の掲載内容に完全に依存しています。",
+                      "自治体によっては一部の疾患・一部の保健所のみを公表、または保健所別データ自体を公表していない場合があり、",
+                      "その場合は取得できていない旨を画面上に表示します"),
+              tags$li("週報の様式は自治体ごとに異なり、PDF・画像・表形式など多様な形式から自動抽出しているため、",
+                      tags$strong("数値を正しく読み取れていない可能性があります"), "。特に表の体裁が変更された場合や、",
+                      "セル結合・脚注付きの数値等は誤抽出のリスクが高くなります"),
+              tags$li("同一都道府県内でも、保健所の統廃合・管轄区域の変更により、年をまたいだ比較が単純にできない場合があります"),
+              tags$li("正確な数値が必要な場合は、必ず出典元の都道府県公式週報をご確認ください")
+            )
+          ),
+          tags$br(),
+
+          # ══════════════════════════════════════════════════
+          # ■ 病原体サーベイランス
+          # ══════════════════════════════════════════════════
+          tags$h4("■ 病原体サーベイランス", style="border-bottom:2px solid #16a085;padding-bottom:4px;color:#2c3e50;"),
+          tags$h5(id="notes-iasr", "病原体検出タブ"),
+          tags$h6("データソース"),
+          tags$p("病原微生物検出情報（IASR）　国立健康危機管理研究機構（JIHS）/ 地方衛生研究所"),
+          tags$ul(
+            tags$li("地方衛生研究所等からの月別・年別ウイルス・細菌分離・検出報告数を集計したもの"),
+            tags$li("月別データ（直近）: 2023年〜直近（JIHS速報集計表）／月別データ（過去）: 2012年〜2022年（IASRアーカイブ）／年別データ: 年次集計"),
+            tags$li("データ更新: 毎日午前3時に自動取得・更新（24時間キャッシュ）")
+          ),
+          tags$h6("病原体カテゴリ"),
+          tags$ul(
+            tags$li(tags$strong("インフルエンザ&呼吸器ウイルス:"), "インフルエンザ各型・RSV・SARS-CoV-2・ヒトメタニューモウイルス等"),
+            tags$li(tags$strong("エンテロウイルス(1)(2):"), "エンテロウイルス・コクサッキーウイルス・ポリオウイルス等"),
+            tags$li(tags$strong("胃腸炎ウイルス:"), "ノロウイルス・ロタウイルス・アストロウイルス等"),
+            tags$li(tags$strong("アデノウイルス:"), "アデノウイルス各型"),
+            tags$li(tags$strong("ヘルペス群ウイルス&その他:"), "HSV・VZV・EBV・CMV・HHV等"),
+            tags$li(tags$strong("腸管出血性大腸菌（VTEC）:"), "血清型別週次データを月別集計"),
+            tags$li(tags$strong("腸管感染症（赤痢・チフス・コレラ）:"), "国内例・海外例を月別集計"),
+            tags$li(tags$strong("食中毒菌:"), "サルモネラ・カンピロバクター・腸炎ビブリオ等")
+          ),
+          tags$div(style="background:#fff8e1;border-left:4px solid #f39c12;padding:8px 12px;margin-bottom:8px;font-size:0.9em;",
+            tags$strong("注意事項: "),
+            tags$ul(style="margin-bottom:0;",
+              tags$li("報告数は分離・検出件数であり、患者数・感染者数ではありません"),
+              tags$li("報告は参加施設（地方衛生研究所等）からの自発的報告に基づくため、全数を反映しているわけではありません"),
+              tags$li("施設数・検査体制の変化により経年比較には注意が必要です"),
+              tags$li("速報値のため、後日修正される場合があります"),
+              tags$li("直近のデータは今後遅れて報告される可能性があります（グラフ上では直近1か月をグレーの網掛けで表示）")
+            )
+          ),
+          tags$h5(id="notes-ari-pathogen", "ARI病原体タブ"),
+          tags$h6("データソース"),
+          tags$p("急性呼吸器感染症（ARI）サーベイランス週報　国立健康危機管理研究機構（JIHS）"),
+          tags$ul(
+            tags$li("ARI病原体定点（基幹定点）における検体採取週ごとの病原体別報告数・陽性率・全国および地域別報告数（タブ内のプルダウンで地域を切り替え）"),
+            tags$li(tags$a(href="https://id-info.jihs.go.jp/surveillance/idss/target-diseases/acute-respiratory-infection/weekly-report/index.html",
+                           target="_blank", "JIHS ARIサーベイランス週報（原本PDF）")),
+            tags$li("データ更新: 毎日午前3時に最新週報PDFを自動取得・再集計")
+          ),
+          tags$div(style="background:#fff8e1;border-left:4px solid #f39c12;padding:8px 12px;margin-bottom:8px;font-size:0.9em;",
+            tags$strong("注意（重要・データの限界）: "),
+            tags$ul(style="margin-bottom:0;",
+              tags$li(tags$strong("このタブの数値は近似値です。"), "週報PDFには図（グラフ画像）のみが掲載され、",
+                      "元データの数値表は公表されていません。グラフをレンダリングした画像を、凡例の色と照合して",
+                      "数値化（ピクセル解析）しているため、元の値と完全には一致しない場合があります"),
+              tags$li("特に色調の近い亜型間（パラインフルエンザウイルス1〜4型、RSウイルスA/B/型不明、",
+                      "インフルエンザ各亜型など）では、誤差が生じやすい点にご留意ください"),
+              tags$li("報告週ではなく検体採取週で集計。集計時点における報告数のため、過去の週報と値が変わる場合があります"),
+              tags$li("正確な数値が必要な場合は、必ず出典元のJIHS公式週報PDFをご確認ください")
+            )
+          ),
+          tags$br(),
+
+          # ══════════════════════════════════════════════════
+          # ■ 重症サーベイランス
+          # ══════════════════════════════════════════════════
+          tags$h4(id="notes-hosp", "■ 重症サーベイランス（入院サーベイランスタブ）", style="border-bottom:2px solid #4b499c;padding-bottom:4px;color:#2c3e50;"),
+          tags$h5("データソース"),
+          tags$p("感染症発生動向調査週報（IDWR）　国立健康危機管理研究機構（JIHS）"),
+          tags$ul(
+            tags$li("基幹定点（300床以上の病院を中心に指定、全国約500カ所。定点の種類については",
+              tags$a(href="javascript:void(0)", onclick="goToNotes('notes-ibs')", "こちら"),
+              "も参照）からの、インフルエンザ・新型コロナウイルス感染症による入院患者数（都道府県別）"),
+            tags$li("定点あたり報告数ではなく、基幹定点から報告された入院患者数の実数（都道府県別合計）を集計したもの"),
+            tags$li("新型コロナウイルス感染症（入院患者）は2023年5月8日の5類移行後に開始された集計のため、それ以前はデータがありません")
+          ),
+          tags$p(style="font-size:0.85em;color:#888;",
+            "※ 報告医療機関数が少数の基幹定点からの実数であるため、地域の医療体制・報告状況によって",
+            "ばらつきが大きい点にご留意ください。"),
+          tags$br(),
+
+          # ══════════════════════════════════════════════════
+          # ■ EBS（イベントベースサーベイランス）
+          # ══════════════════════════════════════════════════
           tags$h4(id="notes-ebs", "■ EBS（イベントベースサーベイランス）", style="border-bottom:2px solid #f39c12;padding-bottom:4px;color:#2c3e50;"),
           tags$h5("主なデータソース"),
           tags$p(style="font-size:0.85em;color:#888;",
@@ -1595,8 +1730,13 @@ function ebsUntranslateCards(containerId) {
           ),
           tags$br(),
 
+          # ── 文献（PubMed） ─────────────────────────────────
+          tags$h5("文献タブ"),
+          tags$p("PubMed収載論文のうち、サイドバーで選択中の疾患に関連するものを一覧表示します。データソース・更新頻度は上記「主なデータソース」「データ更新」と共通です。"),
+          tags$br(),
+
           # ── EBSニュース（海外）──────────────────────────────
-          tags$h4(id="notes-ebs-overseas", "■ EBSニュース（海外）タブ", style="border-bottom:2px solid #4b499c;padding-bottom:4px;color:#2c3e50;"),
+          tags$h5(id="notes-ebs-overseas", "EBSニュース（海外）タブ"),
           tags$ul(
             tags$li("全ソースのうち、タイトル・本文から海外の地名・国名のみ検出された記事を表示"),
             tags$li("Signal High / Signal Low / FYI の判定は国内タブと同じ基準"),
@@ -1606,25 +1746,21 @@ function ebsUntranslateCards(containerId) {
           tags$br(),
 
           # ── EBS Trends ─────────────────────────────────────
-          tags$h4(id="notes-ebs-trends", "■ EBS Trends タブ", style="border-bottom:2px solid #9b59b6;padding-bottom:4px;color:#2c3e50;"),
-          tags$h5("EBSニュース 日別シグナル数グラフ"),
+          tags$h5(id="notes-ebs-trends", "EBSトレンドタブ"),
+          tags$h6("EBSニュース 日別シグナル数グラフ"),
           tags$ul(
             tags$li("EBSニュース（国内）のSignal High・Signal Lowの週別記事数を過去60日分積み上げ棒グラフで表示"),
             tags$li("サイドバーの疾患・都道府県選択に連動"),
             tags$li("PubMed・海外記事は除外")
           ),
-          tags$h5("Google Trends グラフ"),
+          tags$h6("Google Trends グラフ"),
           tags$p("Google Trends API（gtrendsRパッケージ経由）"),
           tags$ul(
             tags$li("検索関心度を0〜100に正規化（100=期間内最大値）、週次・過去12ヶ月"),
             tags$li("サイドバーの疾患・都道府県選択に連動"),
             tags$li("データは毎日午前3時に自動更新（レート制限のため取得できない場合はキャッシュを表示）")
           ),
-          tags$br(),
-
-          # ── EBS/Trends トレンドカード ──────────────────────
-          tags$h4("■ EBS/Trends 流行トレンドカード", style="border-bottom:2px solid #e67e22;padding-bottom:4px;color:#2c3e50;"),
-          tags$h5("評価方法"),
+          tags$h6("流行トレンドカード（評価方法）"),
           tags$p("EBSニュース（過去14日）とGoogle Trendsを統合してトレンドを評価しています。"),
           tags$table(class="table table-bordered table-sm", style="font-size:0.85em;",
             tags$thead(tags$tr(tags$th("判定"), tags$th("基準"))),
@@ -1649,121 +1785,9 @@ function ebsUntranslateCards(containerId) {
           ),
           tags$br(),
 
-          # ── 統合活動レベル（IBS + EBS）─────────────────────
-          # IBS（定点把握・注意報警報基準値・Rt・過去5年比較）とEBSの両方を用いるため、
-          # 両方の説明が出そろった後にまとめて配置する
-          tags$h4(id="notes-integrated", "■ 統合活動レベルカード（IBS + EBS）", style="border-bottom:2px solid #6c3483;padding-bottom:4px;color:#2c3e50;"),
-          tags$p(
-            "地図・流行曲線タブ上部の「統合活動レベル」カードは、上記の定点把握（IBS）データとEBSニュースの", tags$strong("両方"), "を用いて算出しています。",
-            "IBS成分（95%）には「現在の流行フェーズカード」と同じ2段階加重平均ロジック（注意報・警報基準値・Rt・過去5年比較の統合）を適用し、",
-            "EBS成分（5%）と合算して最終的な活動レベル（1〜4）を決定しています。"
-          ),
-          tags$h5("計算式"),
-          tags$div(style="background:#f8f9fa;border:1px solid #ddd;border-radius:6px;padding:12px 16px;margin-bottom:8px;",
-            tags$div(style="font-size:0.8em;color:#666;margin-bottom:4px;",
-              "IBS成分（0〜3点）: 「現在の流行フェーズカード」と同じ2段階加重平均で算出",
-              tags$br(),
-              "（③は直近2週の過去5年比較±SD、2週連続+2SD超過のみ3点。①②が利用可能ならさらに統合）"),
-            tags$div(style="font-size:0.8em;color:#666;margin-bottom:4px;",
-              "EBSスコア（0〜2点）: 今週シグナル（高×3＋低×2）と先週シグナルの変化率 ",
-              tags$em("r"), " から算出（", tags$em("r"), " < 20%→0点、20% ≤ ", tags$em("r"), " < 50%→1点、",
-              tags$em("r"), " ≥ 50%→2点。今週・先週とも記事なしの場合は0点）"),
-            tags$div(HTML("\\[ S_{\\text{EBS}}' = \\min(3,\\ 1.5 \\cdot S_{\\text{EBS}}) \\]")),
-            tags$div(HTML("\\[ S_{\\text{combined}} = 0.95 \\cdot S_{\\text{IBS}} + 0.05 \\cdot S_{\\text{EBS}}' \\]")),
-            tags$div(HTML("\\[ \\text{活動レベル} = \\min\\bigl(4,\\ \\max(1,\\ \\mathrm{round}(S_{\\text{combined}}) + 1) \\bigr) \\]")),
-            tags$div(style="font-size:0.82em;color:#555;",
-              "レベル対応: ", tags$code("1"), "=通常　", tags$code("2"), "=注意　",
-              tags$code("3"), "=警戒　", tags$code("4"), "=流行")
-          ),
-          tags$br(),
-
-          # ── 活動レベル一覧（疾患別／都道府県別） ──────────────
-          tags$h4(id="notes-levels", "■ 活動レベル一覧（疾患別・都道府県別）", style="border-bottom:2px solid #6c3483;padding-bottom:4px;color:#2c3e50;"),
-          tags$p(
-            "上記「統合活動レベルカード」と同じ計算方法で実施した結果を、疾患ごと・都道府県ごとに一括表示するタブです。",
-            "「活動レベル一覧（疾患別）」はサイドバーで選択中の都道府県・表示モードについて全疾患のレベルをタイルで並べ、",
-            "「活動レベル一覧（都道府県別）」は選択中の疾患について全47都道府県のレベルをタイルで表示しています。"
-          ),
-          tags$ul(
-            tags$li("全数把握疾患のIBSスコアは、季節性の有無で評価方式が自動的に切り替わります（詳細は",
-              tags$a(href="javascript:void(0)", onclick="goToNotes('notes-zensu-ibs')", "こちら"), "）。"),
-            tags$li("いずれのタブも、期間スライダー（date_range）で選択した期間の末尾週を評価対象とします。"),
-            tags$li("タイルをクリックすると、その疾患・都道府県（もう一方の軸は現在の選択を維持）に絞り込んだ「流行曲線」タブへ移動します。")
-          ),
-          tags$br(),
-
-          # ── 入院サーベイランス ──────────────────────────────
-          tags$h4(id="notes-hosp", "■ 入院サーベイランスタブ", style="border-bottom:2px solid #4b499c;padding-bottom:4px;color:#2c3e50;"),
-          tags$h5("データソース"),
-          tags$p("感染症発生動向調査週報（IDWR）　国立健康危機管理研究機構（JIHS）"),
-          tags$ul(
-            tags$li("基幹定点（300床以上の病院を中心に指定、全国約500カ所。定点の種類については",
-              tags$a(href="javascript:void(0)", onclick="goToNotes('notes-ibs')", "こちら"),
-              "も参照）からの、インフルエンザ・新型コロナウイルス感染症による入院患者数（都道府県別）"),
-            tags$li("定点あたり報告数ではなく、基幹定点から報告された入院患者数の実数（都道府県別合計）を集計したもの"),
-            tags$li("新型コロナウイルス感染症（入院患者）は2023年5月8日の5類移行後に開始された集計のため、それ以前はデータがありません")
-          ),
-          tags$p(style="font-size:0.85em;color:#888;",
-            "※ 報告医療機関数が少数の基幹定点からの実数であるため、地域の医療体制・報告状況によって",
-            "ばらつきが大きい点にご留意ください。"),
-          tags$br(),
-
-          # ── 病原体検出（IASR）────────────────────────────────
-          tags$h4(id="notes-iasr", "■ 病原体検出タブ", style="border-bottom:2px solid #16a085;padding-bottom:4px;color:#2c3e50;"),
-          tags$h5("データソース"),
-          tags$p("病原微生物検出情報（IASR）　国立健康危機管理研究機構（JIHS）/ 地方衛生研究所"),
-          tags$ul(
-            tags$li("地方衛生研究所等からの月別・年別ウイルス・細菌分離・検出報告数を集計したもの"),
-            tags$li("月別データ（直近）: 2023年〜直近（JIHS速報集計表）"),
-            tags$li("月別データ（過去）: 2012年〜2022年（IASRアーカイブ）"),
-            tags$li("年別データ: 年次集計（複数年スパン）"),
-            tags$li("データ更新: 毎日午前3時に自動取得・更新（24時間キャッシュ）")
-          ),
-          tags$h5("病原体カテゴリ"),
-          tags$ul(
-            tags$li(tags$strong("インフルエンザ&呼吸器ウイルス:"), "インフルエンザ各型・RSV・SARS-CoV-2・ヒトメタニューモウイルス等（2012年〜）"),
-            tags$li(tags$strong("エンテロウイルス(1)(2):"), "エンテロウイルス・コクサッキーウイルス・ポリオウイルス等（2012年〜）"),
-            tags$li(tags$strong("胃腸炎ウイルス:"), "ノロウイルス・ロタウイルス・アストロウイルス等（2012年〜）"),
-            tags$li(tags$strong("アデノウイルス:"), "アデノウイルス各型（2012年〜）"),
-            tags$li(tags$strong("ヘルペス群ウイルス&その他:"), "HSV・VZV・EBV・CMV・HHV等（2012年〜）"),
-            tags$li(tags$strong("腸管出血性大腸菌（VTEC）:"), "血清型別週次データを月別集計（2012年〜）"),
-            tags$li(tags$strong("腸管感染症（赤痢・チフス・コレラ）:"), "国内例・海外例を月別集計（2012年〜）"),
-            tags$li(tags$strong("食中毒菌:"), "サルモネラ・カンピロバクター・腸炎ビブリオ等（2012年〜）")
-          ),
-          tags$h5("注意事項"),
-          tags$ul(
-            tags$li("報告数は分離・検出件数であり、患者数・感染者数ではありません"),
-            tags$li("報告は参加施設（地方衛生研究所等）からの自発的報告に基づくため、全数を反映しているわけではありません"),
-            tags$li("施設数・検査体制の変化により経年比較には注意が必要です"),
-            tags$li("速報値のため、後日修正される場合があります"),
-            tags$li("直近のデータは今後遅れて報告される可能性があります（グラフ上では直近1か月をグレーの網掛けで示しています）"),
-            tags$li("グラフ下の表はCSVダウンロードが可能です（現在の絞り込み・期間設定を反映）")
-          ),
-          tags$br(),
-
-          # ── ARI病原体 ────────────────────────────────────────
-          tags$h4(id="notes-ari-pathogen", "■ ARI病原体タブ", style="border-bottom:2px solid #16a085;padding-bottom:4px;color:#2c3e50;"),
-          tags$h5("データソース"),
-          tags$p("急性呼吸器感染症（ARI）サーベイランス週報　国立健康危機管理研究機構（JIHS）"),
-          tags$ul(
-            tags$li("ARI病原体定点（基幹定点）における検体採取週ごとの病原体別報告数・陽性率・全国および地域別報告数（タブ内のプルダウンで地域を切り替え）"),
-            tags$li(tags$a(href="https://id-info.jihs.go.jp/surveillance/idss/target-diseases/acute-respiratory-infection/weekly-report/index.html",
-                           target="_blank", "JIHS ARIサーベイランス週報（原本PDF）")),
-            tags$li("データ更新: 毎日午前3時に最新週報PDFを自動取得・再集計")
-          ),
-          tags$h5("注意事項（重要）"),
-          tags$ul(
-            tags$li(tags$strong("このタブの数値は近似値です。"), "週報PDFには図（グラフ画像）のみが掲載され、",
-                    "元データの数値表は公表されていません。グラフをレンダリングした画像を、凡例の色と照合して",
-                    "数値化（ピクセル解析）しているため、元の値と完全には一致しない場合があります"),
-            tags$li("特に色調の近い亜型間（パラインフルエンザウイルス1〜4型、RSウイルスA/B/型不明、",
-                    "インフルエンザ各亜型など）では、誤差が生じやすい点にご留意ください"),
-            tags$li("報告週ではなく検体採取週で集計。集計時点における報告数のため、過去の週報と値が変わる場合があります"),
-            tags$li("正確な数値が必要な場合は、必ず出典元のJIHS公式週報PDFをご確認ください")
-          ),
-          tags$br(),
-
-          # ── データ更新スケジュール ─────────────────────────
+          # ══════════════════════════════════════════════════
+          # ■ データ更新スケジュール
+          # ══════════════════════════════════════════════════
           tags$h4("■ データ更新スケジュール", style="border-bottom:2px solid #1abc9c;padding-bottom:4px;color:#2c3e50;"),
           tags$table(class="table table-bordered table-sm", style="font-size:0.85em;",
             tags$thead(tags$tr(tags$th("データ"), tags$th("更新頻度"), tags$th("取得元"))),
@@ -1774,7 +1798,8 @@ function ebsUntranslateCards(containerId) {
               tags$tr(tags$td("Google Trends"), tags$td("毎日 03:00 自動"), tags$td("gtrendsR API")),
               tags$tr(tags$td("病原体検出（IASR）"), tags$td("毎日 03:00 自動（24時間キャッシュ）"), tags$td("JIHS IASR")),
               tags$tr(tags$td("入院サーベイランス"), tags$td("毎日 03:00 自動（直近3号分を再取得）"), tags$td("JIHS IDWR週報PDF")),
-              tags$tr(tags$td("ARI病原体"), tags$td("毎日 03:00 自動（最新週報を再取得）"), tags$td("JIHS ARIサーベイランス週報PDF"))
+              tags$tr(tags$td("ARI病原体"), tags$td("毎日 03:00 自動（最新週報を再取得）"), tags$td("JIHS ARIサーベイランス週報PDF")),
+              tags$tr(tags$td("保健所別マップ"), tags$td("毎日 03:00 自動"), tags$td("各都道府県公式週報"))
             )
           ),
           tags$br(),
