@@ -642,8 +642,8 @@ function ebsUntranslateCards(containerId) {
         )
       ),
 
-      # ── 保健所別マップ（メインの都道府県・疾患選択と連動）──
-      tabPanel("保健所別マップ", icon=icon("map-location-dot"),
+      # ── 保健所別比較（メインの都道府県・疾患選択と連動）──
+      tabPanel("保健所別比較", icon=icon("map-location-dot"),
         tags$div(style="padding:10px 6px 4px;",
           tags$p(style="color:#666;font-size:0.85em;",
             "画面上部で選択中の都道府県・疾患について、その都道府県の週報から取得した",
@@ -1158,7 +1158,7 @@ function ebsUntranslateCards(containerId) {
                 tags$li(tags$strong("複数疾患比較（定点）:"), "複数疾患の定点報告数を重ね合わせ表示"),
                 tags$li(tags$strong("実効再生産数 Rt:"), "Cori法によるRt推定")
               )),
-            tags$li(tags$strong("保健所別マップ:"), "選択中の都道府県・疾患について、保健所単位のデータを地図・グラフ・表で表示"),
+            tags$li(tags$strong("保健所別比較:"), "選択中の都道府県・疾患について、保健所単位のデータを地図・グラフ・表で表示"),
             tags$li(tags$strong("病原体サーベイランス:"),
               tags$ul(
                 tags$li(tags$strong("病原体検出:"), "IASR（病原微生物検出情報）に基づく病原体検出状況"),
@@ -1553,9 +1553,9 @@ function ebsUntranslateCards(containerId) {
           tags$br(),
 
           # ══════════════════════════════════════════════════
-          # ■ 保健所別マップ
+          # ■ 保健所別比較
           # ══════════════════════════════════════════════════
-          tags$h4(id="notes-hokenjo", "■ 保健所別マップ", style="border-bottom:2px solid #16a085;padding-bottom:4px;color:#2c3e50;"),
+          tags$h4(id="notes-hokenjo", "■ 保健所別比較", style="border-bottom:2px solid #16a085;padding-bottom:4px;color:#2c3e50;"),
           tags$h5("データソース"),
           tags$p("各都道府県が公表する感染症週報等（保健所別・報告区分別の内訳）"),
           tags$ul(
@@ -1799,7 +1799,7 @@ function ebsUntranslateCards(containerId) {
               tags$tr(tags$td("病原体検出（IASR）"), tags$td("毎日 03:00 自動（24時間キャッシュ）"), tags$td("JIHS IASR")),
               tags$tr(tags$td("入院サーベイランス"), tags$td("毎日 03:00 自動（直近3号分を再取得）"), tags$td("JIHS IDWR週報PDF")),
               tags$tr(tags$td("ARI病原体"), tags$td("毎日 03:00 自動（最新週報を再取得）"), tags$td("JIHS ARIサーベイランス週報PDF")),
-              tags$tr(tags$td("保健所別マップ"), tags$td("毎日 03:00 自動"), tags$td("各都道府県公式週報"))
+              tags$tr(tags$td("保健所別比較"), tags$td("毎日 03:00 自動"), tags$td("各都道府県公式週報"))
             )
           ),
           tags$br(),
@@ -6179,7 +6179,7 @@ server <- function(input, output, session) {
     }
   )
 
-  # ── 保健所別マップ（都道府県・疾患はメインのコントロールパネルと連動）──
+  # ── 保健所別比較（都道府県・疾患はメインのコントロールパネルと連動）──
   output$hokenjo_metric_selector_ui <- renderUI({
     selectInput("hokenjo_metric", "表示指標",
                 choices = c("定点当たり報告数" = "rate", "報告数" = "count"),
@@ -6569,8 +6569,8 @@ server <- function(input, output, session) {
       }
     }
     msg <- switch(st$status,
-      no_pref = if (national_ok) NULL else "「全国」選択時に地図で塗り分けられる保健所別データが見つかりませんでした。都道府県を選択すると、その県内の保健所別マップが表示されます。",
-      not_teiten = "保健所別マップは「定点把握」の週次疾患のみ対応しています（現在は全数把握モードです）。",
+      no_pref = if (national_ok) NULL else "「全国」選択時に地図で塗り分けられる保健所別データが見つかりませんでした。都道府県を選択すると、その県内の保健所別比較が表示されます。",
+      not_teiten = "保健所別比較は「定点把握」の週次疾患のみ対応しています（現在は全数把握モードです）。",
       pref_unavailable = sprintf("%sの週報からは保健所別データを取得できていません。", st$pref),
       disease_unmatched = sprintf("%sの週報には「%s」の保健所別内訳が見当たりませんでした。", st$pref, st$label),
       ok = if (is.null(d) || nrow(d) == 0 || all(is.na(d$rate) & is.na(d$count))) {

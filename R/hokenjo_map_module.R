@@ -1,5 +1,5 @@
 # ============================================================
-# 保健所別マップ タブ用ヘルパー
+# 保健所別比較 タブ用ヘルパー
 # ------------------------------------------------------------
 # data/hokenjo_current.rds （scripts/refresh_hokenjo_data.R で生成）
 # と data/geo/hokenjo_boundaries/<slug>.geojson、
@@ -105,7 +105,7 @@ load_hokenjo_name_map <- function() {
             error = function(e) NULL)
 }
 
-# データが存在する都道府県一覧（保健所別マップタブの選択肢用）
+# データが存在する都道府県一覧（保健所別比較タブの選択肢用）
 hokenjo_available_prefs <- function(current_data) {
   if (is.null(current_data) || nrow(current_data) == 0) return(character(0))
   present <- unique(as.character(current_data$pref))
@@ -122,7 +122,7 @@ hokenjo_available_diseases <- function(current_data, pref) {
 }
 
 # 都道府県の境界GeoJSONを読み込む（st_read）。ファイルが無ければNULL。
-# 保健所別マップの「全国モード」「選択県以外の全都道府県を色塗り表示」機能は
+# 保健所別比較の「全国モード」「選択県以外の全都道府県を色塗り表示」機能は
 # 表示週を1つ動かすたびに毎回全都道府県分（最大47件）を再読み込みしており、
 # ディスクI/O・GeoJSONパースのコストがスライダー/再生ボタンの描出遅延の
 # 主因になっていた。境界の形状（ジオメトリ）自体は週を変えても変化しない
