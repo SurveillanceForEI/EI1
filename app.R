@@ -1668,7 +1668,6 @@ function ebsUntranslateCards(containerId) {
             tags$thead(tags$tr(tags$th("ソース"), tags$th("カテゴリ"), tags$th("言語"))),
             tags$tbody(
               tags$tr(tags$td("Google News（疾患別キーワード検索）"), tags$td("ニュース"), tags$td("日本語/英語")),
-              tags$tr(tags$td("WHO EIOS"), tags$td("国際"), tags$td("英語")),
               tags$tr(tags$td("CIDRAP（疾患別トピックフィード計20本）"), tags$td("国際"), tags$td("英語")),
               tags$tr(tags$td("ReliefWeb（日本関連）"), tags$td("国際"), tags$td("英語")),
               tags$tr(tags$td("Japan Times"), tags$td("メディア"), tags$td("英語")),
