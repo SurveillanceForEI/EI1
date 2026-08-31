@@ -48,7 +48,10 @@ library(jsonlite)
   # 海外在住日本語コミュニティ向けメディア・海外都市名（本文が日本語要約のため
   # 国名キーワードに一致しないケースの補完）
   "ニューヨーク","マンハッタン","アッパーイーストサイド","japion","ロサンゼルス",
-  "ハワイ報知","ブラジル日報","paulista shimbun"
+  "ハワイ報知","ブラジル日報","paulista shimbun","サンパウロ","リオデジャネイロ",
+  # 米国連邦保健機関の略称のみで国名の言及がない記事の補完
+  # （例:「CDC, FDA end investigation into Listeria outbreak」2026-08-29 ユーザー指摘）
+  "cdc","fda"
 )
 
 # COUNTRY_DB（ebs_rule_screening.R、地域分類用）は英語・カタカナ・漢字表記の国名を
