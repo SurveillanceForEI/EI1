@@ -562,7 +562,7 @@ render_idsc_links_ui <- function() {
       style="background:#eaf4fb;border-left:4px solid #2980b9;border-radius:4px;padding:14px 18px;margin-bottom:20px;font-size:0.9em;",
       tags$p(style="margin:0;",
         "国内の保健所設置自治体（都道府県47・政令指定都市20・中核市62・保健所政令市5・東京23特別区、計157自治体）および国の公的機関、",
-        "国外の感染症サーベイランス情報等発信公的機関のリンク集です。なお、保健所設置市の一部のサイトは注意喚起等情報の発信のみで、",
+        "海外の感染症サーベイランス情報等発信公的機関のリンク集です。なお、保健所設置市の一部のサイトは注意喚起等情報の発信のみで、",
         "サーベイランスデータは都道府県等の感染症情報センターのサイトを参照するものもあります"),
       tags$p(style="margin:6px 0 0;color:#555;",
         icon("triangle-exclamation"),
@@ -579,7 +579,7 @@ render_idsc_links_ui <- function() {
       ),
       region_nav,
       tags$div(style="margin-top:4px;",
-        tags$a(href="#idsc-overseas", style="font-size:0.82em;color:#8e44ad;font-weight:bold;text-decoration:none;", "→ 国外セクションへ")
+        tags$a(href="#idsc-overseas", style="font-size:0.82em;color:#8e44ad;font-weight:bold;text-decoration:none;", "→ 海外セクションへ")
       )
     ),
     tags$script(HTML("
@@ -615,7 +615,7 @@ render_idsc_links_ui <- function() {
     ),
 
     tags$h4(id = "idsc-overseas", style="border-bottom:2px solid #8e44ad;padding-bottom:4px;color:#2c3e50;scroll-margin-top:70px;",
-            icon("globe"), " 国外"),
+            icon("globe"), " 海外"),
     tags$table(style="width:100%;border-collapse:collapse;font-size:0.92em;",
       tags$thead(
         tags$tr(style="border-bottom:2px solid #2c3e50;",
