@@ -39,7 +39,7 @@ IS_SHINYAPPS <- nchar(Sys.getenv("SHINYAPPS_APPLICATION_ID")) > 0 ||
                 grepl("^/srv/", getwd()) ||
                 nchar(Sys.getenv("R_CONFIG_ACTIVE")) > 0
 
-# 国内・海外タブの振り分けロジック（is_overseas_article, detect_pref, strip_gnews_suffix,
+# 国内・国外タブの振り分けロジック（is_overseas_article, detect_pref, strip_gnews_suffix,
 # JAPAN_KEYWORDS/OVERSEAS_KEYWORDS相当）は R/ebs_loader.R 側の定義（.JAPAN_KW_LOADER /
 # .OVERSEAS_KW_LOADER）に一本化している。以前はここに同名の重複定義があり、
 # source("R/ebs_loader.R") の後に評価されるためこちらが常に上書きしてしまい、
@@ -1035,7 +1035,7 @@ function ebsUntranslateCards(containerId) {
             icon("circle-info"), " 注意事項・データソース")),
         fluidRow(
           column(3,
-            tags$div(class="data-source-bar","EBSニュース（海外）"),
+            tags$div(class="data-source-bar","EBSニュース（国外）"),
             tags$div(style="font-size:0.85em;color:#555;margin-bottom:6px;",
               icon("info-circle"), " 初期状態は全疾患を表示。疾患で絞り込みたいときはサイドバーで選択"),
             selectInput("ebs_ov_period","表示期間",
@@ -1056,7 +1056,7 @@ function ebsUntranslateCards(containerId) {
               tags$span(icon("landmark"), " 公式情報のみ表示"),
               value = FALSE),
             tags$div(style="font-size:0.75em;color:#888;margin-top:-8px;line-height:1.4;",
-              "WHO・海外保健当局等の公式サイトからの情報のみに絞り込みます"),
+              "WHO・国外保健当局等の公式サイトからの情報のみに絞り込みます"),
             tags$div(style="font-size:0.8em;color:#888;margin-top:8px;",
               icon("info-circle"),
               " 流行トレンド評価には含まれません。都道府県フィルタ対象外。")
@@ -1597,7 +1597,7 @@ function ebsUntranslateCards(containerId) {
             tags$li(tags$strong("アデノウイルス:"), "アデノウイルス各型"),
             tags$li(tags$strong("ヘルペス群ウイルス&その他:"), "HSV・VZV・EBV・CMV・HHV等"),
             tags$li(tags$strong("腸管出血性大腸菌（VTEC）:"), "血清型別週次データを月別集計"),
-            tags$li(tags$strong("腸管感染症（赤痢・チフス・コレラ）:"), "国内例・海外例を月別集計"),
+            tags$li(tags$strong("腸管感染症（赤痢・チフス・コレラ）:"), "国内例・海外例（データ上の表示名）を月別集計"),
             tags$li(tags$strong("食中毒菌:"), "サルモネラ・カンピロバクター・腸炎ビブリオ等")
           ),
           tags$div(style="background:#fff8e1;border-left:4px solid #f39c12;padding:8px 12px;margin-bottom:8px;font-size:0.9em;",
@@ -1677,12 +1677,12 @@ function ebsUntranslateCards(containerId) {
               tags$tr(tags$td("台湾CDC（衛生福利部疾病管制署）"), tags$td("国際"), tags$td("中国語"))
             )
           ),
-          tags$p(style="font-size:0.85em;color:#888;", "※ PubMed論文はEBSニュース（海外）タブに表示。流行トレンド評価には含まない。"),
-          tags$h5("国内・海外タブの振り分け"),
+          tags$p(style="font-size:0.85em;color:#888;", "※ PubMed論文はEBSニュース（国外）タブに表示。流行トレンド評価には含まない。"),
+          tags$h5("国内・国外タブの振り分け"),
           tags$ul(
-            tags$li("情報ソースではなく、", tags$strong("記事のタイトル・本文中の地名・国名"), "で国内・海外を判定"),
+            tags$li("情報ソースではなく、", tags$strong("記事のタイトル・本文中の地名・国名"), "で国内・国外を判定"),
             tags$li("都道府県名・政令市・市区町村名・保健所名が含まれる記事 → ", tags$strong("EBSニュース（国内）")),
-            tags$li("海外の国名・地名のみ含まれる記事 → ", tags$strong("EBSニュース（海外）")),
+            tags$li("国外の国名・地名のみ含まれる記事 → ", tags$strong("EBSニュース（国外）")),
             tags$li("どちらも検出されない場合は国内扱い")
           ),
           tags$h5("シグナルレベル（WHO EBS 7基準による自動判定）"),
@@ -1693,7 +1693,7 @@ function ebsUntranslateCards(containerId) {
                       tags$td("日本への直接影響あり・原因不明かつ国際的関心・一類感染症＋国内影響"),
                       tags$td("3")),
               tags$tr(tags$td(tags$span(style="color:#e67e22;font-weight:700;", "Signal Low")),
-                      tags$td("海外での重大事象・一類感染症（海外）・伝播可能性あり"),
+                      tags$td("国外での重大事象・一類感染症（国外）・伝播可能性あり"),
                       tags$td("2")),
               tags$tr(tags$td(tags$span(style="color:#95a5a6;font-weight:700;", "FYI")),
                       tags$td("感染症関連情報・参考情報（流行評価には含めない）"),
@@ -1707,10 +1707,10 @@ function ebsUntranslateCards(containerId) {
             "該当疾患を含む記事はシグナルレベルが1段階引き上げられます（FYI→Signal Low→Signal High）。"),
           tags$h5("公式情報のみ表示フィルタ"),
           tags$ul(
-            tags$li("国内・海外タブそれぞれのサイドバーにある「公式情報のみ表示」チェックボックスで、",
+            tags$li("国内・国外タブそれぞれのサイドバーにある「公式情報のみ表示」チェックボックスで、",
                     "行政機関・国際機関の公式サイト/公式RSSから取得した記事のみに絞り込めます"),
             tags$li("対象: 厚生労働省・JIHS・全47都道府県の公式サイト、WHO・ECDC・UKHSA・ロベルトコッホ研究所・",
-                    "台湾/中国CDC・香港CHP等の海外公的機関"),
+                    "台湾/中国CDC・香港CHP等の国外公的機関"),
             tags$li("対象外（公式情報として扱わない）: NHK・新聞社等の報道機関、Google Newsによる",
                     "ニュース集約、PubMed（学術論文）、SNS"),
             tags$li("公式情報源からの記事にはカード上に", tags$strong("「公式」"), "バッジが表示されます")
@@ -1735,10 +1735,10 @@ function ebsUntranslateCards(containerId) {
           tags$p("PubMed収載論文のうち、サイドバーで選択中の疾患に関連するものを一覧表示します。データソース・更新頻度は上記「主なデータソース」「データ更新」と共通です。"),
           tags$br(),
 
-          # ── EBSニュース（海外）──────────────────────────────
-          tags$h5(id="notes-ebs-overseas", "EBSニュース（海外）タブ"),
+          # ── EBSニュース（国外）──────────────────────────────
+          tags$h5(id="notes-ebs-overseas", "EBSニュース（国外）タブ"),
           tags$ul(
-            tags$li("全ソースのうち、タイトル・本文から海外の地名・国名のみ検出された記事を表示"),
+            tags$li("全ソースのうち、タイトル・本文から国外の地名・国名のみ検出された記事を表示"),
             tags$li("Signal High / Signal Low / FYI の判定は国内タブと同じ基準"),
             tags$li(tags$strong("EBS/Trends 流行トレンド評価には含まれない")),
             tags$li("都道府県フィルターの影響を受けない")
@@ -1751,7 +1751,7 @@ function ebsUntranslateCards(containerId) {
           tags$ul(
             tags$li("EBSニュース（国内）のSignal High・Signal Lowの週別記事数を過去60日分積み上げ棒グラフで表示"),
             tags$li("サイドバーの疾患・都道府県選択に連動"),
-            tags$li("PubMed・海外記事は除外")
+            tags$li("PubMed・国外記事は除外")
           ),
           tags$h6("Google Trends グラフ"),
           tags$p("Google Trends API（gtrendsRパッケージ経由）"),
@@ -1973,7 +1973,7 @@ server <- function(input, output, session) {
       updateSelectInput(session, "ebs_period", selected = s$ebs_period)
     if (!is.null(s$ebs_page_size))
       updateSelectInput(session, "ebs_page_size", selected = s$ebs_page_size)
-    # EBSニュース（海外）
+    # EBSニュース（国外）
     if (!is.null(s$ebs_ov_signal))
       updateSelectInput(session, "ebs_ov_signal", selected = s$ebs_ov_signal)
     if (!is.null(s$ebs_ov_disease))
@@ -2293,7 +2293,7 @@ server <- function(input, output, session) {
     "general"="感染症全般"
   )
 
-  # EBSニュース（国内・海外）の「表示期間」セレクタ用ラベル（値=日数）
+  # EBSニュース（国内・国外）の「表示期間」セレクタ用ラベル（値=日数）
   EBS_PERIOD_LABELS <- c(
     "1"="昨日〜現在","3"="直近3日","7"="直近1週間","30"="直近1か月",
     "90"="直近3か月","180"="直近6か月","365"="直近1年"
@@ -2311,8 +2311,8 @@ server <- function(input, output, session) {
     list(lo = Sys.Date() - period_days, hi = NULL)
   }
 
-  # EBSニュース（国内・海外）の現在のフィルタ状態を一目で分かるバッジ表示で返す。
-  # pref_val は都道府県フィルタの現在値（国内EBSのみ。海外EBSは都道府県で
+  # EBSニュース（国内・国外）の現在のフィルタ状態を一目で分かるバッジ表示で返す。
+  # pref_val は都道府県フィルタの現在値（国内EBSのみ。国外EBSは都道府県で
   # 絞り込まないため呼び出し元でNULLを渡す）。ユーザー指示（2026-08-24）:
   # EBSサマリーに疾患だけでなく選択中の都道府県も分かるようにする
   ebs_filter_status_badge <- function(show_all, period_val, pref_val = NULL) {
@@ -2330,7 +2330,7 @@ server <- function(input, output, session) {
                padding:2px 10px;font-size:0.78em;font-weight:700;margin-right:6px;",
         icon("filter"), " ", lbl, " で絞り込み中")
     }
-    # pref_val が NULL の場合（海外EBS等、都道府県フィルタが適用されない場合）は
+    # pref_val が NULL の場合（国外EBS等、都道府県フィルタが適用されない場合）は
     # バッジ自体を出さない。それ以外は「全国」or 選択中の都道府県名を表示する
     pref_badge <- if (is.null(pref_val)) {
       NULL
@@ -2500,7 +2500,7 @@ server <- function(input, output, session) {
     ))
   })
 
-  # EBSニュース（海外）フィルターバー
+  # EBSニュース（国外）フィルターバー
   output$filter_bar_ebs_ov <- renderUI({
     sig_val <- if (!is.null(input$ebs_ov_signal) && input$ebs_ov_signal != "すべて")
       input$ebs_ov_signal else NULL
@@ -5159,7 +5159,7 @@ server <- function(input, output, session) {
     if (!is.null(input$ts_mode) && input$ts_mode == "zensu") input$zensu_disease_ts else input$disease
   })
 
-  # すべて表示フラグ（EBSニュース国内・海外は「全疾患表示」がデフォルト。
+  # すべて表示フラグ（EBSニュース国内・国外は「全疾患表示」がデフォルト。
   # サイドバー（コントロールパネル）で疾患を選ぶと、そこで初めて絞り込みが有効になる。
   # PubMed文献タブのみ従来通りサイドバー疾患での絞り込みがデフォルト）
   ebs_show_all_flag    <- reactiveVal(TRUE)
@@ -5181,7 +5181,7 @@ server <- function(input, output, session) {
     pubmed_show_all_flag(FALSE)
   }, ignoreInit = TRUE)
 
-  # 国内・海外判定（is_overseas_article_vec）はEBSキャッシュ全件に対して行う
+  # 国内・国外判定（is_overseas_article_vec）はEBSキャッシュ全件に対して行う
   # 重い処理のため、filtered_ebs/ebs_overseas/ebs_trend_dataがそれぞれ個別に
   # 再計算すると同じ判定を3回繰り返すことになり無駄に遅い。ここで1回だけ
   # 計算した列を付与し、各reactiveはこの結果を再利用する。
@@ -5420,7 +5420,7 @@ server <- function(input, output, session) {
     )
   })
 
-  # ── EBSニュース（海外）─────────────────────────────────────
+  # ── EBSニュース（国外）─────────────────────────────────────
   ebs_overseas <- reactive({
     d <- ebs_classified()
     if (is.null(d) || nrow(d) == 0) return(d)
@@ -5462,7 +5462,7 @@ server <- function(input, output, session) {
     }
     tags$div(style="background:#f8f9fa;border-radius:8px;padding:12px 16px;margin-bottom:4px;",
       tags$div(style="font-size:0.78em;color:#888;margin-bottom:6px;",
-               "EBS サマリー（海外）"),
+               "EBS サマリー（国外）"),
       ebs_filter_status_badge(ebs_ov_show_all_flag(), input$ebs_ov_period),
       tags$div(style="font-size:0.75em;color:#999;margin-bottom:6px;",
                period_txt, "　※古い記事はリンク切れの場合があります",
