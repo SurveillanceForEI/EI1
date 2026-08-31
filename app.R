@@ -982,6 +982,9 @@ function ebsUntranslateCards(containerId) {
 
       # ── EBS ──────────────────────────────────────────────
       tabPanel("EBS", icon=icon("newspaper"),
+      tags$div(style="background:#fff8e1;border-left:4px solid #f39c12;border-radius:4px;padding:8px 14px;margin:4px 4px 8px;font-size:0.85em;color:#7a5c00;",
+        icon("triangle-exclamation"),
+        " EBS（イベントベースサーベイランス）のデータ取得・シグナル判定は開発中の機能です。感染症と無関係な記事が誤って紛れ込む場合があります。"),
       tabsetPanel(id="sub_ebs", type="tabs",
 
       tabPanel("国内", icon=icon("newspaper"),
