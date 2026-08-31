@@ -549,8 +549,6 @@ function ebsUntranslateCards(containerId) {
     # 失敗するため、常にレンダリングされる位置にこれを置いて確実に読み込む
     tags$div(style="display:none;", plotlyOutput("plotly_dep_loader", height="1px")),
 
-    uiOutput("data_source_banner"),
-
     # ── KPIカード ──────────────────────────────────────────
     # 1行目: 疾患・地域 + IBS・EBS統合活動レベル
     # 2行目: IBS総合判定 + IBS3枚（報告数・Rt・基準値）+ EBS（トレンド）
@@ -2004,45 +2002,6 @@ server <- function(input, output, session) {
     if (!is.null(s$main_tabs))
       updateTabsetPanel(session, "main_tabs", selected = s$main_tabs)
   }, once = TRUE, ignoreNULL = TRUE)
-
-  # ── last_update.txt を60秒ごとに再読み（外部スクリプト更新を検知）
-  last_update_reader <- reactiveFileReader(
-    intervalMillis = 60000,
-    session        = session,
-    filePath       = "data/last_update.txt",
-    readFunc       = function(f) {
-      if (file.exists(f)) readLines(f, warn=FALSE)[1] else "不明"
-    }
-  )
-
-  # ── データソースバナー ─────────────────────────────────
-  output$data_source_banner <- renderUI({
-    fetch_time <- last_update_reader()
-    if (IS_REAL_DATA) {
-      tags$div(
-        style = paste0(
-          "background:#fff3cd;border:1px solid #ffc107;border-radius:6px;",
-          "padding:8px 14px;font-size:0.82em;color:#856404;margin-bottom:12px;",
-          "display:flex;justify-content:space-between;align-items:center;"
-        ),
-        tags$div(
-          paste0("最終データ取得: ", fetch_time),
-          tags$span(style="margin-left:12px;color:#856404;",
-            "（データソース・確定値/速報値の詳細は",
-            tags$a(href="javascript:void(0)", onclick="goToNotes('notes-zensu')",
-                   style="color:#856404;text-decoration:underline;", "Notes"),
-            "を参照）"
-          )
-        ),
-      )
-    } else {
-      tags$div(class="demo-banner",
-        tags$strong("⚠ デモデータ表示中: "),
-        "JIHS IDWRへの接続に失敗したため、参考用のシミュレーションデータを表示しています。",
-        "ネットワーク接続を確認してください。"
-      )
-    }
-  })
 
   # ── 自動更新タイマー（1日1回 正午） ────────────────────
   next_3am <- function() {
