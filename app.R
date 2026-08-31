@@ -1688,7 +1688,7 @@ function ebsUntranslateCards(containerId) {
             tags$li("国外の国名・地名のみ含まれる記事 → ", tags$strong("EBSニュース（国外）")),
             tags$li("どちらも検出されない場合は国内扱い")
           ),
-          tags$h5("シグナルレベル（WHO EBS 7基準による自動判定）"),
+          tags$h5("シグナルレベル"),
           tags$table(class="table table-bordered table-sm", style="font-size:0.85em;",
             tags$thead(tags$tr(tags$th("レベル"), tags$th("意味"), tags$th("重み"))),
             tags$tbody(
@@ -1703,11 +1703,6 @@ function ebsUntranslateCards(containerId) {
                       tags$td("―"))
             )
           ),
-          tags$p(style="font-size:0.85em;color:#666;",
-            "※ WHO Weekly Epidemiological Record（WER）の「Highlighted signals and events」（毎週金曜発行）で",
-            "その週に取り上げられた疾患は、それ自体を記事として一覧に加えるのではなく、",
-            "他ソース由来の記事の", tags$strong("補強シグナル"), "として扱います。",
-            "該当疾患を含む記事はシグナルレベルが1段階引き上げられます（FYI→Signal Low→Signal High）。"),
           tags$h5("公式情報のみ表示フィルタ"),
           tags$ul(
             tags$li("国内・国外タブそれぞれのサイドバーにある「公式情報のみ表示」チェックボックスで、",
