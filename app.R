@@ -1227,6 +1227,9 @@ function ebsUntranslateCards(containerId) {
           tags$p("感染症発生動向調査週報（IDWR）速報／感染症発生動向調査事業年報　国立健康危機管理研究機構（JIHS）"),
           tags$ul(
             tags$li("2024年までは感染症発生動向調査事業年報の確定値、2025年以降はIDWR週報の速報値（暫定値）を使用（画面右上の「⚠ 速報値」「✓ 確定値」表示で判別可）"),
+            tags$li("速報値は後日、事業年報の確定値で修正される場合があります。詳細・確定値は",
+                    tags$a(href="https://id-info.jihs.go.jp/surveillance/idwr/", target="_blank", "JIHS公式サイト"),
+                    "でご確認ください"),
             tags$li("集計週は月曜〜日曜、報告週は翌週月曜基準で公表。JIHSサイトでの公表は原則毎週火曜日（祝祭日等の影響でずれる場合あり）"),
             tags$li("本ダッシュボードのデータ更新: 毎日午前3時に自動取得（新週が公表されていれば差分取得）")
           ),
@@ -2023,16 +2026,12 @@ server <- function(input, output, session) {
           "display:flex;justify-content:space-between;align-items:center;"
         ),
         tags$div(
-          tags$strong("ℹ データについて: "),
-          "2023年以前は感染症発生動向調査事業年報の確定値、",
-          "直近分は感染症発生動向調査週報（IDWR）の速報値（暫定値）を使用しています。",
-          "速報値は後日修正される場合があります。詳細・確定値は",
-          tags$a(href="https://id-info.jihs.go.jp/surveillance/idwr/",
-                 target="_blank", style="color:#856404;",
-                 "JIHS公式サイト"),
-          "でご確認ください。",
-          tags$span(style="margin-left:12px;",
-            paste0("最終データ取得: ", fetch_time)
+          paste0("最終データ取得: ", fetch_time),
+          tags$span(style="margin-left:12px;color:#856404;",
+            "（データソース・確定値/速報値の詳細は",
+            tags$a(href="javascript:void(0)", onclick="goToNotes('notes-zensu')",
+                   style="color:#856404;text-decoration:underline;", "Notes"),
+            "を参照）"
           )
         ),
       )
