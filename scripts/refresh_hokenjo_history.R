@@ -201,6 +201,10 @@ cat(paste(status_log, collapse = "\n"), "\n")
 
 if (length(new_rows) > 0) {
   added <- do.call(rbind, new_rows)
+  # hokenjo_year列は起動時の再計算コスト削減のためdata/hokenjo_history.rds側に
+  # 保存している（R/hokenjo_map_module.R参照）。新規追記行のみ計算して既存の
+  # historyと列を揃える（この列がないとrbindで列数不一致エラーになる）。
+  added$hokenjo_year <- vapply(added$week_label, .hokenjo_extract_year_local, integer(1))
   combined <- if (!is.null(history)) rbind(history, added) else added
   saveRDS(combined, HISTORY_PATH)
   cat(sprintf("\n追記: %d行（新規） / 累計: %d行\n", nrow(added), nrow(combined)))

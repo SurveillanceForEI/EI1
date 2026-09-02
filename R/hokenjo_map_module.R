@@ -57,8 +57,17 @@ load_hokenjo_history <- function() {
   }
   # week_num（1〜52）は年をまたいで再利用されるため、週報スライダーで
   # 「2025年〜最新」のような年をまたぐ連続範囲を作れるよう、week_labelから
-  # 実際の西暦年を抜き出しておく（年+週番号の複合キーの元になる）
-  d$hokenjo_year <- vapply(d$week_label, .hokenjo_extract_year, integer(1))
+  # 実際の西暦年を抜き出しておく（年+週番号の複合キーの元になる）。
+  # 全行に対する正規表現ベースの抽出（.hokenjo_extract_year）は
+  # データが100万行を超えると数十秒かかり、Connect Cloudのワーカー
+  # 起動タイムアウト（60秒）を超えて「Your application failed to
+  # start」の原因になっていた（2026-09-02 実例）。hokenjo_year列は
+  # 既にdata/hokenjo_history.rds側に保存済み（scripts/refresh_hokenjo_history.R
+  # で新規追記行のみ計算）のため、通常はここでの再計算は発生しない。
+  # 列が無い古い形式のファイルを読んだ場合のみフォールバックとして計算する。
+  if (!"hokenjo_year" %in% names(d)) {
+    d$hokenjo_year <- vapply(d$week_label, .hokenjo_extract_year, integer(1))
+  }
   d
 }
 
