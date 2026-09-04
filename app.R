@@ -540,6 +540,18 @@ function ebsUntranslateCards(containerId) {
     if (orig) { el.textContent = orig; el.removeAttribute("data-orig"); }
   });
 }
+$(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
+  // 保健所別比較タブが非表示（display:none）の間にLeafletマップが
+  // 初期化されると、コンテナのサイズが0のまま内部のピクセル座標系が
+  // 決まってしまい、タブを表示してもレイヤーが正しく表示されないことが
+  // ある。タブが表示されるたびにinvalidateSize()を呼び直し、現在の
+  // コンテナサイズで座標系を再計算させる（保険的な対応）。
+  setTimeout(function() {
+    var widget = document.getElementById("hokenjo_map") ? HTMLWidgets.find("#hokenjo_map") : null;
+    var map = widget ? widget.getMap() : null;
+    if (map) map.invalidateSize();
+  }, 200);
+});
       '))
     ),
 
