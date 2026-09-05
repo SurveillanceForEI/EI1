@@ -681,7 +681,7 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
               plotlyOutput("hokenjo_bar_plot", height="480px")
             )
           ),
-          tags$h5("週別集計表（年始〜選択週、保健所別）", style="font-weight:700;margin-top:10px;"),
+          tags$h5("週別集計表（データ取得済み期間〜選択週、保健所別）", style="font-weight:700;margin-top:10px;"),
           tags$style(HTML("
             #hokenjo_summary_table table.dataTable thead th:first-child,
             #hokenjo_summary_table table.dataTable tbody td:first-child {
