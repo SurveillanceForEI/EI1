@@ -5855,8 +5855,11 @@ server <- function(input, output, session) {
     zd <- ZENSU_DATA
     if (is.null(zd) || nrow(zd) == 0)
       return(plot_ly() %>% add_annotations(text="データなし", showarrow=FALSE))
+    # ZENSU_DATA（zensu_loader.R側）は読み込み時点で既にregion列をjoin済み
+    # のため、ここで再度left_joinすると列名衝突でregion.x/region.yに
+    # なってしまい、後続のgroup_by(region, ...)が失敗していた
+    # （2026-09-08 ユーザー報告: 全数把握選択時に地域別比較グラフが出ない）
     d <- zd %>% filter(disease == input$zensu_disease_ts, pref_name != "全国") %>%
-      left_join(PREF_MASTER %>% select(pref_code, region), by = "pref_code") %>%
       group_by(region,date) %>%
       summarise(cases=sum(cases, na.rm=TRUE), .groups="drop")
     if (nrow(d) == 0)
