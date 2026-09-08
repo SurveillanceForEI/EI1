@@ -1846,7 +1846,7 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
               tags$tbody(
                 tags$tr(
                   tags$td(style="text-align:center;vertical-align:middle;font-weight:700;color:#2c2b97;font-size:0.85em;",
-                    "インディケーターベース\nサーベイランス", tags$br(), "（IBS）"),
+                    "インディケーターベース", tags$br(), "サーベイランス", tags$br(), "（IBS）"),
                   tags$td(style="background:#eef0fb;border:1px solid #c7ccec;border-radius:8px;padding:8px 10px;font-size:0.78em;vertical-align:top;",
                     tags$div(style="font-weight:700;color:#2c2b97;", "リスク探知"),
                     tags$div(style="color:#555;", "全数報告、病原体サーベイランスなど"),
@@ -1865,7 +1865,7 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
                 ),
                 tags$tr(
                   tags$td(style="text-align:center;vertical-align:middle;font-weight:700;color:#6c3483;font-size:0.85em;",
-                    "イベントベース\nサーベイランス", tags$br(), "（EBS）"),
+                    "イベントベース", tags$br(), "サーベイランス", tags$br(), "（EBS）"),
                   tags$td(style="background:#f5eefb;border:1px solid #dcc7ec;border-radius:8px;padding:8px 10px;font-size:0.78em;vertical-align:top;",
                     tags$div(style="font-weight:700;color:#6c3483;", "国内情報"),
                     tags$div(style="color:#555;", "メディアモニタリング、フォーカルポイント・ネットワーク情報"),
