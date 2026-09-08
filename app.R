@@ -667,10 +667,6 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
             column(4, uiOutput("hokenjo_metric_selector_ui")),
             column(8, uiOutput("hokenjo_week_slider_ui"))
           ),
-          tags$div(style="text-align:right;margin-bottom:6px;",
-            downloadButton("hokenjo_bulk_dl", "保健所別データダウンロード（選択都道府県・全疾患・全週・CSV）",
-                           class="btn-xs btn-default", icon=icon("download"))
-          ),
           uiOutput("hokenjo_status_ui"),
           fluidRow(
             column(7,
@@ -732,10 +728,7 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
           ),
           tags$a(href="javascript:void(0)", onclick="goToNotes('notes-forecast')",
             style="font-size:0.78em;color:#888;text-decoration:none;",
-            icon("circle-info"), " 予測手法について"),
-          tags$div(style="margin-left:auto;",
-            downloadButton("download_csv", "CSVダウンロード", class="btn-xs btn-default", icon=icon("download"))
-          )
+            icon("circle-info"), " 予測手法について")
         ),
         # 定点把握（線グラフ＋年別重ね合わせ）。「定点把握疾患」選択肢には
         # 週次報告の疾患と月次報告（性感染症・薬剤耐性菌）の疾患が混在するため、
@@ -909,10 +902,6 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
         ),
         fluidRow(style="margin-top:4px;",
           column(12,
-            div(style="text-align:right; margin-bottom:4px;",
-              downloadButton("iasr_table_dl", "CSVダウンロード",
-                             class="btn-xs btn-default", icon=icon("download"))
-            ),
             DTOutput("iasr_table", height="300px")
           )
         )
@@ -954,10 +943,6 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
         ),
         fluidRow(style="margin-top:8px;",
           column(12,
-            div(style="text-align:right; margin-bottom:4px;",
-              downloadButton("ari_table_dl", "CSVダウンロード",
-                             class="btn-xs btn-default", icon=icon("download"))
-            ),
             DTOutput("ari_table", height="300px")
           )
         )
@@ -984,8 +969,7 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
         plotlyOutput("hosp_plot", height="380px"),
         uiOutput("hosp_legend"),
         tags$hr(),
-        DTOutput("hosp_table"),
-        downloadButton("hosp_table_dl", "CSVダウンロード", class="btn-sm", style="margin-top:8px;")
+        DTOutput("hosp_table")
       ),
 
       # ── EBS ──────────────────────────────────────────────
@@ -1183,6 +1167,7 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
             tags$li(tags$strong("その他:"),
               tags$ul(
                 tags$li(tags$strong("Notes:"), "このページ（データソース・算出方法・注意事項の説明）"),
+                tags$li(tags$strong("データダウンロード:"), "データ種別・疾患・都道府県・期間を選んでCSVを一括ダウンロード（EBSを除く）"),
                 tags$li(tags$strong("参考リンク:"), "国内外の感染症情報センター等へのリンク集")
               ))
           ),
@@ -1818,6 +1803,31 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
               tags$li("データの正確性・完全性・最新性について保証するものではありません")
             )
           )
+        )
+      ),
+
+      # ── データダウンロード ─────────────────────────────────
+      tabPanel("データダウンロード", icon=icon("download"),
+        tags$div(style="padding:16px 4px;max-width:760px;",
+          tags$p(style="font-size:0.85em;color:#666;",
+            "データ種別を選び、必要に応じて疾患・都道府県・期間を絞り込んでCSVをダウンロードできます（EBSニュース等の記事データは対象外です）。"),
+          selectInput("dl_dataset", "データ種別", choices = c(
+            "定点把握（週次）"       = "teiten",
+            "全数把握（週次）"       = "zensu",
+            "月報疾患（性感染症・薬剤耐性菌、月次）" = "std",
+            "保健所別データ（週次）" = "hokenjo",
+            "病原体検出（IASR、月次/年次）" = "iasr",
+            "ARI病原体（週次）"      = "ari",
+            "入院サーベイランス（週次）" = "hosp"
+          ), width = "100%"),
+          uiOutput("dl_options_ui"),
+          dateRangeInput("dl_date_range", "期間",
+            start = "2001-01-01", end = Sys.Date(),
+            language = "ja", separator = " 〜 ", width = "100%"),
+          tags$div(style="margin-top:10px;",
+            downloadButton("dl_download", "この条件でCSVダウンロード", class="btn-primary")
+          ),
+          uiOutput("dl_row_count_ui")
         )
       ),
 
@@ -4091,18 +4101,6 @@ server <- function(input, output, session) {
       datatable(options = list(pageLength = 15, dom = "tip"), rownames = FALSE)
   })
 
-  output$hosp_table_dl <- downloadHandler(
-    filename = function() paste0("入院サーベイランス_", Sys.Date(), ".csv"),
-    content = function(file) {
-      d <- hosp_filtered()
-      if (is.null(d) || nrow(d) == 0) { write.csv(data.frame(), file, row.names = FALSE); return() }
-      out <- d %>%
-        transmute(年 = year, 週 = week, 週開始日 = format(date, "%Y-%m-%d"),
-                  インフルエンザ入院 = flu_hosp, 新型コロナ入院 = covid_hosp)
-      write_csv_bom(out, file)
-    }
-  )
-
   # ── 病原体検出（IASR）────────────────────────────────────
 
   # カテゴリ変更時にウイルス絞り込み選択肢を更新
@@ -4255,25 +4253,6 @@ server <- function(input, output, session) {
         backgroundPosition = "center")
   })
 
-  output$iasr_table_dl <- downloadHandler(
-    filename = function() {
-      cat_label <- IASR_CATEGORIES[[input$iasr_category]]$label
-      paste0("IASR_", cat_label, "_", Sys.Date(), ".csv")
-    },
-    content = function(file) {
-      d <- iasr_filtered()
-      if (is.null(d) || nrow(d) == 0) { write.csv(data.frame(), file, row.names=FALSE); return() }
-      d_wide <- d %>%
-        filter(count > 0) %>%
-        select(virus, label = date, count) %>%
-        mutate(label = if (input$iasr_time_type == "monthly")
-                         format(label, "%Y/%m") else format(label, "%Y")) %>%
-        pivot_wider(names_from = label, values_from = count, values_fill = 0L) %>%
-        arrange(virus)
-      write_csv_bom(d_wide, file)
-    }
-  )
-
   # ── ARI病原体（急性呼吸器感染症サーベイランス週報）────────
   output$ari_last_updated <- renderUI({
     if (file.exists(ARI_DATA_CACHE))
@@ -4382,18 +4361,6 @@ server <- function(input, output, session) {
       arrange(desc(検体採取週), desc(報告数)) %>%
       datatable(options = list(pageLength = 20, dom = "tip"), rownames = FALSE)
   })
-
-  output$ari_table_dl <- downloadHandler(
-    filename = function() paste0("ARI病原体_", Sys.Date(), ".csv"),
-    content = function(file) {
-      d <- ari_count_filtered()
-      if (is.null(d) || nrow(d) == 0) { write.csv(data.frame(), file, row.names = FALSE); return() }
-      out <- d %>%
-        mutate(疾患名 = ARI_COUNT_LABELS[category]) %>%
-        select(年 = year, 週 = week, 検体採取週 = date, 病原体 = 疾患名, 報告数 = reports)
-      write_csv_bom(out, file)
-    }
-  )
 
   # ── EBS + Google Trends 流行トレンド評価カード ────────────
   output$kpi_ebs_trend <- renderUI({
@@ -6136,19 +6103,6 @@ server <- function(input, output, session) {
     }
   })
 
-  output$download_csv <- downloadHandler(
-    filename = function() {
-      is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
-      if (is_zensu)
-        paste0("nesid_", input$zensu_disease_ts, "_", Sys.Date(), ".csv")
-      else
-        paste0("idwr_", input$disease, "_", Sys.Date(), ".csv")
-    },
-    content = function(file) {
-      write_csv_bom(data_tab_df(), file)
-    }
-  )
-
   # ── 保健所別比較（都道府県・疾患はメインのコントロールパネルと連動）──
   output$hokenjo_metric_selector_ui <- renderUI({
     selectInput("hokenjo_metric", "表示指標",
@@ -6365,54 +6319,40 @@ server <- function(input, output, session) {
   # 保健所別データの一括ダウンロード。画面上部で選択中の都道府県に
   # 絞り込む（疾患・週は絞り込まず全て出力する）。「全国」選択時は
   # 従来通り取得できている全都道府県分を出力する
-  output$hokenjo_bulk_dl <- downloadHandler(
-    filename = function() {
-      pref <- input$pref_filter
-      pref_part <- if (is.null(pref) || pref == "" || pref == "全国") "全県" else pref
-      paste0("保健所別データ_", pref_part, "_", Sys.Date(), ".csv")
-    },
-    content = function(file) {
-      if (is.null(HOKENJO_HISTORY) || nrow(HOKENJO_HISTORY) == 0) {
-        write.csv(data.frame(), file, row.names = FALSE); return()
-      }
-      pref <- input$pref_filter
-      d <- if (!is.null(pref) && pref != "" && pref != "全国") {
-        HOKENJO_HISTORY[HOKENJO_HISTORY$pref == pref, ]
-      } else {
-        HOKENJO_HISTORY
-      }
-      if (nrow(d) == 0) {
-        write.csv(data.frame(), file, row.names = FALSE); return()
-      }
-      # 疾患名は都道府県ごとに週報側の生の表記（全角半角混在・略記など）
-      # のままなので、画面のプルダウンと同じ標準ラベルに正規化する
-      candidate_labels <- unique(c(
-        vapply(DISEASE_CONFIG, function(x) x$label, character(1)),
-        vapply(STD_DISEASE_CONFIG, function(x) x$label, character(1))
-      ))
-      d$disease_std <- d$disease
-      for (p in unique(d$pref)) {
-        map <- hokenjo_disease_label_map(HOKENJO_HISTORY, p, candidate_labels)
-        idx <- d$pref == p
-        matched <- map[d$disease[idx]]
-        d$disease_std[idx] <- ifelse(!is.na(matched), matched, d$disease[idx])
-      }
-      # 週表記も自治体ごとにバラバラな元表記のままなので、年+週番号から
-      # 「YYYY年第N週（M/D〜M/D）」形式に一律計算し直す（スライダーの
-      # ラベルと同じロジック）。年・週番号のいずれかが不明な行は空欄にする。
-      # 行ごとにmapplyすると60万行では非常に遅いため、(年,週番号)の
-      # 一意な組み合わせだけ計算してから結合する
-      combo <- unique(d[!is.na(d$hokenjo_year) & !is.na(d$week_num), c("hokenjo_year", "week_num")])
-      combo$week_label_std <- mapply(hokenjo_week_period_label, combo$week_num, combo$hokenjo_year)
-      d <- dplyr::left_join(d, combo, by = c("hokenjo_year", "week_num"))
-      out <- d %>%
-        transmute(都道府県 = pref, 保健所 = hokenjo, 疾患 = disease_std,
-                  年 = hokenjo_year, 週番号 = week_num, 週表記 = week_label_std,
-                  報告数 = count, 定点当たり報告数 = rate) %>%
-        arrange(都道府県, 疾患, 年, 週番号, 保健所)
-      write_csv_bom(out, file)
+  # 保健所別データの標準化（都道府県ごとにバラバラな疾患名の生表記を
+  # 画面のプルダウンと同じ標準ラベルに正規化し、週表記も年+週番号から
+  # 統一形式で作り直す）。データダウンロードタブと共用するヘルパー。
+  build_hokenjo_export_df <- function(prefs = NULL, diseases = NULL, dr = NULL) {
+    if (is.null(HOKENJO_HISTORY) || nrow(HOKENJO_HISTORY) == 0) return(data.frame())
+    d <- HOKENJO_HISTORY
+    if (!is.null(prefs) && length(prefs) > 0) d <- d[d$pref %in% prefs, ]
+    if (nrow(d) == 0) return(data.frame())
+    candidate_labels <- unique(c(
+      vapply(DISEASE_CONFIG, function(x) x$label, character(1)),
+      vapply(STD_DISEASE_CONFIG, function(x) x$label, character(1))
+    ))
+    d$disease_std <- d$disease
+    for (p in unique(d$pref)) {
+      map <- hokenjo_disease_label_map(HOKENJO_HISTORY, p, candidate_labels)
+      idx <- d$pref == p
+      matched <- map[d$disease[idx]]
+      d$disease_std[idx] <- ifelse(!is.na(matched), matched, d$disease[idx])
     }
-  )
+    if (!is.null(diseases) && length(diseases) > 0) d <- d[d$disease_std %in% diseases, ]
+    if (nrow(d) == 0) return(data.frame())
+    # 行ごとにmapplyすると60万行では非常に遅いため、(年,週番号)の
+    # 一意な組み合わせだけ計算してから結合する
+    combo <- unique(d[!is.na(d$hokenjo_year) & !is.na(d$week_num), c("hokenjo_year", "week_num")])
+    combo$week_label_std <- mapply(hokenjo_week_period_label, combo$week_num, combo$hokenjo_year)
+    d <- dplyr::left_join(d, combo, by = c("hokenjo_year", "week_num"))
+    d <- d %>%
+      transmute(都道府県 = pref, 保健所 = hokenjo, 疾患 = disease_std,
+                年 = hokenjo_year, 週番号 = week_num, 週表記 = week_label_std,
+                日付 = as.Date(paste0(hokenjo_year, "-01-01")) + (week_num - 1) * 7,
+                報告数 = count, 定点当たり報告数 = rate)
+    if (!is.null(dr) && length(dr) == 2) d <- d %>% filter(is.na(日付) | (日付 >= dr[1] & 日付 <= dr[2]))
+    d %>% arrange(都道府県, 疾患, 年, 週番号, 保健所)
+  }
 
   # 「全国」選択時: 都道府県ごとにHOKENJO_CURRENT（最新週）から選択疾患を
   # 名寄せし、build_hokenjo_map_data()で各県の保健所別ポリゴンを作った上で
@@ -6786,6 +6726,158 @@ server <- function(input, output, session) {
                 "if (body0) body0.scrollLeft = body0.scrollWidth;"
               ))
   })
+
+  # ══════════════════════════════════════════════════════════
+  # ■ データダウンロード（その他タブ）
+  # 各データセットの「疾患」「都道府県」の選択肢・列構成をここに集約する。
+  # EBS（ニュース記事）はデータの性質が異なる（記事単位・シグナル判定付き）
+  # ため対象外とする。
+  # ══════════════════════════════════════════════════════════
+  .DL_PREF_CHOICES <- setNames(PREF_MASTER$pref_name, PREF_MASTER$pref_name)
+  .DL_TEITEN_DISEASE_CHOICES <- setNames(names(DISEASE_CONFIG),
+    vapply(DISEASE_CONFIG, function(x) x$label, character(1)))
+  .DL_ZENSU_DISEASE_CHOICES <- setNames(names(ZENSU_DISEASE_CONFIG),
+    vapply(ZENSU_DISEASE_CONFIG, function(x) x$label, character(1)))
+  .DL_STD_DISEASE_CHOICES <- setNames(names(STD_DISEASE_CONFIG),
+    vapply(STD_DISEASE_CONFIG, function(x) x$label, character(1)))
+  .DL_HOKENJO_DISEASE_CHOICES <- sort(unique(c(
+    vapply(DISEASE_CONFIG, function(x) x$label, character(1)),
+    vapply(STD_DISEASE_CONFIG, function(x) x$label, character(1))
+  )))
+  .DL_IASR_CATEGORY_CHOICES <- setNames(names(IASR_CATEGORIES),
+    vapply(IASR_CATEGORIES, function(x) x$label, character(1)))
+  .DL_ARI_CATEGORY_CHOICES <- setNames(names(ARI_COUNT_LABELS), unname(ARI_COUNT_LABELS))
+
+  output$dl_options_ui <- renderUI({
+    ds <- input$dl_dataset
+    pref_block <- function() checkboxGroupInput("dl_pref", "都道府県（未選択の場合は全都道府県）",
+      choices = .DL_PREF_CHOICES, inline = TRUE)
+    switch(ds,
+      "teiten" = tagList(
+        checkboxGroupInput("dl_disease", "疾患（未選択の場合は全疾患）",
+          choices = .DL_TEITEN_DISEASE_CHOICES, inline = TRUE),
+        pref_block()
+      ),
+      "zensu" = tagList(
+        checkboxGroupInput("dl_disease", "疾患（未選択の場合は全疾患）",
+          choices = .DL_ZENSU_DISEASE_CHOICES, inline = TRUE),
+        pref_block()
+      ),
+      "std" = tagList(
+        checkboxGroupInput("dl_disease", "疾患（未選択の場合は全疾患）",
+          choices = .DL_STD_DISEASE_CHOICES, inline = TRUE),
+        pref_block()
+      ),
+      "hokenjo" = tagList(
+        pref_block(),
+        checkboxGroupInput("dl_disease", "疾患（未選択の場合は全疾患）",
+          choices = .DL_HOKENJO_DISEASE_CHOICES, inline = TRUE)
+      ),
+      "iasr" = checkboxGroupInput("dl_disease", "病原体カテゴリ（未選択の場合は全カテゴリ）",
+        choices = .DL_IASR_CATEGORY_CHOICES, inline = TRUE),
+      "ari" = checkboxGroupInput("dl_disease", "病原体カテゴリ（未選択の場合は全カテゴリ）",
+        choices = .DL_ARI_CATEGORY_CHOICES, inline = TRUE),
+      "hosp" = pref_block()
+    )
+  })
+
+  # 現在の選択条件でのダウンロード対象データフレームを組み立てる
+  # （ダウンロード本体・件数プレビューの両方から共有して呼ぶ）
+  dl_build_df <- reactive({
+    ds <- input$dl_dataset
+    dr <- input$dl_date_range
+    diseases <- input$dl_disease
+    prefs <- input$dl_pref
+
+    if (ds == "teiten") {
+      if (is.null(SURV_DATA)) return(data.frame())
+      d <- SURV_DATA
+      if (!is.null(diseases) && length(diseases) > 0) d <- d %>% filter(disease %in% diseases)
+      if (!is.null(prefs) && length(prefs) > 0) d <- d %>% filter(pref_name %in% prefs)
+      if (!is.null(dr)) d <- d %>% filter(date >= dr[1], date <= dr[2])
+      labels <- vapply(DISEASE_CONFIG, function(x) x$label, character(1))
+      d %>% mutate(疾患名 = ifelse(disease %in% names(labels), labels[disease], disease)) %>%
+        select(年 = year, 週 = week, 日付 = date, 都道府県 = pref_name, 地域 = region,
+               疾患名, 定点あたり報告数 = reports_per_site) %>%
+        arrange(desc(日付), 都道府県, 疾患名)
+
+    } else if (ds == "zensu") {
+      if (is.null(ZENSU_DATA)) return(data.frame())
+      d <- ZENSU_DATA
+      if (!is.null(diseases) && length(diseases) > 0) d <- d %>% filter(disease %in% diseases)
+      if (!is.null(prefs) && length(prefs) > 0) d <- d %>% filter(pref_name %in% prefs)
+      if (!is.null(dr)) d <- d %>% filter(date >= dr[1], date <= dr[2])
+      labels <- vapply(ZENSU_DISEASE_CONFIG, function(x) x$label, character(1))
+      d %>% mutate(疾患名 = ifelse(disease %in% names(labels), labels[disease], disease)) %>%
+        select(年 = year, 週 = week, 日付 = date, 都道府県 = pref_name, 地域 = region,
+               疾患名, 報告数 = cases) %>%
+        arrange(desc(日付), 都道府県, 疾患名)
+
+    } else if (ds == "std") {
+      if (is.null(STD_DATA)) return(data.frame())
+      d <- STD_DATA
+      if (!is.null(diseases) && length(diseases) > 0) d <- d %>% filter(disease %in% diseases)
+      if (!is.null(prefs) && length(prefs) > 0) d <- d %>% filter(pref_name %in% prefs)
+      if (!is.null(dr)) d <- d %>% filter(date >= dr[1], date <= dr[2])
+      labels <- vapply(STD_DISEASE_CONFIG, function(x) x$label, character(1))
+      d %>% mutate(疾患名 = ifelse(disease %in% names(labels), labels[disease], disease)) %>%
+        select(年 = year, 月 = month, 日付 = date, 都道府県 = pref_name,
+               疾患名, 報告数 = reports) %>%
+        arrange(desc(日付), 都道府県, 疾患名)
+
+    } else if (ds == "hokenjo") {
+      build_hokenjo_export_df(prefs = prefs, diseases = diseases, dr = dr)
+
+    } else if (ds == "iasr") {
+      if (is.null(IASR_DATA)) return(data.frame())
+      d <- IASR_DATA
+      if (!is.null(diseases) && length(diseases) > 0) d <- d %>% filter(category %in% diseases)
+      if (!is.null(dr)) d <- d %>% filter(date >= dr[1], date <= dr[2])
+      cat_labels <- vapply(IASR_CATEGORIES, function(x) x$label, character(1))
+      d %>% mutate(カテゴリ = ifelse(category %in% names(cat_labels), cat_labels[category], category)) %>%
+        select(カテゴリ, 集計単位 = time_type, 病原体 = virus, 年月 = date, 検出数 = count) %>%
+        arrange(desc(年月), カテゴリ, 病原体)
+
+    } else if (ds == "ari") {
+      if (is.null(ARI_PATHOGEN_DATA) || is.null(ARI_PATHOGEN_DATA$counts)) return(data.frame())
+      d <- ARI_PATHOGEN_DATA$counts
+      if (!is.null(diseases) && length(diseases) > 0) d <- d %>% filter(category %in% diseases)
+      if (!is.null(dr)) d <- d %>% filter(date >= dr[1], date <= dr[2])
+      d %>% mutate(病原体 = ifelse(category %in% names(ARI_COUNT_LABELS), ARI_COUNT_LABELS[category], category)) %>%
+        select(年 = year, 週 = week, 検体採取週 = date, 病原体, 報告数 = reports) %>%
+        arrange(desc(検体採取週), 病原体)
+
+    } else if (ds == "hosp") {
+      if (is.null(HOSP_DATA)) return(data.frame())
+      d <- HOSP_DATA
+      if (!is.null(prefs) && length(prefs) > 0) d <- d %>% filter(pref_name %in% prefs)
+      if (!is.null(dr)) d <- d %>% filter(date >= dr[1], date <= dr[2])
+      d %>% select(年 = year, 週 = week, 週開始日 = date, 都道府県 = pref_name,
+                   インフルエンザ入院 = flu_hosp, 新型コロナ入院 = covid_hosp) %>%
+        arrange(desc(週開始日), 都道府県)
+    } else {
+      data.frame()
+    }
+  })
+
+  output$dl_row_count_ui <- renderUI({
+    n <- tryCatch(nrow(dl_build_df()), error = function(e) 0)
+    tags$div(style="font-size:0.8em;color:#888;margin-top:6px;",
+      sprintf("この条件で %s 行が出力されます。", format(n, big.mark=",")))
+  })
+
+  output$dl_download <- downloadHandler(
+    filename = function() {
+      ds_label <- c(teiten="定点把握", zensu="全数把握", std="月報疾患",
+                    hokenjo="保健所別", iasr="IASR病原体検出", ari="ARI病原体",
+                    hosp="入院サーベイランス")[input$dl_dataset]
+      paste0(ds_label, "_", Sys.Date(), ".csv")
+    },
+    content = function(file) {
+      d <- tryCatch(dl_build_df(), error = function(e) data.frame())
+      write_csv_bom(d, file)
+    }
+  )
 }
 
 shinyApp(ui, server)
