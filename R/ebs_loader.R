@@ -5685,6 +5685,18 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
     "quarantine","隔離","検疫",
     "インフルエンザ","コロナ","COVID","RSウイルス","麻疹","はしか","デング",
     "エボラ","マラリア","結核","梅毒","百日咳","エムポックス","mpox",
+    # 上記は日本語表記のみのものが多く、CIDRAP・ReliefWeb・WHO EIOS・UKHSA・
+    # 香港CHP等の英語ソースで疾患名のみ（"outbreak"等の一般語を伴わない）
+    # 記事タイトルが本フィルタを通過できず、取りこぼされていた
+    # （例:"France reports MERS in 2 travelers"、"Single-dose malaria
+    # treatment..."、麻疹ワクチンの有効性に関する記事等。2026-09-11
+    # 精度チェックで発覚）。代表的な英語疾患名を補う
+    "measles","mers","malaria","ebola","tuberculosis","syphilis",
+    "pertussis","whooping cough","dengue","hepatitis","cholera",
+    "typhoid","diphtheria","meningitis","rabies","anthrax","plague",
+    "yellow fever","zika","chikungunya","polio","monkeypox",
+    "marburg","lassa","nipah","hantavirus","norovirus","salmonella",
+    "botulism",
     # JIHSは意図的に含めない: fetch_jihs_news()で取得する記事はJIHS自身の発表であるため
     # タイトルに機関名「JIHS」がほぼ必ず含まれてしまい、受賞・調印・講座案内等の
     # 感染症と無関係な記事までフィルタを素通りしてしまう原因になっていた
@@ -5730,7 +5742,16 @@ fetch_all_ebs <- function(sources      = EBS_SOURCES,
       vapply(full_text, function(txt) {
         tryCatch({
           tl <- tolower(txt)
-          isTRUE(any(sapply(INFECT_FILTER_KEYWORDS, function(kw) keyword_matches(kw, tl))))
+          # "WHO"（世界保健機関）は英文中で極めて頻出する関係代名詞"who"と
+          # 綴りが完全一致するため、他のキーワードと同様に小文字化して
+          # 単語境界一致させると、"...Watanuki, who helped..."のような
+          # 無関係な英文まで大量に誤検出してしまっていた（例:南極基地の
+          # 調理に関する記事、「WHO ARE WE」という展示会タイトル等。
+          # 2026-09-11 精度チェックで発覚）。"WHO"のみ大文字小文字を区別し、
+          # 元の大文字表記のまま単語境界一致するかで判定する
+          other_kw <- setdiff(INFECT_FILTER_KEYWORDS, "WHO")
+          isTRUE(any(sapply(other_kw, function(kw) keyword_matches(kw, tl)))) ||
+            grepl("\\bWHO\\b", txt, perl = TRUE)
         }, error = function(e) FALSE)
       }, FUN.VALUE = logical(1), USE.NAMES = FALSE)
     ) %>%
