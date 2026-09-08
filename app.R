@@ -5859,7 +5859,14 @@ server <- function(input, output, session) {
     # のため、ここで再度left_joinすると列名衝突でregion.x/region.yに
     # なってしまい、後続のgroup_by(region, ...)が失敗していた
     # （2026-09-08 ユーザー報告: 全数把握選択時に地域別比較グラフが出ない）
-    d <- zd %>% filter(disease == input$zensu_disease_ts, pref_name != "全国") %>%
+    dr <- input$date_range
+    d <- zd %>% filter(disease == input$zensu_disease_ts, pref_name != "全国")
+    # 期間スライダー（input$date_range）でグラフの表示範囲を絞り込む。
+    # 以前はこのフィルタが無く、スライダーの選択と無関係に取得済み全期間
+    # （2001年〜）を表示していたため、選択期間と見た目が一致しなかった
+    # （2026-09-08 ユーザー報告: 表示されるグラフがスライダーの範囲になっていない）
+    if (!is.null(dr)) d <- d %>% filter(date >= dr[1], date <= dr[2])
+    d <- d %>%
       group_by(region,date) %>%
       summarise(cases=sum(cases, na.rm=TRUE), .groups="drop")
     if (nrow(d) == 0)
