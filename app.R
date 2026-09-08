@@ -1823,7 +1823,7 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
               tags$em("Early detection, assessment and response to acute public health events: implementation of early warning and response with a focus on event-based surveillance"),
               tags$br(),
               "出典: Kaiser R, et al. \"What is epidemic intelligence, and how is it being improved in Europe?\" ",
-              tags$em("Euro Surveill."), " 2006;11(5)（訳・一部改変）")
+              tags$em("Euro Surveill."), " 2006;11(5)")
           ),
 
           # ── ① 全体像 ─────────────────────────────────────
@@ -1846,7 +1846,7 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
               tags$tbody(
                 tags$tr(
                   tags$td(style="text-align:center;vertical-align:middle;font-weight:700;color:#2c2b97;font-size:0.85em;",
-                    "インディケーターベースサーベイランス", tags$br(), "（IBS）"),
+                    "インディケーターベース/nサーベイランス", tags$br(), "（IBS）"),
                   tags$td(style="background:#eef0fb;border:1px solid #c7ccec;border-radius:8px;padding:8px 10px;font-size:0.78em;vertical-align:top;",
                     tags$div(style="font-weight:700;color:#2c2b97;", "リスク探知"),
                     tags$div(style="color:#555;", "全数報告、病原体サーベイランスなど"),
@@ -1865,7 +1865,7 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
                 ),
                 tags$tr(
                   tags$td(style="text-align:center;vertical-align:middle;font-weight:700;color:#6c3483;font-size:0.85em;",
-                    "イベントベースサーベイランス", tags$br(), "（EBS）"),
+                    "イベントベース/nサーベイランス", tags$br(), "（EBS）"),
                   tags$td(style="background:#f5eefb;border:1px solid #dcc7ec;border-radius:8px;padding:8px 10px;font-size:0.78em;vertical-align:top;",
                     tags$div(style="font-weight:700;color:#6c3483;", "国内情報"),
                     tags$div(style="color:#555;", "メディアモニタリング、フォーカルポイント・ネットワーク情報"),
@@ -1904,11 +1904,11 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
             lapply(list(
               list(t="IBSデータ\nEBS情報", c="#5a5a87"),
               list(t="データ・\n情報収集", c="#4b499c"),
-              list(t="スクリーニング・\nフィルタリング", c="#4b499c", note="早期探知"),
+              list(t="スクリーニング・\nフィルタリング", c="#4b499c", note="Initial /nrisk assessment"),
               list(t="情報集約", c="#4b499c"),
               list(t="検証", c="#2c2b97"),
-              list(t="分析・\nリスク評価", c="#2c2b97", note="Initial → Rapid\nrisk assessment"),
-              list(t="さらなる\nアクション", c="#1f1b79", note="文書化等")
+              list(t="分析・\nリスク評価", c="#2c2b97", note="Initial → Rapid /nrisk assessment"),
+              list(t="さらなる\nアクション", c="#1f1b79", note="情報提供、/n疫学調査等")
             ), function(x) {
               tagList(
                 tags$div(style=paste0("min-width:100px;max-width:120px;background:", x$c,
@@ -1921,9 +1921,8 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
               )
             })
           ),
-          tags$p(style="font-size:0.85em;color:#888;",
-            "※ スクリーニング・フィルタリングの段階は「早期探知」、分析・リスク評価の段階は国際的には",
-            "Initial risk assessment→Rapid risk assessmentという2段階で整理されることがあります。"),
+          tags$p(style="font-size:0.85em;color:#888;margin-top:10px;",
+                 "本ダッシュボードは、情報集約の部分までの活動支援を意図して作成されています。"),
           tags$br(),
 
           # ── ③ 検証〜さらなるアクション ─────────────────────
@@ -2091,6 +2090,12 @@ server <- function(input, output, session) {
       ),
       tags$p(
         "本サイトで用いている評価は試験的なアルゴリズムによる判定であり、情報に基づく判断は専門家を代替するものではありません。必ず、元データを参照し、利用者自身の責任において利用してください。"
+      ),
+      tags$p(
+        icon("circle-info"), " IBS・EBSを用いたEpidemic Intelligence（EI）活動については、",
+        tags$a(href="javascript:void(0)",
+          onclick="$('#shiny-modal').modal('hide'); var t1=document.querySelector(\"a[data-value='その他']\"); if(t1) t1.click(); setTimeout(function(){ var t2=document.querySelector(\"a[data-value='EIとは']\"); if(t2) t2.click(); }, 150);",
+          "「EIとは」タブ"), "をご覧ください。"
       )
     ),
     footer = modalButton("同意して閉じる"),
