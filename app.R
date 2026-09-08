@@ -1815,7 +1815,7 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
             style="background:#eaf4fb;border-left:4px solid #4b499c;border-radius:4px;padding:14px 18px;margin-bottom:20px;",
             tags$p(style="margin:0;",
               "「", tags$strong("Epidemic Intelligence（EI）"), "」とは、届出等に基づく",
-              tags$strong("定量的なサーベイランスデータ（IBS）"), "と、報道・行政発表等の",
+              tags$strong("定量的なサーベイランスデータ（Indicator-based surveillance:IBS）"), "と、報道、行政発表、SNS情報、パーソナルコミュニケーション等の",
               tags$strong("イベント情報（EBS）"), "を組み合わせて公衆衛生上のリスクを早期に検知・評価し、対応につなげる活動です。",
               "本ダッシュボードはこのEI活動を支援するツールとして開発されています。"),
             tags$p(style="margin:10px 0 0;font-size:0.85em;color:#555;border-top:1px solid #d5e3ee;padding-top:8px;",
