@@ -304,6 +304,15 @@ load_all_zensu_cached <- function() {
   raw_list <- lapply(files, readRDS)
   df <- bind_rows(raw_list)
   rm(raw_list); gc(FALSE)
+  # 週次キャッシュファイルは取得時期のコード版によって、region列が既に
+  # 焼き込まれているものと無いものが混在している。bind_rows()で欠けている
+  # 側がNAになった歯抜けのregion列がここに残ると、この関数の戻り値を直接
+  # ZENSU_DATAとして使っている箇所（app.R起動時の読み込み）でregionが
+  # 部分的にNAのまま使われてしまう（2026-09-08 ユーザー報告: 地域別比較
+  # グラフで2012年9月以降のデータが表示されない）。PREF_MASTER基準で
+  # 常に作り直すため、キャッシュ由来のregion列は使わず一旦破棄する。
+  df <- df %>% select(-any_of("region")) %>%
+    left_join(PREF_MASTER %>% select(pref_code, region), by = "pref_code")
   # メモリ削減: 低カーディナリティの文字列列をfactor化。
   # disease列はZENSU_DISEASE_CONFIG[[disease]]のリストキーとして使われるため
   # factor化しない（[[はfactorを整数コードで引いてしまうため）
@@ -360,6 +369,16 @@ get_zensu_data <- function(years = 2020:2026, force = FALSE) {
 
   result <- bind_rows(cached_data, bind_rows(new_data))
   if (is.null(result) || nrow(result) == 0) return(NULL)
+
+  # 一部の古いキャッシュファイル（週次rds）には過去のコード版でregion列が
+  # 既に焼き込まれており、新しいキャッシュファイルには無いため、
+  # bind_rows()で欠けている側がNAになった「歯抜けのregion列」が
+  # resultに混入することがある。この状態のままleft_joinすると、既存の
+  # region列と衝突してregion.x/region.yに分かれてしまい、実質的に
+  # どちらの列も正しく参照されない状態になっていた（2026-09-08 ユーザー
+  # 報告: 地域別比較グラフで2012年9月以降のデータが表示されない）。
+  # 常にPREF_MASTER基準で作り直すため、事前に既存のregion列を破棄する。
+  result <- result %>% select(-any_of("region"))
 
   result %>%
     filter(year %in% years) %>%
