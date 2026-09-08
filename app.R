@@ -1846,7 +1846,7 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
               tags$tbody(
                 tags$tr(
                   tags$td(style="text-align:center;vertical-align:middle;font-weight:700;color:#2c2b97;font-size:0.85em;",
-                    "インディケーターベース/nサーベイランス", tags$br(), "（IBS）"),
+                    "インディケーターベース\nサーベイランス", tags$br(), "（IBS）"),
                   tags$td(style="background:#eef0fb;border:1px solid #c7ccec;border-radius:8px;padding:8px 10px;font-size:0.78em;vertical-align:top;",
                     tags$div(style="font-weight:700;color:#2c2b97;", "リスク探知"),
                     tags$div(style="color:#555;", "全数報告、病原体サーベイランスなど"),
@@ -1865,7 +1865,7 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
                 ),
                 tags$tr(
                   tags$td(style="text-align:center;vertical-align:middle;font-weight:700;color:#6c3483;font-size:0.85em;",
-                    "イベントベース/nサーベイランス", tags$br(), "（EBS）"),
+                    "イベントベース\nサーベイランス", tags$br(), "（EBS）"),
                   tags$td(style="background:#f5eefb;border:1px solid #dcc7ec;border-radius:8px;padding:8px 10px;font-size:0.78em;vertical-align:top;",
                     tags$div(style="font-weight:700;color:#6c3483;", "国内情報"),
                     tags$div(style="color:#555;", "メディアモニタリング、フォーカルポイント・ネットワーク情報"),
@@ -1902,18 +1902,19 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
 
           tags$div(style="display:flex;align-items:stretch;gap:6px;flex-wrap:wrap;justify-content:center;margin:14px 0;",
             lapply(list(
-              list(t="IBSデータ\nEBS情報", c="#5a5a87"),
-              list(t="データ・\n情報収集", c="#4b499c"),
-              list(t="スクリーニング・\nフィルタリング", c="#4b499c", note="Initial /nrisk assessment"),
-              list(t="情報集約", c="#4b499c"),
-              list(t="検証", c="#2c2b97"),
-              list(t="分析・\nリスク評価", c="#2c2b97", note="Initial → Rapid /nrisk assessment"),
-              list(t="さらなる\nアクション", c="#1f1b79", note="情報提供、/n疫学調査等")
+              list(t="IBSデータ\nEBS情報", c="#5a5a87", i="database"),
+              list(t="データ・\n情報収集", c="#4b499c", i="inbox"),
+              list(t="スクリーニング・\nフィルタリング", c="#4b499c", i="filter", note="Initial risk\nassessment"),
+              list(t="情報集約", c="#4b499c", i="layer-group"),
+              list(t="検証", c="#2c2b97", i="magnifying-glass"),
+              list(t="分析・\nリスク評価", c="#2c2b97", i="chart-pie", note="Rapid risk\nassessment"),
+              list(t="さらなる\nアクション", c="#1f1b79", i="paper-plane", note="情報提供、疫学調査等")
             ), function(x) {
               tagList(
                 tags$div(style=paste0("min-width:100px;max-width:120px;background:", x$c,
                                        ";color:#fff;border-radius:8px;padding:10px 8px;text-align:center;font-size:0.8em;font-weight:700;white-space:pre-line;",
                                        "display:flex;flex-direction:column;justify-content:center;align-items:center;"),
+                  tags$div(style="font-size:1.3em;margin-bottom:4px;opacity:0.9;", icon(x$i)),
                   x$t,
                   if (!is.null(x$note)) tags$div(style="font-size:0.78em;font-weight:400;margin-top:4px;opacity:0.9;white-space:pre-line;", x$note) else NULL
                 ),
