@@ -1167,6 +1167,7 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
             tags$li(tags$strong("その他:"),
               tags$ul(
                 tags$li(tags$strong("Notes:"), "このページ（データソース・算出方法・注意事項の説明）"),
+                tags$li(tags$strong("EIとは:"), "IBS・EBSを用いたEpidemic Intelligence活動についての解説"),
                 tags$li(tags$strong("データダウンロード:"), "データ種別・疾患・都道府県・期間を選んでCSVを一括ダウンロード（EBSを除く）"),
                 tags$li(tags$strong("参考リンク:"), "国内外の感染症情報センター等へのリンク集")
               ))
@@ -1803,6 +1804,140 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
               tags$li("データの正確性・完全性・最新性について保証するものではありません")
             )
           )
+        )
+      ),
+
+      # ── Epidemic Intelligence活動について ─────────────────
+      tabPanel("EIとは", icon=icon("chalkboard-user"),
+        tags$div(style="padding:20px;max-width:960px;font-size:0.9em;line-height:1.8;",
+
+          tags$div(
+            style="background:#eaf4fb;border-left:4px solid #4b499c;border-radius:4px;padding:14px 18px;margin-bottom:20px;",
+            tags$p(style="margin:0;",
+              "「", tags$strong("Epidemic Intelligence（EI）"), "」とは、届出等に基づく定量的な",
+              tags$strong("サーベイランスデータ（IBS）"), "と、報道・行政発表等の",
+              tags$strong("非構造化情報（EBS）"), "を組み合わせて公衆衛生上のリスクを早期に検知・評価し、対応につなげる活動です。",
+              "本ダッシュボードはこのEI活動を支援するツールとして開発されています。"),
+            tags$p(style="margin:10px 0 0;font-size:0.85em;color:#555;border-top:1px solid #d5e3ee;padding-top:8px;",
+              tags$strong("WHOの定義: "),
+              tags$em("Early detection, assessment and response to acute public health events: implementation of early warning and response with a focus on event-based surveillance"),
+              tags$br(),
+              "出典: Kaiser R, et al. \"What is epidemic intelligence, and how is it being improved in Europe?\" ",
+              tags$em("Euro Surveill."), " 2006;11(5)（訳・一部改変）")
+          ),
+
+          # ── ① 全体像 ─────────────────────────────────────
+          tags$h4("① サーベイランスとEIの全体像", style="border-bottom:2px solid #4b499c;padding-bottom:4px;color:#2c3e50;"),
+          tags$p(
+            "様々な情報源から得られる情報は、大きく「指標ベース（IBS）」と「イベントベース（EBS）」の2つの機能に整理されます。",
+            "双方とも共通の", tags$strong("サーベイランスシステム"), "に集約され、継続的なリスク評価と対応（EI活動）につながります。"
+          ),
+
+          tags$div(style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:14px 0 4px;",
+            lapply(list(
+              list(t="リスク探知", d="全数報告、病原体サーベイランスなど"),
+              list(t="新興リスク", d="症候群サーベイランス、死亡者数モニタリング、処方箋モニタリングなど"),
+              list(t="非医療ベース", d="中毒センター、行動モニタリング、環境サーベイランス、獣医サーベイランス、食中毒モニタリングなど")
+            ), function(x) {
+              tags$div(style="flex:1;min-width:170px;max-width:220px;background:#eef0fb;border:1px solid #c7ccec;border-radius:8px;padding:8px 10px;font-size:0.82em;",
+                tags$div(style="font-weight:700;color:#2c2b97;", x$t),
+                tags$div(style="color:#555;margin-top:2px;", x$d))
+            }),
+            lapply(list(
+              list(t="国内情報", d="メディアモニタリング、フォーカルポイント・ネットワーク情報"),
+              list(t="国外情報", d="情報スキャンツール、配信情報、国際機関情報")
+            ), function(x) {
+              tags$div(style="flex:1;min-width:170px;max-width:220px;background:#f5eefb;border:1px solid #dcc7ec;border-radius:8px;padding:8px 10px;font-size:0.82em;",
+                tags$div(style="font-weight:700;color:#6c3483;", x$t),
+                tags$div(style="color:#555;margin-top:2px;", x$d))
+            })
+          ),
+          tags$div(style="text-align:center;color:#8b8bda;font-size:1.3em;margin:2px 0;", icon("arrow-down")),
+          tags$div(style="text-align:center;background:#4b499c;color:#fff;border-radius:8px;padding:8px;font-weight:700;max-width:520px;margin:0 auto;",
+            "サーベイランスシステム"),
+          tags$div(style="text-align:center;color:#8b8bda;font-size:1.3em;margin:2px 0;", icon("arrow-down")),
+
+          tags$div(style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-bottom:4px;",
+            tags$div(style="flex:1;min-width:260px;max-width:400px;background:#eef0fb;border:2px solid #4b499c;border-radius:10px;padding:12px 14px;",
+              tags$div(style="font-weight:700;color:#2c2b97;margin-bottom:4px;",
+                "IBS（指標ベースサーベイランス）"),
+              tags$div(style="font-size:0.82em;color:#555;",
+                "トレンドモニタリング・プログラムモニタリング・慢性疾患・疾病負荷の把握"),
+              tags$div(style="font-size:0.82em;color:#2c2b97;margin-top:6px;font-weight:700;",
+                "→ 計画／実行、長期的・構造的対応")
+            ),
+            tags$div(style="flex:1;min-width:260px;max-width:400px;background:#f5eefb;border:2px solid #6c3483;border-radius:10px;padding:12px 14px;",
+              tags$div(style="font-weight:700;color:#6c3483;margin-bottom:4px;",
+                "EBS（イベントベースサーベイランス）"),
+              tags$div(style="font-size:0.82em;color:#555;",
+                "シグナル・緊急の公衆衛生イベントの探知・アラート"),
+              tags$div(style="font-size:0.82em;color:#6c3483;margin-top:6px;font-weight:700;",
+                "→ 迅速対応")
+            )
+          ),
+          tags$div(style="text-align:center;color:#8b8bda;font-size:1.3em;margin:2px 0;", icon("arrow-down")),
+          tags$div(style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;",
+            tags$div(style="background:#1f1b79;color:#fff;border-radius:8px;padding:8px 16px;font-weight:700;",
+              "継続的なリスク評価"),
+            tags$div(style="align-self:center;color:#8b8bda;", icon("arrow-right")),
+            tags$div(style="background:#1f1b79;color:#fff;border-radius:8px;padding:8px 16px;font-weight:700;",
+              "対応")
+          ),
+          tags$p(style="font-size:0.85em;color:#888;margin-top:10px;",
+            "本ダッシュボードでは、「患者サーベイランス」「病原体サーベイランス」「入院サーベイランス」等の各タブがIBSに、",
+            "「EBS」タブがEBSに対応しています。"),
+          tags$br(),
+
+          # ── ② プロセス ────────────────────────────────────
+          tags$h4("② EI活動のプロセス", style="border-bottom:2px solid #4b499c;padding-bottom:4px;color:#2c3e50;"),
+          tags$p("IBSデータ・EBS情報は、以下のプロセスを経て評価・対応につながります。"),
+
+          tags$div(style="display:flex;align-items:stretch;gap:6px;flex-wrap:wrap;justify-content:center;margin:14px 0;",
+            lapply(list(
+              list(t="IBSデータ\nEBS情報", c="#5a5a87"),
+              list(t="データ・\n情報収集", c="#4b499c"),
+              list(t="スクリーニング・\nフィルタリング", c="#4b499c", note="早期探知"),
+              list(t="情報集約", c="#4b499c"),
+              list(t="検証", c="#2c2b97"),
+              list(t="分析・\nリスク評価", c="#2c2b97", note="Initial → Rapid\nrisk assessment"),
+              list(t="さらなる\nアクション", c="#1f1b79", note="文書化等")
+            ), function(x) {
+              tagList(
+                tags$div(style=paste0("min-width:100px;max-width:120px;background:", x$c,
+                                       ";color:#fff;border-radius:8px;padding:10px 8px;text-align:center;font-size:0.8em;font-weight:700;white-space:pre-line;"),
+                  x$t,
+                  if (!is.null(x$note)) tags$div(style="font-size:0.78em;font-weight:400;margin-top:4px;opacity:0.9;white-space:pre-line;", x$note) else NULL
+                ),
+                tags$div(style="align-self:center;color:#8b8bda;font-size:1.1em;", icon("arrow-right"))
+              )
+            })
+          ),
+          tags$p(style="font-size:0.85em;color:#888;",
+            "※ 上図は所内資料「サーベイランスとEpidemic Intelligence」（Epidemic Intelligence活動のプロセス）を基に作成。",
+            "スクリーニング・フィルタリングの段階が「早期探知」、分析・リスク評価の段階が国際的にはInitial risk assessment→",
+            "Rapid risk assessmentという2段階で整理されることがあります。"),
+          tags$br(),
+
+          # ── ③ 検証〜さらなるアクション ─────────────────────
+          tags$h4("③「検証」から「分析・リスク評価」「さらなるアクション」へ", style="border-bottom:2px solid #4b499c;padding-bottom:4px;color:#2c3e50;"),
+          tags$h5("検証"),
+          tags$ul(
+            tags$li("シグナルやイベントの内容を確認し、それぞれのフィルタリングが妥当か確認する（センター内ミーティング等）"),
+            tags$li(tags$em("← 不足情報等の確認。フィルタリングの理由は、実施した本人が説明できれば良い")),
+            tags$li("積極的モニタリング・分析・リスク評価等に繋げる必要があるかを検証する（他部署との連携も実施）")
+          ),
+          tags$h5("分析・リスク評価"),
+          tags$ul(
+            tags$li("リスク評価の際には、IBSを含めた複数のデータ・情報を活用して分析・評価を行う"),
+            tags$li(tags$em("※ この段階では非公開情報も多く含むため、内部共有止まりになることがほとんど"))
+          ),
+          tags$h5("さらなるアクション"),
+          tags$ul(
+            tags$li("評価を基にしたさらなる積極的情報収集"),
+            tags$li("自治体等への情報提供・調査")
+          ),
+          tags$p(style="font-size:0.8em;color:#aaa;margin-top:16px;",
+            "本タブの内容は所内資料「サーベイランスとEpidemic Intelligence」を基に作成しています。")
         )
       ),
 
