@@ -1814,9 +1814,9 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
           tags$div(
             style="background:#eaf4fb;border-left:4px solid #4b499c;border-radius:4px;padding:14px 18px;margin-bottom:20px;",
             tags$p(style="margin:0;",
-              "「", tags$strong("Epidemic Intelligence（EI）"), "」とは、届出等に基づく定量的な",
-              tags$strong("サーベイランスデータ（IBS）"), "と、報道・行政発表等の",
-              tags$strong("非構造化情報（EBS）"), "を組み合わせて公衆衛生上のリスクを早期に検知・評価し、対応につなげる活動です。",
+              "「", tags$strong("Epidemic Intelligence（EI）"), "」とは、届出等に基づく",
+              tags$strong("定量的なサーベイランスデータ（IBS）"), "と、報道・行政発表等の",
+              tags$strong("イベント情報（EBS）"), "を組み合わせて公衆衛生上のリスクを早期に検知・評価し、対応につなげる活動です。",
               "本ダッシュボードはこのEI活動を支援するツールとして開発されています。"),
             tags$p(style="margin:10px 0 0;font-size:0.85em;color:#555;border-top:1px solid #d5e3ee;padding-top:8px;",
               tags$strong("WHOの定義: "),
@@ -1830,7 +1830,7 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
           tags$h4("① サーベイランスとEIの全体像", style="border-bottom:2px solid #4b499c;padding-bottom:4px;color:#2c3e50;"),
           tags$p(
             "様々な情報源（インプット）から得られる情報は、サーベイランスシステム（プロセス）を通じて、",
-            "大きく「指標ベース（IBS）」と「イベントベース（EBS）」の2つの機能に整理され、",
+            "大きく「IBS」と「EBS」の2つに整理され、",
             "それぞれの対応（アウトプット）につながります。双方の結果は継続的なリスク評価に集約され、",
             "自治体等における具体的な対応判断を支えます。"
           ),
@@ -1846,7 +1846,7 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
               tags$tbody(
                 tags$tr(
                   tags$td(style="text-align:center;vertical-align:middle;font-weight:700;color:#2c2b97;font-size:0.85em;",
-                    "指標ベース", tags$br(), "（IBS）"),
+                    "インディケーターベースサーベイランス", tags$br(), "（IBS）"),
                   tags$td(style="background:#eef0fb;border:1px solid #c7ccec;border-radius:8px;padding:8px 10px;font-size:0.78em;vertical-align:top;",
                     tags$div(style="font-weight:700;color:#2c2b97;", "リスク探知"),
                     tags$div(style="color:#555;", "全数報告、病原体サーベイランスなど"),
@@ -1865,7 +1865,7 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
                 ),
                 tags$tr(
                   tags$td(style="text-align:center;vertical-align:middle;font-weight:700;color:#6c3483;font-size:0.85em;",
-                    "イベントベース", tags$br(), "（EBS）"),
+                    "イベントベースサーベイランス", tags$br(), "（EBS）"),
                   tags$td(style="background:#f5eefb;border:1px solid #dcc7ec;border-radius:8px;padding:8px 10px;font-size:0.78em;vertical-align:top;",
                     tags$div(style="font-weight:700;color:#6c3483;", "国内情報"),
                     tags$div(style="color:#555;", "メディアモニタリング、フォーカルポイント・ネットワーク情報"),
@@ -1912,7 +1912,8 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
             ), function(x) {
               tagList(
                 tags$div(style=paste0("min-width:100px;max-width:120px;background:", x$c,
-                                       ";color:#fff;border-radius:8px;padding:10px 8px;text-align:center;font-size:0.8em;font-weight:700;white-space:pre-line;"),
+                                       ";color:#fff;border-radius:8px;padding:10px 8px;text-align:center;font-size:0.8em;font-weight:700;white-space:pre-line;",
+                                       "display:flex;flex-direction:column;justify-content:center;align-items:center;"),
                   x$t,
                   if (!is.null(x$note)) tags$div(style="font-size:0.78em;font-weight:400;margin-top:4px;opacity:0.9;white-space:pre-line;", x$note) else NULL
                 ),
@@ -1930,18 +1931,18 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
           tags$h5("検証"),
           tags$ul(
             tags$li("シグナルやイベントの内容を確認し、それぞれのフィルタリング（採否の判断）が妥当か関係者内で確認する"),
-            tags$li(tags$em("← 不足している情報等を洗い出す段階。フィルタリングの理由は、判断した担当者が説明できれば良い")),
+            tags$li("不足している情報等を洗い出す段階であり、フィルタリングの理由は、判断した担当者が説明できれば良い"),
             tags$li("積極的モニタリング・分析・リスク評価等につなげる必要があるかを、必要に応じて関係部署とも連携しながら検証する")
           ),
           tags$h5("分析・リスク評価"),
           tags$ul(
-            tags$li("リスク評価の際には、IBSを含めた複数のデータ・情報を活用して分析・評価を行う"),
-            tags$li(tags$em("※ この段階では非公開情報も多く含むため、関係者内での共有にとどまることがほとんど"))
+            tags$li("リスク評価の際には、複数のデータ・情報を活用して分析・評価を行う"),
+            tags$li("この段階では非公開情報も多く含むため、関係者内での共有にとどまることがほとんど")
           ),
           tags$h5("さらなるアクション"),
           tags$ul(
             tags$li("評価結果を踏まえた、さらなる積極的な情報収集"),
-            tags$li("関係機関への情報提供・調査依頼")
+            tags$li("関係機関への情報提供、情報収集、積極的疫学調査の検討へ")
           )
         )
       ),
