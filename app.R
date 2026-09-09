@@ -1837,58 +1837,69 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
 
           (function() {
             down_arrow <- tags$div(style="text-align:center;color:#8b8bda;font-size:1.1em;margin:2px 0;", icon("arrow-down"))
-            make_column <- function(header, dark, light, border, input_items, process_title, process_sub, process_detail, output_text) {
-              tags$div(style="flex:1;min-width:220px;max-width:340px;display:flex;flex-direction:column;",
-                tags$div(style=paste0("text-align:center;font-weight:700;color:", dark, ";font-size:0.85em;margin-bottom:2px;"),
-                  header),
-                down_arrow,
-                tags$div(style=paste0("background:", light, ";border:1px solid ", border, ";border-radius:8px;padding:8px 10px;font-size:0.78em;"),
-                  input_items
-                ),
-                down_arrow,
-                tags$div(style=paste0("background:", dark, ";color:#fff;border-radius:8px;padding:8px 10px;font-size:0.78em;"),
-                  tags$div(style="font-weight:700;", process_title),
-                  tags$div(style="opacity:0.9;margin-top:2px;", process_sub),
-                  tags$div(style="margin-top:6px;", process_detail)
-                ),
-                down_arrow,
-                tags$div(style=paste0("background:", light, ";border:1px solid ", border, ";border-radius:8px;padding:8px 10px;font-size:0.8em;text-align:center;font-weight:700;color:", dark, ";"),
-                  output_text)
-              )
+            level_label <- function(text) {
+              tags$div(style="display:flex;align-items:center;justify-content:center;height:100%;font-size:0.78em;font-weight:700;color:#888;text-align:center;padding:4px;",
+                text)
+            }
+            box <- function(bg, color, border, content, extra_style="") {
+              tags$div(style=paste0("background:", bg, ";color:", color, ";",
+                                     if (nzchar(border)) paste0("border:1px solid ", border, ";") else "",
+                                     "border-radius:8px;padding:8px 10px;font-size:0.78em;height:100%;box-sizing:border-box;", extra_style),
+                content)
             }
 
             tagList(
-              tags$div(style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin:14px 0;",
-                make_column(
-                  header = tagList("インディケーターベース", tags$br(), "サーベイランス（IBS）"),
-                  dark = "#2c2b97", light = "#eef0fb", border = "#c7ccec",
-                  input_items = tagList(
-                    tags$div(style="font-weight:700;color:#2c2b97;", "リスク探知"),
-                    tags$div(style="color:#555;", "全数報告、病原体サーベイランスなど"),
-                    tags$div(style="font-weight:700;color:#2c2b97;margin-top:6px;", "新興リスク"),
-                    tags$div(style="color:#555;", "症候群サーベイランス、死亡者数モニタリング、処方箋モニタリングなど"),
-                    tags$div(style="font-weight:700;color:#2c2b97;margin-top:6px;", "非医療ベース"),
-                    tags$div(style="color:#555;", "中毒センター、行動モニタリング、環境サーベイランス、獣医サーベイランス、食中毒モニタリングなど")
-                  ),
-                  process_title = "サーベイランスシステム",
-                  process_sub = "諸々のサーベイランス機能",
-                  process_detail = "トレンドモニタリング・プログラムモニタリング・慢性疾患・疾病負荷の把握",
-                  output_text = tagList("計画／実行", tags$br(), "長期的・構造的対応")
-                ),
-                make_column(
-                  header = tagList("イベントベース", tags$br(), "サーベイランス（EBS）"),
-                  dark = "#6c3483", light = "#f5eefb", border = "#dcc7ec",
-                  input_items = tagList(
-                    tags$div(style="font-weight:700;color:#6c3483;", "国内情報"),
-                    tags$div(style="color:#555;", "メディアモニタリング、フォーカルポイント・ネットワーク情報"),
-                    tags$div(style="font-weight:700;color:#6c3483;margin-top:6px;", "国外情報"),
-                    tags$div(style="color:#555;", "情報スキャンツール、配信情報、国際機関情報")
-                  ),
-                  process_title = "サーベイランスシステム",
-                  process_sub = "早期探知・警戒機能",
-                  process_detail = "シグナル・緊急の公衆衛生イベントの探知・アラート",
-                  output_text = "迅速対応"
-                )
+              tags$div(style="display:grid;grid-template-columns:64px 1fr 1fr;gap:8px;align-items:stretch;margin:14px 0;",
+                # ── ヘッダー行 ──
+                tags$div(),
+                tags$div(style="text-align:center;font-weight:700;color:#2c2b97;font-size:0.85em;align-self:end;",
+                  "インディケーターベース", tags$br(), "サーベイランス（IBS）"),
+                tags$div(style="text-align:center;font-weight:700;color:#6c3483;font-size:0.85em;align-self:end;",
+                  "イベントベース", tags$br(), "サーベイランス（EBS）"),
+
+                tags$div(style="grid-column:1 / -1;", down_arrow),
+
+                # ── インプット行 ──
+                level_label("インプット"),
+                box("#eef0fb", "#333", "#c7ccec", tagList(
+                  tags$div(style="font-weight:700;color:#2c2b97;", "リスク探知"),
+                  tags$div(style="color:#555;", "全数報告、病原体サーベイランスなど"),
+                  tags$div(style="font-weight:700;color:#2c2b97;margin-top:6px;", "新興リスク"),
+                  tags$div(style="color:#555;", "症候群サーベイランス、死亡者数モニタリング、処方箋モニタリングなど"),
+                  tags$div(style="font-weight:700;color:#2c2b97;margin-top:6px;", "非医療ベース"),
+                  tags$div(style="color:#555;", "中毒センター、行動モニタリング、環境サーベイランス、獣医サーベイランス、食中毒モニタリングなど")
+                )),
+                box("#f5eefb", "#333", "#dcc7ec", tagList(
+                  tags$div(style="font-weight:700;color:#6c3483;", "国内情報"),
+                  tags$div(style="color:#555;", "メディアモニタリング、フォーカルポイント・ネットワーク情報"),
+                  tags$div(style="font-weight:700;color:#6c3483;margin-top:6px;", "国外情報"),
+                  tags$div(style="color:#555;", "情報スキャンツール、配信情報、国際機関情報")
+                )),
+
+                tags$div(style="grid-column:1 / -1;", down_arrow),
+
+                # ── プロセス行 ──
+                level_label("プロセス"),
+                box("#2c2b97", "#fff", "", tagList(
+                  tags$div(style="font-weight:700;", "サーベイランスシステム"),
+                  tags$div(style="opacity:0.9;margin-top:2px;", "諸々のサーベイランス機能"),
+                  tags$div(style="margin-top:6px;", "トレンドモニタリング・プログラムモニタリング・慢性疾患・疾病負荷の把握")
+                )),
+                box("#6c3483", "#fff", "", tagList(
+                  tags$div(style="font-weight:700;", "サーベイランスシステム"),
+                  tags$div(style="opacity:0.9;margin-top:2px;", "早期探知・警戒機能"),
+                  tags$div(style="margin-top:6px;", "シグナル・緊急の公衆衛生イベントの探知・アラート")
+                )),
+
+                tags$div(style="grid-column:1 / -1;", down_arrow),
+
+                # ── アウトプット行 ──
+                level_label("アウトプット"),
+                box("#eef0fb", "#2c2b97", "#c7ccec",
+                  tagList("計画／実行", tags$br(), "長期的・構造的対応"),
+                  extra_style="text-align:center;font-weight:700;display:flex;align-items:center;justify-content:center;"),
+                box("#f5eefb", "#6c3483", "#dcc7ec", "迅速対応",
+                  extra_style="text-align:center;font-weight:700;display:flex;align-items:center;justify-content:center;")
               ),
               down_arrow,
               tags$div(style="display:flex;flex-direction:column;align-items:center;gap:2px;",
