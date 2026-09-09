@@ -1835,19 +1835,34 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
             "自治体等における具体的な対応判断を支えます。"
           ),
 
-          tags$div(style="overflow-x:auto;margin:14px 0;",
-            tags$table(style="width:100%;min-width:640px;border-collapse:separate;border-spacing:6px;",
-              tags$thead(tags$tr(
-                tags$th(style="width:16%;"),
-                tags$th(style="text-align:center;color:#888;font-size:0.8em;font-weight:700;", "インプット（情報源）"),
-                tags$th(style="text-align:center;color:#888;font-size:0.8em;font-weight:700;", "プロセス"),
-                tags$th(style="text-align:center;color:#888;font-size:0.8em;font-weight:700;", "アウトプット")
-              )),
-              tags$tbody(
-                tags$tr(
-                  tags$td(style="text-align:center;vertical-align:middle;font-weight:700;color:#2c2b97;font-size:0.85em;",
-                    "インディケーターベース", tags$br(), "サーベイランス", tags$br(), "（IBS）"),
-                  tags$td(style="background:#eef0fb;border:1px solid #c7ccec;border-radius:8px;padding:8px 10px;font-size:0.78em;vertical-align:top;",
+          (function() {
+            down_arrow <- tags$div(style="text-align:center;color:#8b8bda;font-size:1.1em;margin:2px 0;", icon("arrow-down"))
+            make_column <- function(header, dark, light, border, input_items, process_title, process_sub, process_detail, output_text) {
+              tags$div(style="flex:1;min-width:220px;max-width:340px;display:flex;flex-direction:column;",
+                tags$div(style=paste0("text-align:center;font-weight:700;color:", dark, ";font-size:0.85em;margin-bottom:2px;"),
+                  header),
+                down_arrow,
+                tags$div(style=paste0("background:", light, ";border:1px solid ", border, ";border-radius:8px;padding:8px 10px;font-size:0.78em;"),
+                  input_items
+                ),
+                down_arrow,
+                tags$div(style=paste0("background:", dark, ";color:#fff;border-radius:8px;padding:8px 10px;font-size:0.78em;"),
+                  tags$div(style="font-weight:700;", process_title),
+                  tags$div(style="opacity:0.9;margin-top:2px;", process_sub),
+                  tags$div(style="margin-top:6px;", process_detail)
+                ),
+                down_arrow,
+                tags$div(style=paste0("background:", light, ";border:1px solid ", border, ";border-radius:8px;padding:8px 10px;font-size:0.8em;text-align:center;font-weight:700;color:", dark, ";"),
+                  output_text)
+              )
+            }
+
+            tagList(
+              tags$div(style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin:14px 0;",
+                make_column(
+                  header = tagList("インディケーターベース", tags$br(), "サーベイランス（IBS）"),
+                  dark = "#2c2b97", light = "#eef0fb", border = "#c7ccec",
+                  input_items = tagList(
                     tags$div(style="font-weight:700;color:#2c2b97;", "リスク探知"),
                     tags$div(style="color:#555;", "全数報告、病原体サーベイランスなど"),
                     tags$div(style="font-weight:700;color:#2c2b97;margin-top:6px;", "新興リスク"),
@@ -1855,42 +1870,36 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
                     tags$div(style="font-weight:700;color:#2c2b97;margin-top:6px;", "非医療ベース"),
                     tags$div(style="color:#555;", "中毒センター、行動モニタリング、環境サーベイランス、獣医サーベイランス、食中毒モニタリングなど")
                   ),
-                  tags$td(style="background:#4b499c;color:#fff;border-radius:8px;padding:8px 10px;font-size:0.78em;vertical-align:top;",
-                    tags$div(style="font-weight:700;", "サーベイランスシステム"),
-                    tags$div(style="opacity:0.9;margin-top:2px;", "諸々のサーベイランス機能"),
-                    tags$div(style="margin-top:6px;", "トレンドモニタリング・プログラムモニタリング・慢性疾患・疾病負荷の把握")
-                  ),
-                  tags$td(style="background:#eef0fb;border:1px solid #c7ccec;border-radius:8px;padding:8px 10px;font-size:0.8em;vertical-align:middle;text-align:center;font-weight:700;color:#2c2b97;",
-                    "計画／実行", tags$br(), "長期的・構造的対応")
+                  process_title = "サーベイランスシステム",
+                  process_sub = "諸々のサーベイランス機能",
+                  process_detail = "トレンドモニタリング・プログラムモニタリング・慢性疾患・疾病負荷の把握",
+                  output_text = tagList("計画／実行", tags$br(), "長期的・構造的対応")
                 ),
-                tags$tr(
-                  tags$td(style="text-align:center;vertical-align:middle;font-weight:700;color:#6c3483;font-size:0.85em;",
-                    "イベントベース", tags$br(), "サーベイランス", tags$br(), "（EBS）"),
-                  tags$td(style="background:#f5eefb;border:1px solid #dcc7ec;border-radius:8px;padding:8px 10px;font-size:0.78em;vertical-align:top;",
+                make_column(
+                  header = tagList("イベントベース", tags$br(), "サーベイランス（EBS）"),
+                  dark = "#6c3483", light = "#f5eefb", border = "#dcc7ec",
+                  input_items = tagList(
                     tags$div(style="font-weight:700;color:#6c3483;", "国内情報"),
                     tags$div(style="color:#555;", "メディアモニタリング、フォーカルポイント・ネットワーク情報"),
                     tags$div(style="font-weight:700;color:#6c3483;margin-top:6px;", "国外情報"),
                     tags$div(style="color:#555;", "情報スキャンツール、配信情報、国際機関情報")
                   ),
-                  tags$td(style="background:#6c3483;color:#fff;border-radius:8px;padding:8px 10px;font-size:0.78em;vertical-align:top;",
-                    tags$div(style="font-weight:700;", "サーベイランスシステム"),
-                    tags$div(style="opacity:0.9;margin-top:2px;", "早期探知・警戒機能"),
-                    tags$div(style="margin-top:6px;", "シグナル・緊急の公衆衛生イベントの探知・アラート")
-                  ),
-                  tags$td(style="background:#f5eefb;border:1px solid #dcc7ec;border-radius:8px;padding:8px 10px;font-size:0.8em;vertical-align:middle;text-align:center;font-weight:700;color:#6c3483;",
-                    "迅速対応")
+                  process_title = "サーベイランスシステム",
+                  process_sub = "早期探知・警戒機能",
+                  process_detail = "シグナル・緊急の公衆衛生イベントの探知・アラート",
+                  output_text = "迅速対応"
                 )
+              ),
+              down_arrow,
+              tags$div(style="display:flex;flex-direction:column;align-items:center;gap:2px;",
+                tags$div(style="background:#1f1b79;color:#fff;border-radius:8px;padding:8px 16px;font-weight:700;min-width:200px;text-align:center;",
+                  "継続的なリスク評価"),
+                down_arrow,
+                tags$div(style="background:#1f1b79;color:#fff;border-radius:8px;padding:8px 16px;font-weight:700;min-width:200px;text-align:center;",
+                  "対応")
               )
             )
-          ),
-          tags$div(style="text-align:center;color:#8b8bda;font-size:1.3em;margin:2px 0;", icon("arrow-down")),
-          tags$div(style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;",
-            tags$div(style="background:#1f1b79;color:#fff;border-radius:8px;padding:8px 16px;font-weight:700;",
-              "継続的なリスク評価"),
-            tags$div(style="align-self:center;color:#8b8bda;", icon("arrow-right")),
-            tags$div(style="background:#1f1b79;color:#fff;border-radius:8px;padding:8px 16px;font-weight:700;",
-              "対応")
-          ),
+          })(),
           tags$p(style="font-size:0.85em;color:#888;margin-top:10px;",
             "本ダッシュボードでは、「患者サーベイランス」「病原体サーベイランス」「入院サーベイランス」等の各タブがIBSに、",
             "「EBS」タブがEBSに対応しています。"),
@@ -1927,22 +1936,22 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
           tags$br(),
 
           # ── ③ 検証〜さらなるアクション ─────────────────────
-          tags$h4("③「検証」から「分析・リスク評価」「さらなるアクション」へ", style="border-bottom:2px solid #4b499c;padding-bottom:4px;color:#2c3e50;"),
+          tags$h4("③「検証」から「分析・リスク評価」「アクション」へ", style="border-bottom:2px solid #4b499c;padding-bottom:4px;color:#2c3e50;"),
           tags$h5("検証"),
           tags$ul(
-            tags$li("シグナルやイベントの内容を確認し、それぞれのフィルタリング（採否の判断）が妥当か関係者内で確認する"),
-            tags$li("不足している情報等を洗い出す段階であり、フィルタリングの理由は、判断した担当者が説明できれば良い"),
-            tags$li("積極的モニタリング・分析・リスク評価等につなげる必要があるかを、必要に応じて関係部署とも連携しながら検証する")
+            tags$li("シグナルやイベントと判断した情報の内容を確認し、それぞれのフィルタリングが妥当か関係者内で確認する"),
+            tags$li("この過程は不足している情報等を洗い出す段階であり、フィルタリングの理由は、その時判断した担当者が説明できれば問題ない"),
+            tags$li("積極的モニタリング・分析・リスク評価等につなげる必要があるかを、関係者で連携しながら検証する")
           ),
           tags$h5("分析・リスク評価"),
           tags$ul(
             tags$li("リスク評価の際には、複数のデータ・情報を活用して分析・評価を行う"),
-            tags$li("この段階では非公開情報も多く含むため、関係者内での共有にとどまることがほとんど")
+            tags$li("この段階では非公開情報も多く含むため、その結果は関係者内での共有にとどまることも多い")
           ),
-          tags$h5("さらなるアクション"),
+          tags$h5("アクション"),
           tags$ul(
-            tags$li("評価結果を踏まえた、さらなる積極的な情報収集"),
-            tags$li("関係機関への情報提供、情報収集、積極的疫学調査の検討へ")
+            tags$li("評価結果を踏まえ、さらなる積極的な情報収集を検討する"),
+            tags$li("関係機関への情報提供や外部機関からの情報収集、積極的疫学調査を検討する")
           )
         )
       ),
