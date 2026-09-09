@@ -1836,32 +1836,44 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
           ),
 
           (function() {
-            down_arrow <- tags$div(style="text-align:center;color:#8b8bda;font-size:1.1em;margin:2px 0;", icon("arrow-down"))
-            level_label <- function(text) {
-              tags$div(style="display:flex;align-items:center;justify-content:center;height:100%;font-size:0.78em;font-weight:700;color:#888;text-align:center;padding:4px;",
-                text)
+            arrow <- function(row, col="1 / -1") tags$div(style=paste0("grid-row:", row, ";grid-column:", col, ";text-align:center;color:#8b8bda;font-size:1.1em;margin:2px 0;z-index:1;"), icon("arrow-down"))
+            cell <- function(row, col, content, style="") {
+              tags$div(style=paste0("grid-row:", row, ";grid-column:", col, ";z-index:1;", style), content)
             }
-            box <- function(bg, color, border, content, extra_style="") {
-              tags$div(style=paste0("background:", bg, ";color:", color, ";",
-                                     if (nzchar(border)) paste0("border:1px solid ", border, ";") else "",
-                                     "border-radius:8px;padding:8px 10px;font-size:0.78em;height:100%;box-sizing:border-box;", extra_style),
-                content)
+            level_label <- function(row, text) {
+              cell(row, 1, text, style="display:flex;align-items:center;justify-content:center;font-size:0.78em;font-weight:700;color:#888;text-align:center;padding:4px;")
+            }
+            box <- function(row, col, bg, color, border, content, extra_style="") {
+              cell(row, col,
+                tags$div(style=paste0("background:", bg, ";color:", color, ";",
+                                       if (nzchar(border)) paste0("border:1px solid ", border, ";") else "",
+                                       "border-radius:8px;padding:8px 10px;font-size:0.78em;height:100%;box-sizing:border-box;", extra_style),
+                  content))
             }
 
             tagList(
-              tags$div(style="display:grid;grid-template-columns:64px 1fr 1fr;gap:8px;align-items:stretch;margin:14px 0;",
-                # ── ヘッダー行 ──
-                tags$div(),
-                tags$div(style="text-align:center;font-weight:700;color:#2c2b97;font-size:0.85em;align-self:end;",
-                  "インディケーターベース", tags$br(), "サーベイランス（IBS）"),
-                tags$div(style="text-align:center;font-weight:700;color:#6c3483;font-size:0.85em;align-self:end;",
-                  "イベントベース", tags$br(), "サーベイランス（EBS）"),
+              tags$div(style="display:grid;grid-template-columns:64px 1fr 1fr;gap:8px;align-items:stretch;margin:14px 0;position:relative;",
 
-                tags$div(style="grid-column:1 / -1;", down_arrow),
+                # ── 列の背景色（IBS＝ピンク系／EBS＝オレンジ系） ──
+                tags$div(style="grid-row:1 / 12;grid-column:2;background:#fdeef4;border-radius:12px;z-index:0;"),
+                tags$div(style="grid-row:1 / 12;grid-column:3;background:#fff6e6;border-radius:12px;z-index:0;"),
+
+                # ── Epidemic Intelligence活動の重なりを表す枠 ──
+                tags$div(style="grid-row:5 / 12;grid-column:2 / -1;border:2px solid #2c6fbb;border-radius:14px;z-index:0;position:relative;",
+                  tags$div(style="position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:#fff;padding:0 10px;color:#2c6fbb;font-weight:700;font-size:0.82em;white-space:nowrap;",
+                    "Epidemic Intelligence活動")),
+
+                # ── ヘッダー行 ──
+                cell(1, 2, tagList("インディケーターベース", tags$br(), "サーベイランス（IBS）"),
+                  style="text-align:center;font-weight:700;color:#2c2b97;font-size:0.85em;align-self:end;"),
+                cell(1, 3, tagList("イベントベース", tags$br(), "サーベイランス（EBS）"),
+                  style="text-align:center;font-weight:700;color:#6c3483;font-size:0.85em;align-self:end;"),
+
+                arrow(2),
 
                 # ── インプット行 ──
-                level_label("インプット"),
-                box("#eef0fb", "#333", "#c7ccec", tagList(
+                level_label(3, "インプット"),
+                box(3, 2, "#eef0fb", "#333", "#c7ccec", tagList(
                   tags$div(style="font-weight:700;color:#2c2b97;", "リスク探知"),
                   tags$div(style="color:#555;", "全数報告、病原体サーベイランスなど"),
                   tags$div(style="font-weight:700;color:#2c2b97;margin-top:6px;", "新興リスク"),
@@ -1869,45 +1881,50 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
                   tags$div(style="font-weight:700;color:#2c2b97;margin-top:6px;", "非医療ベース"),
                   tags$div(style="color:#555;", "中毒センター、行動モニタリング、環境サーベイランス、獣医サーベイランス、食中毒モニタリングなど")
                 )),
-                box("#f5eefb", "#333", "#dcc7ec", tagList(
+                box(3, 3, "#f5eefb", "#333", "#dcc7ec", tagList(
                   tags$div(style="font-weight:700;color:#6c3483;", "国内情報"),
                   tags$div(style="color:#555;", "メディアモニタリング、フォーカルポイント・ネットワーク情報"),
                   tags$div(style="font-weight:700;color:#6c3483;margin-top:6px;", "国外情報"),
                   tags$div(style="color:#555;", "情報スキャンツール、配信情報、国際機関情報")
                 )),
 
-                tags$div(style="grid-column:1 / -1;", down_arrow),
+                arrow(4),
 
-                # ── プロセス行 ──
-                level_label("プロセス"),
-                box("#2c2b97", "#fff", "", tagList(
+                # ── プロセス行（Epidemic Intelligence活動の枠内） ──
+                level_label(5, "プロセス"),
+                box(5, 2, "#2c2b97", "#fff", "", tagList(
                   tags$div(style="font-weight:700;", "サーベイランスシステム"),
                   tags$div(style="opacity:0.9;margin-top:2px;", "諸々のサーベイランス機能"),
                   tags$div(style="margin-top:6px;", "トレンドモニタリング・プログラムモニタリング・慢性疾患・疾病負荷の把握")
                 )),
-                box("#6c3483", "#fff", "", tagList(
+                box(5, 3, "#6c3483", "#fff", "", tagList(
                   tags$div(style="font-weight:700;", "サーベイランスシステム"),
                   tags$div(style="opacity:0.9;margin-top:2px;", "早期探知・警戒機能"),
                   tags$div(style="margin-top:6px;", "シグナル・緊急の公衆衛生イベントの探知・アラート")
                 )),
 
-                tags$div(style="grid-column:1 / -1;", down_arrow),
+                arrow(6, "2 / -1"),
 
                 # ── アウトプット行 ──
-                level_label("アウトプット"),
-                box("#eef0fb", "#2c2b97", "#c7ccec",
+                level_label(7, "アウトプット"),
+                box(7, 2, "#eef0fb", "#2c2b97", "#c7ccec",
                   tagList("計画／実行", tags$br(), "長期的・構造的対応"),
                   extra_style="text-align:center;font-weight:700;display:flex;align-items:center;justify-content:center;"),
-                box("#f5eefb", "#6c3483", "#dcc7ec", "迅速対応",
-                  extra_style="text-align:center;font-weight:700;display:flex;align-items:center;justify-content:center;")
-              ),
-              down_arrow,
-              tags$div(style="display:flex;flex-direction:column;align-items:center;gap:2px;",
-                tags$div(style="background:#1f1b79;color:#fff;border-radius:8px;padding:8px 16px;font-weight:700;min-width:200px;text-align:center;",
-                  "継続的なリスク評価"),
-                down_arrow,
-                tags$div(style="background:#1f1b79;color:#fff;border-radius:8px;padding:8px 16px;font-weight:700;min-width:200px;text-align:center;",
-                  "対応")
+                box(7, 3, "#f5eefb", "#6c3483", "#dcc7ec", "迅速対応",
+                  extra_style="text-align:center;font-weight:700;display:flex;align-items:center;justify-content:center;"),
+
+                arrow(8, "2 / -1"),
+
+                # ── 継続的なリスク評価・対応（IBS・EBSの重なりの中で行う） ──
+                cell(9, "2 / -1",
+                  "継続的なリスク評価",
+                  style="background:#1f1b79;color:#fff;border-radius:8px;padding:8px 16px;font-weight:700;text-align:center;justify-self:center;min-width:220px;"),
+
+                arrow(10, "2 / -1"),
+
+                cell(11, "2 / -1",
+                  "対応",
+                  style="background:#1f1b79;color:#fff;border-radius:8px;padding:8px 16px;font-weight:700;text-align:center;justify-self:center;min-width:220px;")
               )
             )
           })(),
