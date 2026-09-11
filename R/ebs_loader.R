@@ -5516,6 +5516,29 @@ rescreen_ebs_data <- function(df) {
 
   screen_results <- lapply(seq_len(nrow(df)), screen_fn)
 
+  # WHO EIOSは世界中の一般メディア記事を無差別に収集するアグリゲーターであり、
+  # 実際には国内（日本語）記事も大量に含まれる。categoryを一律「国際」のまま
+  # 表示すると国内記事が国際記事に紛れ込んで見えるため、記事ごとの国内・海外
+  # 判定（is_overseas_article、上のscreen_fnで既に計算済み）に基づき、
+  # 国内記事のcategoryを「ニュース」に補正する
+  # （実例: 2026-09-11 EBS精度チェックで、青森県内インフルエンザ流行等の
+  # 国内ニュースがWHO EIOS経由でcategory="国際"のまま表示されているのを発見）
+  if ("category" %in% names(df) && "source_id" %in% names(df)) {
+    who_eios_rows <- which(coalesce(df$source_id, "") == "who_eios")
+    if (length(who_eios_rows) > 0) {
+      is_domestic <- vapply(who_eios_rows, function(i) {
+        tryCatch(!isTRUE(is_overseas_article(
+          title       = coalesce(df$title[i], ""),
+          summary     = coalesce(df$summary[i], ""),
+          ebs_pref    = if ("ebs_pref" %in% names(df)) coalesce(df$ebs_pref[i], NA_character_) else NA_character_,
+          source_id   = coalesce(df$source_id[i], ""),
+          source_name = coalesce(df$source_name[i], "")
+        )), error = function(e) FALSE)
+      }, logical(1))
+      df$category[who_eios_rows[is_domestic]] <- "ニュース"
+    }
+  }
+
   df$signal_level  <- factor(sapply(screen_results, `[[`, "signal_weight"),
                               levels = c("Signal High","Signal Low","FYI"))
   df$ebs_unusual   <- sapply(screen_results, `[[`, "unusual_unexpected")
