@@ -92,8 +92,13 @@ HOKENJO_REFRESH_DISPATCH <- list(
   "長野県"   = function() probe_latest_week_fetch(function(y, w)
     fetch_nagano(resolve_nagano_data_url(y, w))),
   "岐阜県"   = function() fetch_gifu(resolve_gifu_data_url()),
+  # 静岡県は他県より掲載までのタイムラグが大きく（実例: 2026-09-16確認時点で
+  # 直近4週(35〜38週)は全て404、35週前の34週でようやく取得できた）、
+  # デフォルトのmax_back=3（直近4週分）では既に公開済みの最新号を
+  # 取り逃してしまう。ラグを見込んでmax_backを広げる
   "静岡県"   = function() probe_latest_week_fetch(function(y, w)
-    fetch_shizuoka(sprintf("https://www.pref.shizuoka.jp/_res/projects/default_project/_page_/001/081/723/%didwr%d-2.pdf", y, w))),
+    fetch_shizuoka(sprintf("https://www.pref.shizuoka.jp/_res/projects/default_project/_page_/001/081/723/%didwr%d-2.pdf", y, w)),
+    max_back = 6),
   # 愛知県: サイト全体がリダイレクトループ中で現状取得不可（2026-08確認）。
   # URLパターン自体は分かっているので復旧後はprobe_latest_week_fetchに変更可能
   "愛知県"   = function() fetch_aichi(.sample_url("愛知県")),
