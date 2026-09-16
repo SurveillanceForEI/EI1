@@ -92,13 +92,24 @@ HOKENJO_REFRESH_DISPATCH <- list(
   "長野県"   = function() probe_latest_week_fetch(function(y, w)
     fetch_nagano(resolve_nagano_data_url(y, w))),
   "岐阜県"   = function() fetch_gifu(resolve_gifu_data_url()),
-  # 静岡県は他県より掲載までのタイムラグが大きく（実例: 2026-09-16確認時点で
-  # 直近4週(35〜38週)は全て404、35週前の34週でようやく取得できた）、
-  # デフォルトのmax_back=3（直近4週分）では既に公開済みの最新号を
-  # 取り逃してしまう。ラグを見込んでmax_backを広げる
-  "静岡県"   = function() probe_latest_week_fetch(function(y, w)
-    fetch_shizuoka(sprintf("https://www.pref.shizuoka.jp/_res/projects/default_project/_page_/001/081/723/%didwr%d-2.pdf", y, w)),
-    max_back = 6),
+  # 静岡県は他県より掲載までのタイムラグが大きく、デフォルトのmax_back=3
+  # （直近4週分）だと公開済みの最新号を取り逃すことがあるためmax_backを
+  # 広げてある。また、ファイル名の末尾「-2」サフィックスは号によって
+  # 付いたり付かなかったりする（実例: 2026-09-16確認時点で第36週は
+  # サフィックス無しの"2026idwr36.pdf"で公開されていたが、それ以前は
+  # "-2"付きだった）ため、両方のパターンを候補として試す
+  "静岡県"   = function() probe_latest_week_fetch(function(y, w) {
+    candidates <- c(
+      sprintf("https://www.pref.shizuoka.jp/_res/projects/default_project/_page_/001/081/723/%didwr%d.pdf", y, w),
+      sprintf("https://www.pref.shizuoka.jp/_res/projects/default_project/_page_/001/081/723/%didwr%d-2.pdf", y, w)
+    )
+    last_err <- NULL
+    for (u in candidates) {
+      res <- tryCatch(fetch_shizuoka(u), error = function(e) { last_err <<- e; NULL })
+      if (!is.null(res)) return(res)
+    }
+    stop(conditionMessage(last_err))
+  }, max_back = 6),
   # 愛知県: サイト全体がリダイレクトループ中で現状取得不可（2026-08確認）。
   # URLパターン自体は分かっているので復旧後はprobe_latest_week_fetchに変更可能
   "愛知県"   = function() fetch_aichi(.sample_url("愛知県")),
