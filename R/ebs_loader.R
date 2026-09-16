@@ -5982,7 +5982,7 @@ aggregate_ebs_weekly <- function(ebs_data, disease_filter = NULL) {
       .groups = "drop"
     ) %>%
     mutate(date = as.Date(paste0(year, "-W", sprintf("%02d", week), "-1"),
-                          format = "%Y-W%W-%u"))
+                          format = "%Y-W%V-%u"))
 }
 
 # ============================================================

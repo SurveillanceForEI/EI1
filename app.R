@@ -2421,7 +2421,7 @@ server <- function(input, output, session) {
       if (!is.null(sel)) paste0(format(sel, "%Y年%m月"), " の都道府県別 月次報告数")
       else "都道府県別 月次報告数"
     } else if (!is.null(sel)) {
-      paste0(sprintf("%s（%s〜%s）", format(sel, "%Y年第%W週"), format(sel, "%m/%d"), format(sel + 6, "%m/%d")), " の都道府県別 定点あたり報告数")
+      paste0(sprintf("%s（%s〜%s）", format(sel, "%Y年第%V週"), format(sel, "%m/%d"), format(sel + 6, "%m/%d")), " の都道府県別 定点あたり報告数")
     } else "都道府県別 定点あたり報告数"
     make_source_bar(week_label)
   })
@@ -2565,7 +2565,7 @@ server <- function(input, output, session) {
     is_std   <- !is_zensu && input$disease %in% names(STD_DISEASE_CONFIG)
     week_val <- if (is.null(sel)) NULL
                 else if (is_std) format(sel, "%Y年%m月")
-                else sprintf("%s（%s〜%s）", format(sel, "%Y年第%W週"), format(sel, "%m/%d"), format(sel + 6, "%m/%d"))
+                else sprintf("%s（%s〜%s）", format(sel, "%Y年第%V週"), format(sel, "%m/%d"), format(sel + 6, "%m/%d"))
     make_filter_bar(list(
       "疾患"     = disease_label,
       "表示週"   = week_val,
@@ -2779,7 +2779,7 @@ server <- function(input, output, session) {
     if (is.null(sel)) return(NULL)
     is_zensu <- !is.null(input$ts_mode) && input$ts_mode == "zensu"
     is_std   <- !is_zensu && input$disease %in% names(STD_DISEASE_CONFIG)
-    lbl <- if (is_std) format(sel, "%Y年%m月") else sprintf("%s（%s〜%s）", format(sel, "%Y年 第%W週"), format(sel, "%m/%d"), format(sel + 6, "%m/%d"))
+    lbl <- if (is_std) format(sel, "%Y年%m月") else sprintf("%s（%s〜%s）", format(sel, "%Y年 第%V週"), format(sel, "%m/%d"), format(sel + 6, "%m/%d"))
     tags$div(
       style = "font-size:0.85em;font-weight:600;color:#1f1b79;margin-bottom:2px;",
       icon("calendar-week", style = "margin-right:4px;"),
@@ -4727,7 +4727,7 @@ server <- function(input, output, session) {
       tags$h5(paste0(if (!is.null(dconf)) dconf$label else input$disease, " 報告数ランキング（", month_str, "）"),
               style = "font-weight:700")
     } else {
-      week_str <- if (!is.null(sel)) format(sel, "%Y年第%W週") else "直近週"
+      week_str <- if (!is.null(sel)) format(sel, "%Y年第%V週") else "直近週"
       if (is_zensu) {
         dconf <- ZENSU_DISEASE_CONFIG[[input$zensu_disease_ts]]
         tags$h5(paste0(dconf$label, " 報告数ランキング（", week_str, "）"),
