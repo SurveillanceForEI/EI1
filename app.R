@@ -1852,16 +1852,23 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
             }
 
             tagList(
-              tags$div(style="display:grid;grid-template-columns:64px 1fr 1fr;gap:8px;align-items:stretch;margin:14px 0;position:relative;",
+              tags$div(style="display:grid;grid-template-columns:64px 1fr 1fr 70px;gap:8px;align-items:stretch;margin:14px 0;position:relative;",
 
                 # ── 列の背景色（IBS＝ピンク系／EBS＝オレンジ系） ──
                 tags$div(style="grid-row:1 / 12;grid-column:2;background:#fdeef4;border-radius:12px;z-index:0;"),
                 tags$div(style="grid-row:1 / 12;grid-column:3;background:#fff6e6;border-radius:12px;z-index:0;"),
 
-                # ── Epidemic Intelligence活動の重なりを表す枠 ──
-                tags$div(style="grid-row:5 / 12;grid-column:2 / -1;border:2px solid #2c6fbb;border-radius:14px;z-index:0;position:relative;",
-                  tags$div(style="position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:#fff;padding:0 10px;color:#2c6fbb;font-weight:700;font-size:0.82em;white-space:nowrap;",
-                    "Epidemic Intelligence活動")),
+                # ── Epidemic Intelligence活動：プロセス〜対応の範囲を図の右側の｝でくくる ──
+                # フルwidth全角の「｝」は環境によりグリフが薄く見えづらいため、半角の
+                # "}" をscaleYで縦に引き伸ばして確実に描画されるようにする
+                cell("5 / 12", 4,
+                  tagList(
+                    tags$div(style="font-size:2.4em;font-weight:400;color:#2c6fbb;line-height:1;transform:scaleY(3.4);transform-origin:center;",
+                      "}"),
+                    tags$div(style="writing-mode:vertical-rl;color:#2c6fbb;font-weight:700;font-size:0.82em;white-space:nowrap;margin-left:6px;",
+                      "Epidemic Intelligence活動")
+                  ),
+                  style="display:flex;align-items:center;justify-content:flex-start;"),
 
                 # ── ヘッダー行 ──
                 cell(1, 2, tagList("インディケーターベース", tags$br(), "サーベイランス（IBS）"),
