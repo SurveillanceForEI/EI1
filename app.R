@@ -1124,7 +1124,20 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
             tags$div(class="data-source-bar", "SNS情報（Bluesky）"),
             selectInput("sns_disease_filter", "疾患フィルター",
               choices = c("すべて", BLUESKY_SEARCH_KEYWORDS), selected = "すべて"),
+            selectInput("sns_period","表示期間",
+              choices=c("昨日〜現在"=1,"直近3日"=3,"直近1週間"=7,"直近1か月"=30,"全部"=9999),
+              selected=9999),
+            selectInput("sns_page_size","表示件数",
+              choices=c("10件"=10,"50件"=50,"100件"=100,"全部"=9999), selected=50),
+            radioButtons("sns_sort", "並び順",
+              choices = c("新しい順"="date", "いいね数順"="likes"),
+              selected = "date"),
+            actionButton("sns_show_all", "すべて表示",
+              icon=icon("list"), class="btn btn-default btn-sm",
+              style="width:100%;margin-top:4px;"),
             tags$div(style="font-size:0.75em;color:#888;margin-top:4px;line-height:1.4;",
+              "押すと疾患フィルターを解除して全キーワードの投稿を表示します"),
+            tags$div(style="font-size:0.75em;color:#888;margin-top:8px;line-height:1.4;",
               "登録キーワードでBlueskyを検索します（インフルエンザ、新型コロナ、麻しん等）。毎日の自動更新で取得しています")
           ),
           column(9,
@@ -2240,12 +2253,37 @@ server <- function(input, output, session) {
     if (file.exists(sns_bluesky_cache_path)) tryCatch(readRDS(sns_bluesky_cache_path), error = function(e) NULL) else NULL
   })
 
-  # 選択中の疾患（キーワード）で絞り込んだ投稿一覧
+  # 「すべて表示」（EBSカードと同様、押すと疾患フィルターを解除する）
+  observeEvent(input$sns_show_all, {
+    updateSelectInput(session, "sns_disease_filter", selected = "すべて")
+  })
+
+  # 疾患フィルター・表示期間・並び順・表示件数で絞り込んだ投稿一覧
+  # （EBSニュースカードのfiltered_ebsと同じ考え方のフィルタ構成）
   sns_bluesky_filtered <- reactive({
     df <- sns_bluesky_raw()
     if (is.null(df) || nrow(df) == 0) return(df)
+
     sel <- input$sns_disease_filter
-    if (is.null(sel) || sel == "すべて") df else df[df$keyword == sel, , drop = FALSE]
+    if (!is.null(sel) && sel != "すべて") df <- df[df$keyword == sel, , drop = FALSE]
+
+    df$created_date <- as.Date(substr(df$created_at, 1, 10))
+    period_days <- suppressWarnings(as.numeric(input$sns_period))
+    bounds <- ebs_period_bounds(period_days)
+    if (!is.null(bounds)) {
+      df <- df[is.na(df$created_date) | df$created_date >= bounds$lo, , drop = FALSE]
+      if (!is.null(bounds$hi)) df <- df[is.na(df$created_date) | df$created_date < bounds$hi, , drop = FALSE]
+    }
+
+    df <- if (!is.null(input$sns_sort) && input$sns_sort == "likes") {
+      df[order(-df$like_count), , drop = FALSE]
+    } else {
+      df[order(df$created_at, decreasing = TRUE), , drop = FALSE]
+    }
+
+    page_size <- suppressWarnings(as.integer(input$sns_page_size))
+    if (!is.na(page_size) && nrow(df) > page_size) df <- df[seq_len(page_size), , drop = FALSE]
+    df
   })
 
   output$sns_trend_plot <- renderPlotly({

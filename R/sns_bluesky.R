@@ -76,6 +76,43 @@ BLUESKY_SEARCH_KEYWORDS <- c(
 coalesce_chr <- function(x, default) if (is.null(x) || !nzchar(x)) default else x
 coalesce_num <- function(x, default) if (is.null(x)) default else x
 
+# ── 紛れ込み対策 ────────────────────────────────────────────
+# 「はしか」等の短い和語キーワードは、疾患名としてではなく文法的な語尾
+# （「〜はしなかった」「〜はしません」「〜はしかねない」等の「〜は」＋
+# 「し」＋「か」の組み合わせ）としてヒットしてしまうことが多い
+# （実例: 2026-09-18 ユーザー指摘。「はしか」検索で無関係な投稿が混入）。
+# 疾患名の直後に助詞・句読点等が続く自然な名詞用法のみを許可する
+.SNS_KEYWORD_FALSE_POSITIVE_PATTERNS <- list(
+  "はしか" = "はし(かね|かった|ません|ない|なかった)"
+)
+
+# 「インフルエンザ」等の疾患名キーワードにヒットしても、実際には症状・流行状況等
+# 感染症サーベイランスの文脈を伴わない個人の雑談・比喩表現等が大半を占める。
+# EBSの一次情報と異なりSNS投稿は文脈情報が乏しいため、キーワードに加えて
+# 感染症の発生状況を示唆する語（症状・流行・行政的対応等）が最低1つ共起する
+# ことを要求し、雑談・比喩的な言及を減らす
+.SNS_CONTEXT_KEYWORDS <- c(
+  "感染", "患者", "ウイルス", "流行", "発症", "症状", "ワクチン", "予防接種",
+  "陽性", "発熱", "咳", "下痢", "嘔吐", "学級閉鎖", "休校", "休園",
+  "集団感染", "保健所", "厚労省", "自治体", "医療機関", "病院", "感染症",
+  "定点", "報告数", "警報", "注意報", "食中毒", "検疫"
+)
+
+.sns_is_relevant <- function(keyword, text) {
+  # Bluesky検索は語形変化・トークン単位の緩いマッチングを行っており、検索語を
+  # 文字列として全く含まない投稿（例:「はしか」で検索して「骨しか」がヒット）が
+  # 返ってくることがある（実例: 2026-09-18 ユーザー指摘で発覚）。まず検索語を
+  # 文字列として実際に含むことを必須にする
+  if (!grepl(keyword, text, fixed = TRUE)) return(FALSE)
+
+  fp <- .SNS_KEYWORD_FALSE_POSITIVE_PATTERNS[[keyword]]
+  if (!is.null(fp) && grepl(fp, text, perl = TRUE)) return(FALSE)
+  # キーワード自体が既に感染症文脈を強く示唆する語（ウイルス名等を含む）の
+  # 場合は文脈語の共起を必須にしない
+  if (grepl("ウイルス|感染症|食中毒", keyword, fixed = FALSE)) return(TRUE)
+  any(vapply(.SNS_CONTEXT_KEYWORDS, function(k) grepl(k, text, fixed = TRUE), logical(1)))
+}
+
 # 全キーワードを検索し、重複投稿(uri基準)を除去して返す
 fetch_bluesky_posts <- function(keywords = BLUESKY_SEARCH_KEYWORDS, limit_per_keyword = 20) {
   jwt <- .bluesky_login()
@@ -88,6 +125,13 @@ fetch_bluesky_posts <- function(keywords = BLUESKY_SEARCH_KEYWORDS, limit_per_ke
   # 同じ投稿が複数キーワードにヒットした場合はuriで重複排除（最初にヒットしたキーワードを残す）
   df <- df[!duplicated(df$uri), ]
 
+  # キーワードの文法的な誤爆・文脈の乏しい雑談投稿を除外する
+  is_relevant <- vapply(seq_len(nrow(df)), function(i) {
+    tryCatch(.sns_is_relevant(df$keyword[i], df$text[i]), error = function(e) TRUE)
+  }, logical(1))
+  df <- df[is_relevant, , drop = FALSE]
+  if (nrow(df) == 0) return(df)
+
   # 既存のEBSノイズ判定ロジックを流用（is_noise_articleはR/ebs_rule_screening.Rで定義）
   if (exists("is_noise_article", mode = "function")) {
     is_noise <- vapply(seq_len(nrow(df)), function(i) {
@@ -95,6 +139,7 @@ fetch_bluesky_posts <- function(keywords = BLUESKY_SEARCH_KEYWORDS, limit_per_ke
     }, logical(1))
     df <- df[!is_noise, , drop = FALSE]
   }
+  if (nrow(df) == 0) return(df)
 
   df <- df[order(df$created_at, decreasing = TRUE), ]
   df$fetched_at <- as.character(Sys.time())
