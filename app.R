@@ -1858,10 +1858,10 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
                 tags$div(style="grid-row:1 / 12;grid-column:2;background:#fdeef4;border-radius:12px;z-index:0;"),
                 tags$div(style="grid-row:1 / 12;grid-column:3;background:#fff6e6;border-radius:12px;z-index:0;"),
 
-                # ── Epidemic Intelligence活動：プロセス〜対応の範囲を図の右側の｝でくくる ──
+                # ── Epidemic Intelligence活動：プロセス〜アウトプット（迅速対応）の範囲を図の右側の｝でくくる ──
                 # フルwidth全角の「｝」は環境によりグリフが薄く見えづらいため、半角の
                 # "}" をscaleYで縦に引き伸ばして確実に描画されるようにする
-                cell("5 / 12", 4,
+                cell("5 / 8", 4,
                   tagList(
                     tags$div(style="font-size:2.4em;font-weight:400;color:#2c6fbb;line-height:1;transform:scaleY(3.4);transform-origin:center;",
                       "}"),
