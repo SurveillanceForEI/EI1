@@ -1123,7 +1123,7 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
           column(3,
             tags$div(class="data-source-bar", "SNS情報（Bluesky）"),
             selectInput("sns_disease_filter", "疾患フィルター",
-              choices = c("すべて", BLUESKY_SEARCH_KEYWORDS), selected = "すべて"),
+              choices = c("すべて", BLUESKY_DISEASE_CHOICES), selected = "すべて"),
             selectInput("sns_period","表示期間",
               choices=c("昨日〜現在"=1,"直近3日"=3,"直近1週間"=7,"直近1か月"=30,"全部"=9999),
               selected=9999),
@@ -2250,7 +2250,12 @@ server <- function(input, output, session) {
   sns_bluesky_cache_path <- "data/sns_bluesky_cache.rds"
 
   sns_bluesky_raw <- reactive({
-    if (file.exists(sns_bluesky_cache_path)) tryCatch(readRDS(sns_bluesky_cache_path), error = function(e) NULL) else NULL
+    df <- if (file.exists(sns_bluesky_cache_path)) tryCatch(readRDS(sns_bluesky_cache_path), error = function(e) NULL) else NULL
+    if (!is.null(df) && nrow(df) > 0 && !"disease" %in% names(df)) {
+      df$disease <- unname(BLUESKY_DISEASE_LABELS[df$keyword])
+      df$disease[is.na(df$disease)] <- df$keyword[is.na(df$disease)]
+    }
+    df
   })
 
   # 「すべて表示」（EBSカードと同様、押すと疾患フィルターを解除する）
@@ -2265,7 +2270,7 @@ server <- function(input, output, session) {
     if (is.null(df) || nrow(df) == 0) return(df)
 
     sel <- input$sns_disease_filter
-    if (!is.null(sel) && sel != "すべて") df <- df[df$keyword == sel, , drop = FALSE]
+    if (!is.null(sel) && sel != "すべて") df <- df[df$disease == sel, , drop = FALSE]
 
     df$created_date <- as.Date(substr(df$created_at, 1, 10))
     period_days <- suppressWarnings(as.numeric(input$sns_period))
@@ -2291,19 +2296,19 @@ server <- function(input, output, session) {
     if (is.null(df) || nrow(df) == 0) return(plotly_empty(type = "scatter", mode = "markers"))
     df$created_date <- as.Date(substr(df$created_at, 1, 10))
     sel <- input$sns_disease_filter
-    if (!is.null(sel) && sel != "すべて") df <- df[df$keyword == sel, , drop = FALSE]
+    if (!is.null(sel) && sel != "すべて") df <- df[df$disease == sel, , drop = FALSE]
     if (nrow(df) == 0) return(plotly_empty(type = "scatter", mode = "markers"))
 
     agg <- if (is.null(sel) || sel == "すべて") {
       # 疾患ごとに色分けした積み上げ棒グラフ
-      stats::aggregate(uri ~ created_date + keyword, data = df, FUN = length)
+      stats::aggregate(uri ~ created_date + disease, data = df, FUN = length)
     } else {
       stats::aggregate(uri ~ created_date, data = df, FUN = length)
     }
     names(agg)[names(agg) == "uri"] <- "n"
 
     p <- if (is.null(sel) || sel == "すべて") {
-      plot_ly(agg, x = ~created_date, y = ~n, color = ~keyword, type = "bar") %>%
+      plot_ly(agg, x = ~created_date, y = ~n, color = ~disease, type = "bar") %>%
         layout(barmode = "stack")
     } else {
       plot_ly(agg, x = ~created_date, y = ~n, type = "bar",

@@ -23,6 +23,30 @@ BLUESKY_SEARCH_KEYWORDS <- c(
   "溶連菌", "RSウイルス", "集団感染", "感染症"
 )
 
+# 検索キーワード（SNS上で実際に使われる口語表現）→ 疾患の正式名称。
+# 「麻しん」「はしか」のように同じ疾患を指す複数の口語表現を検索語として
+# 幅広く拾いつつ、フィルターや集計上は正式名称に名寄せして1つの疾患として
+# 扱う（既存のDISEASE_CONFIG/ZENSU_DISEASE_CONFIG等で使われている表記に合わせる）
+BLUESKY_DISEASE_LABELS <- c(
+  "インフルエンザ" = "インフルエンザ",
+  "新型コロナ"     = "新型コロナウイルス感染症",
+  "麻しん"         = "麻しん",
+  "はしか"         = "麻しん",
+  "風しん"         = "風しん",
+  "手足口病"       = "手足口病",
+  "感染性胃腸炎"   = "感染性胃腸炎",
+  "ノロウイルス"   = "感染性胃腸炎（ノロウイルス）",
+  "食中毒"         = "食中毒",
+  "百日咳"         = "百日咳",
+  "溶連菌"         = "Ａ群溶血性レンサ球菌咽頭炎",
+  "RSウイルス"     = "RSウイルス感染症",
+  "集団感染"       = "集団感染（疾患不特定）",
+  "感染症"         = "感染症（疾患不特定）"
+)
+
+# フィルター等での選択肢用に、正式名称の一覧（重複除去・出現順）を返す
+BLUESKY_DISEASE_CHOICES <- unique(unname(BLUESKY_DISEASE_LABELS[BLUESKY_SEARCH_KEYWORDS]))
+
 .bluesky_login <- function(identifier = Sys.getenv("BLUESKY_IDENTIFIER"),
                             app_password = Sys.getenv("BLUESKY_APP_PASSWORD")) {
   if (!nzchar(identifier) || !nzchar(app_password)) {
@@ -125,6 +149,10 @@ fetch_bluesky_posts <- function(keywords = BLUESKY_SEARCH_KEYWORDS, limit_per_ke
   # 同じ投稿が複数キーワードにヒットした場合はuriで重複排除（最初にヒットしたキーワードを残す）
   df <- df[!duplicated(df$uri), ]
 
+  # 検索キーワード（口語表現）を疾患の正式名称に名寄せする
+  df$disease <- unname(BLUESKY_DISEASE_LABELS[df$keyword])
+  df$disease[is.na(df$disease)] <- df$keyword[is.na(df$disease)]
+
   # キーワードの文法的な誤爆・文脈の乏しい雑談投稿を除外する
   is_relevant <- vapply(seq_len(nrow(df)), function(i) {
     tryCatch(.sns_is_relevant(df$keyword[i], df$text[i]), error = function(e) TRUE)
@@ -160,6 +188,12 @@ refresh_bluesky_cache <- function(cache_path = "data/sns_bluesky_cache.rds",
   if ((is.null(new_df) || nrow(new_df) == 0) && is.null(old_df)) {
     message("Bluesky: 新規投稿なし、またはノイズ除去後0件")
     return(invisible(NULL))
+  }
+
+  # 過去バージョンのキャッシュにdisease列が無い場合はここで補う（後方互換）
+  if (!is.null(old_df) && !"disease" %in% names(old_df)) {
+    old_df$disease <- unname(BLUESKY_DISEASE_LABELS[old_df$keyword])
+    old_df$disease[is.na(old_df$disease)] <- old_df$keyword[is.na(old_df$disease)]
   }
 
   df <- if (is.null(old_df)) new_df
