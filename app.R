@@ -1122,10 +1122,8 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
         fluidRow(
           column(3,
             tags$div(class="data-source-bar", "SNS情報（Bluesky）"),
-            actionButton("sns_refresh", "SNS情報更新", icon=icon("rotate"),
-              class="btn btn-default btn-sm", style="width:100%;margin-top:4px;"),
             tags$div(style="font-size:0.75em;color:#888;margin-top:4px;line-height:1.4;",
-              "登録キーワードでBlueskyを検索します（インフルエンザ、新型コロナ、麻しん等）")
+              "登録キーワードでBlueskyを検索します（インフルエンザ、新型コロナ、麻しん等）。毎日の自動更新で取得しています")
           ),
           column(9,
             uiOutput("sns_bluesky_feed")
@@ -2228,34 +2226,16 @@ server <- function(input, output, session) {
       type="message", duration=3)
   })
 
-  # ── SNS情報（Bluesky）────────────────────────────────────
+  # ── SNS情報（Bluesky）── 毎日の自動更新（scripts/auto_update.R）で
+  # data/sns_bluesky_cache.rdsが更新される想定のため、手動更新ボタンは持たず
+  # キャッシュファイルを読み込んで表示するだけとする ──────────────────
   sns_bluesky_cache_path <- "data/sns_bluesky_cache.rds"
-  sns_bluesky_data <- reactiveVal(
-    if (file.exists(sns_bluesky_cache_path)) tryCatch(readRDS(sns_bluesky_cache_path), error = function(e) NULL)
-    else NULL
-  )
-
-  observeEvent(input$sns_refresh, {
-    showNotification("SNS情報（Bluesky）取得中...", type="message", duration=NULL, id="sns_upd")
-    tryCatch({
-      df <- refresh_bluesky_cache(sns_bluesky_cache_path)
-      sns_bluesky_data(df)
-      removeNotification("sns_upd")
-      showNotification(
-        if (is.null(df)) "SNS情報: 新規投稿なし（ノイズ除去後0件）"
-        else paste0("SNS情報更新完了（", nrow(df), "件）"),
-        type="message", duration=3)
-    }, error = function(e) {
-      removeNotification("sns_upd")
-      showNotification(paste0("SNS情報取得エラー: ", e$message), type="error", duration=8)
-    })
-  })
 
   output$sns_bluesky_feed <- renderUI({
-    df <- sns_bluesky_data()
+    df <- if (file.exists(sns_bluesky_cache_path)) tryCatch(readRDS(sns_bluesky_cache_path), error = function(e) NULL) else NULL
     if (is.null(df) || nrow(df) == 0) {
       return(tags$div(style="color:#888;padding:20px;text-align:center;",
-        "まだSNS情報が取得されていません。「SNS情報更新」ボタンを押してください。"))
+        "まだSNS情報が取得されていません（毎日の自動更新をお待ちください）。"))
     }
     tagList(
       tags$div(style="font-size:0.8em;color:#888;margin-bottom:8px;",

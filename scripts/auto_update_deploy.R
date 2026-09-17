@@ -136,7 +136,8 @@ tryCatch({
     "data/japan_map.rds", "data/last_update.txt",
     "data/ebs_startup_cache.rds", "data/gtrends_cache_JP.rds",
     "data/data_change_log.rds",
-    "data/hokenjo_current.rds", "data/hokenjo_history.rds"
+    "data/hokenjo_current.rds", "data/hokenjo_history.rds",
+    "data/sns_bluesky_cache.rds"
   )
   data_paths <- data_paths[file.exists(data_paths)]
   # タスクスケジューラ等の非対話実行環境ではgitのglobal設定(HOME解決)が
@@ -237,6 +238,7 @@ tryCatch({
     ari_data_file,
     hokenjo_current_file,
     hokenjo_history_file,
+    if (file.exists("data/sns_bluesky_cache.rds")) "data/sns_bluesky_cache.rds" else character(0),
     hokenjo_name_map_file,
     hokenjo_boundary_files
   )

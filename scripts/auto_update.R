@@ -31,6 +31,8 @@ source("R/ebs_loader.R",   local = FALSE)
 source("R/hosp_loader.R",  local = FALSE)
 source("R/std_loader.R",   local = FALSE)
 source("R/ari_pathogen_loader.R", local = FALSE)
+source("R/ebs_rule_screening.R", local = FALSE)
+source("R/sns_bluesky.R", local = FALSE)
 
 dir.create("data",       showWarnings = FALSE)
 dir.create("data/cache", showWarnings = FALSE)
@@ -149,6 +151,20 @@ tryCatch({
     log("保健所別最新週データ完了: data/hokenjo_current.rds (", nrow(latest), " 行)")
   }
 }, error = function(e) log("保健所別データ エラー: ", e$message))
+
+# ⑧ SNS情報（Bluesky）
+log("SNS情報（Bluesky）取得中...")
+tryCatch({
+  if (nzchar(Sys.getenv("BLUESKY_IDENTIFIER")) && nzchar(Sys.getenv("BLUESKY_APP_PASSWORD"))) {
+    df <- refresh_bluesky_cache("data/sns_bluesky_cache.rds")
+    if (!is.null(df) && nrow(df) > 0)
+      log("SNS情報完了: ", nrow(df), " 件 -> data/sns_bluesky_cache.rds")
+    else
+      log("SNS情報: 新規投稿なし（ノイズ除去後0件）")
+  } else {
+    log("SNS情報: 環境変数 BLUESKY_IDENTIFIER / BLUESKY_APP_PASSWORD 未設定のためスキップ")
+  }
+}, error = function(e) log("SNS情報 エラー: ", e$message))
 
 log("===== 自動更新完了 =====")
 

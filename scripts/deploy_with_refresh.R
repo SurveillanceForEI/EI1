@@ -21,7 +21,8 @@ tryCatch({
     "data/japan_map.rds", "data/last_update.txt",
     "data/ebs_startup_cache.rds", "data/gtrends_cache_JP.rds",
     "data/data_change_log.rds",
-    "data/hokenjo_current.rds", "data/hokenjo_history.rds"
+    "data/hokenjo_current.rds", "data/hokenjo_history.rds",
+    "data/sns_bluesky_cache.rds"
   )
   data_paths <- data_paths[file.exists(data_paths)]
   # バックグラウンド実行環境ではgitのglobal設定(HOME解決)が正しく引き継がれず
