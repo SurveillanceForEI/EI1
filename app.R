@@ -1122,10 +1122,15 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
         fluidRow(
           column(3,
             tags$div(class="data-source-bar", "SNS情報（Bluesky）"),
+            selectInput("sns_disease_filter", "疾患フィルター",
+              choices = c("すべて", BLUESKY_SEARCH_KEYWORDS), selected = "すべて"),
             tags$div(style="font-size:0.75em;color:#888;margin-top:4px;line-height:1.4;",
               "登録キーワードでBlueskyを検索します（インフルエンザ、新型コロナ、麻しん等）。毎日の自動更新で取得しています")
           ),
           column(9,
+            tags$h5("SNS投稿件数の推移（日別）", style="font-weight:700;"),
+            plotlyOutput("sns_trend_plot", height="240px"),
+            tags$hr(),
             uiOutput("sns_bluesky_feed")
           )
         )
@@ -2231,11 +2236,52 @@ server <- function(input, output, session) {
   # キャッシュファイルを読み込んで表示するだけとする ──────────────────
   sns_bluesky_cache_path <- "data/sns_bluesky_cache.rds"
 
+  sns_bluesky_raw <- reactive({
+    if (file.exists(sns_bluesky_cache_path)) tryCatch(readRDS(sns_bluesky_cache_path), error = function(e) NULL) else NULL
+  })
+
+  # 選択中の疾患（キーワード）で絞り込んだ投稿一覧
+  sns_bluesky_filtered <- reactive({
+    df <- sns_bluesky_raw()
+    if (is.null(df) || nrow(df) == 0) return(df)
+    sel <- input$sns_disease_filter
+    if (is.null(sel) || sel == "すべて") df else df[df$keyword == sel, , drop = FALSE]
+  })
+
+  output$sns_trend_plot <- renderPlotly({
+    df <- sns_bluesky_raw()
+    if (is.null(df) || nrow(df) == 0) return(plotly_empty(type = "scatter", mode = "markers"))
+    df$created_date <- as.Date(substr(df$created_at, 1, 10))
+    sel <- input$sns_disease_filter
+    if (!is.null(sel) && sel != "すべて") df <- df[df$keyword == sel, , drop = FALSE]
+    if (nrow(df) == 0) return(plotly_empty(type = "scatter", mode = "markers"))
+
+    agg <- if (is.null(sel) || sel == "すべて") {
+      # 疾患ごとに色分けした積み上げ棒グラフ
+      stats::aggregate(uri ~ created_date + keyword, data = df, FUN = length)
+    } else {
+      stats::aggregate(uri ~ created_date, data = df, FUN = length)
+    }
+    names(agg)[names(agg) == "uri"] <- "n"
+
+    p <- if (is.null(sel) || sel == "すべて") {
+      plot_ly(agg, x = ~created_date, y = ~n, color = ~keyword, type = "bar") %>%
+        layout(barmode = "stack")
+    } else {
+      plot_ly(agg, x = ~created_date, y = ~n, type = "bar",
+              marker = list(color = "#1f77b4"))
+    }
+    p %>% layout(
+      xaxis = list(title = ""), yaxis = list(title = "投稿件数"),
+      margin = list(t = 10), legend = list(orientation = "h")
+    ) %>% config(displayModeBar = FALSE)
+  })
+
   output$sns_bluesky_feed <- renderUI({
-    df <- if (file.exists(sns_bluesky_cache_path)) tryCatch(readRDS(sns_bluesky_cache_path), error = function(e) NULL) else NULL
+    df <- sns_bluesky_filtered()
     if (is.null(df) || nrow(df) == 0) {
       return(tags$div(style="color:#888;padding:20px;text-align:center;",
-        "まだSNS情報が取得されていません（毎日の自動更新をお待ちください）。"))
+        "該当するSNS情報がありません（毎日の自動更新をお待ちください）。"))
     }
     tagList(
       tags$div(style="font-size:0.8em;color:#888;margin-bottom:8px;",

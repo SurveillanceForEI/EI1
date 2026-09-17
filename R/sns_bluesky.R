@@ -101,17 +101,34 @@ fetch_bluesky_posts <- function(keywords = BLUESKY_SEARCH_KEYWORDS, limit_per_ke
   df
 }
 
-# 取得結果をキャッシュファイルに保存する（scripts/からの定期実行用）
+# 取得結果をキャッシュファイルに保存する（scripts/からの定期実行用）。
+# Bluesky検索APIは直近の投稿しか返さないため、疾患トレンド（日別件数の推移）を
+# 出すには毎回の取得結果を蓄積する必要がある。そのため過去のキャッシュに
+# 新規分をマージし、uriで重複排除したうえで保存する（保持期間: keep_days）。
 refresh_bluesky_cache <- function(cache_path = "data/sns_bluesky_cache.rds",
                                    keywords = BLUESKY_SEARCH_KEYWORDS,
-                                   limit_per_keyword = 20) {
-  df <- fetch_bluesky_posts(keywords, limit_per_keyword)
-  if (is.null(df) || nrow(df) == 0) {
+                                   limit_per_keyword = 20,
+                                   keep_days = 90) {
+  new_df <- fetch_bluesky_posts(keywords, limit_per_keyword)
+  old_df <- if (file.exists(cache_path)) tryCatch(readRDS(cache_path), error = function(e) NULL) else NULL
+
+  if ((is.null(new_df) || nrow(new_df) == 0) && is.null(old_df)) {
     message("Bluesky: 新規投稿なし、またはノイズ除去後0件")
     return(invisible(NULL))
   }
+
+  df <- if (is.null(old_df)) new_df
+        else if (is.null(new_df)) old_df
+        else rbind(new_df, old_df)
+  df <- df[!duplicated(df$uri), ]
+
+  created <- suppressWarnings(as.POSIXct(df$created_at, format = "%Y-%m-%dT%H:%M:%OS", tz = "UTC"))
+  cutoff <- Sys.time() - as.difftime(keep_days, units = "days")
+  df <- df[is.na(created) | created >= cutoff, , drop = FALSE]
+  df <- df[order(df$created_at, decreasing = TRUE), ]
+
   dir.create(dirname(cache_path), recursive = TRUE, showWarnings = FALSE)
   saveRDS(df, cache_path)
-  message("Bluesky: ", nrow(df), "件のSNS投稿を保存しました")
+  message("Bluesky: 累計", nrow(df), "件のSNS投稿を保存しました（新規取得", if (is.null(new_df)) 0 else nrow(new_df), "件）")
   invisible(df)
 }
