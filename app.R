@@ -32,6 +32,7 @@ source("R/idsc_links_data.R")
 source("R/hokenjo_boundary_pipeline.R")
 source("R/hokenjo_data_sources.R")
 source("R/hokenjo_map_module.R")
+source("R/sns_bluesky.R")
 
 # shinyapps.io 上での実行かどうかを判定
 # R_CONFIG_ACTIVE, HOME パス, またはアプリIDのいずれかで判定
@@ -1108,6 +1109,26 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
                 selected="off", inline=TRUE)
             ),
             uiOutput("pubmed_news_feed")
+          )
+        )
+      ),
+
+      # ── SNS情報（Bluesky）── EBSの一次情報（ニュース・行政機関等）とは別建てで、
+      # 一般ユーザーのSNS投稿を参考情報として表示する ─────────────────────
+      tabPanel("SNS情報", icon=icon("hashtag"),
+        tags$div(style="background:#fff8e1;border-left:4px solid #f39c12;border-radius:4px;padding:8px 14px;margin:4px 4px 8px;font-size:0.85em;color:#7a5c00;",
+          icon("triangle-exclamation"),
+          " Bluesky上の一般ユーザー投稿を試験的に表示しています。個人の感想・雑談等、感染症サーベイランスと無関係な投稿が多数含まれます。公式情報の裏付けなしに内容を鵜呑みにしないでください。"),
+        fluidRow(
+          column(3,
+            tags$div(class="data-source-bar", "SNS情報（Bluesky）"),
+            actionButton("sns_refresh", "SNS情報更新", icon=icon("rotate"),
+              class="btn btn-default btn-sm", style="width:100%;margin-top:4px;"),
+            tags$div(style="font-size:0.75em;color:#888;margin-top:4px;line-height:1.4;",
+              "登録キーワードでBlueskyを検索します（インフルエンザ、新型コロナ、麻しん等）")
+          ),
+          column(9,
+            uiOutput("sns_bluesky_feed")
           )
         )
       )
@@ -2205,6 +2226,54 @@ server <- function(input, output, session) {
     showNotification(
       paste0("EBSニュース更新完了（過去1年・", nrow(merged), "件）"),
       type="message", duration=3)
+  })
+
+  # ── SNS情報（Bluesky）────────────────────────────────────
+  sns_bluesky_cache_path <- "data/sns_bluesky_cache.rds"
+  sns_bluesky_data <- reactiveVal(
+    if (file.exists(sns_bluesky_cache_path)) tryCatch(readRDS(sns_bluesky_cache_path), error = function(e) NULL)
+    else NULL
+  )
+
+  observeEvent(input$sns_refresh, {
+    showNotification("SNS情報（Bluesky）取得中...", type="message", duration=NULL, id="sns_upd")
+    tryCatch({
+      df <- refresh_bluesky_cache(sns_bluesky_cache_path)
+      sns_bluesky_data(df)
+      removeNotification("sns_upd")
+      showNotification(
+        if (is.null(df)) "SNS情報: 新規投稿なし（ノイズ除去後0件）"
+        else paste0("SNS情報更新完了（", nrow(df), "件）"),
+        type="message", duration=3)
+    }, error = function(e) {
+      removeNotification("sns_upd")
+      showNotification(paste0("SNS情報取得エラー: ", e$message), type="error", duration=8)
+    })
+  })
+
+  output$sns_bluesky_feed <- renderUI({
+    df <- sns_bluesky_data()
+    if (is.null(df) || nrow(df) == 0) {
+      return(tags$div(style="color:#888;padding:20px;text-align:center;",
+        "まだSNS情報が取得されていません。「SNS情報更新」ボタンを押してください。"))
+    }
+    tagList(
+      tags$div(style="font-size:0.8em;color:#888;margin-bottom:8px;",
+        "取得日時: ", format(as.POSIXct(df$fetched_at[1]), "%Y-%m-%d %H:%M"), "　", nrow(df), "件"),
+      lapply(seq_len(nrow(df)), function(i) {
+        tags$div(style="border:1px solid #e5e5e5;border-radius:8px;padding:10px 14px;margin-bottom:8px;",
+          tags$div(style="display:flex;justify-content:space-between;font-size:0.82em;color:#666;",
+            tags$span(tags$strong(df$author[i]), " @", df$handle[i]),
+            tags$span(tryCatch(format(as.POSIXct(df$created_at[i], format="%Y-%m-%dT%H:%M:%OS"), "%Y-%m-%d %H:%M"), error=function(e) df$created_at[i]))
+          ),
+          tags$div(style="margin-top:4px;white-space:pre-wrap;", df$text[i]),
+          tags$div(style="margin-top:6px;font-size:0.78em;color:#999;",
+            icon("heart"), " ", df$like_count[i], "　",
+            icon("retweet"), " ", df$repost_count[i], "　",
+            tags$a(href=df$url[i], target="_blank", "Blueskyで見る"))
+        )
+      })
+    )
   })
 
   observeEvent(input$date_range_reset, {
