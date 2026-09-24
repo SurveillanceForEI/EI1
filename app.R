@@ -69,10 +69,22 @@ JAPAN_MAP <- tryCatch({
     m %>% mutate(pref_name=name_ja) %>% select(pref_name, geometry)
   }
 }, error = function(e) NULL)
-cat("保健所別データ読み込み中（キャッシュ）...\n")
-HOKENJO_CURRENT <- load_hokenjo_current()
-HOKENJO_HISTORY <- load_hokenjo_history()
+# 保健所別データ（HOKENJO_HISTORYは280万行超で読み込みに3秒以上かかり、
+# 起動直後に表示される「活動レベル一覧」等では参照されず「保健所別比較」
+# タブでのみ使われるため、ZENSU_DATA等と同様に起動をブロックしない
+# バックグラウンド読み込みに変更した（実例: 2026-09-24 ユーザーからの
+# 起動速度改善の要望を受けて調査し発見）。参照側は既にis.null()で
+# ガードされているため、読み込み完了前にタブを開いた場合は「データなし」
+# 表示になり、完了後に再度開けば正しく表示される
+HOKENJO_CURRENT <- NULL
+HOKENJO_HISTORY <- NULL
 HOKENJO_NAME_MAP <- load_hokenjo_name_map()
+later::later(function() {
+  cat("保健所別データ読み込み中（キャッシュ、バックグラウンド）...\n")
+  HOKENJO_CURRENT <<- tryCatch(load_hokenjo_current(), error = function(e) NULL)
+  HOKENJO_HISTORY <<- tryCatch(load_hokenjo_history(), error = function(e) NULL)
+  cat("保健所別データ読み込み完了\n")
+}, delay = 0)
 cat("EBS データ読み込み中（キャッシュ）...\n")
 EBS_STARTUP_CACHE <- "data/ebs_startup_cache.rds"
 EBS_CACHE <- local({
