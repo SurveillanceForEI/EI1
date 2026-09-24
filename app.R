@@ -3089,19 +3089,33 @@ server <- function(input, output, session) {
   })
 
   # ── サイドバー疾患 ↔ Rt タブ 双方向同期 ────────────────────
+  # 値が既に一致している場合は更新しないidentical()ガードだけでは、
+  # updateSelectInput()による値反映がクライアント側での非同期処理
+  # （selectizeの再描画）を経て入力値として返ってくるまでの間に
+  # 両observerが交互に発火し続け、プルダウンが切り替わり続ける・
+  # 「勝手に疾患が切り替わる」不具合が起きることがあった
+  # （実例: 2026-09-24 ユーザー指摘。EBSトレンドタブで疾患選択時に発生）。
+  # 明示的な再入防止ロックを設け、片方の更新処理中はもう片方の
+  # observerを無条件にスキップすることで、確実にループを断ち切る
+  rt_disease_sync_lock <- reactiveVal(FALSE)
+
   # サイドバー → Rt タブ（Rt対応疾患の場合のみ）
-  # 値が既に一致している場合は更新しない（双方向同期による無限ループ・
-  # プルダウンの値が行ったり来たりする不具合を防ぐためのガード）
   observeEvent(input$disease, {
+    if (isTRUE(rt_disease_sync_lock())) return()
     if (input$disease %in% RT_DISEASE_IDS && !identical(input$rt_disease, input$disease)) {
+      rt_disease_sync_lock(TRUE)
       updateSelectInput(session, "rt_disease", selected = input$disease)
+      later::later(function() rt_disease_sync_lock(FALSE), 0.5)
     }
   }, ignoreInit = TRUE)
 
   # Rt タブ → サイドバー
   observeEvent(input$rt_disease, {
+    if (isTRUE(rt_disease_sync_lock())) return()
     if (!identical(input$disease, input$rt_disease)) {
+      rt_disease_sync_lock(TRUE)
       updateSelectInput(session, "disease", selected = input$rt_disease)
+      later::later(function() rt_disease_sync_lock(FALSE), 0.5)
     }
   }, ignoreInit = TRUE)
 
