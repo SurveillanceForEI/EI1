@@ -2665,7 +2665,15 @@ fetch_kashiwa_news <- function(timeout_sec = 15, n_results = 20) {
       a <- xml_find_first(li, ".//a")
       title <- trimws(xml_text(a))
       href  <- xml_attr(a, "href")
-      m <- regmatches(title, regexpr("\\d{1,2}月\\d{1,2}日", title))
+      # 掲載日は末尾の「（M月D日）」に埋め込まれている想定だが、タイトル本文自体に
+      # 「【10月1日から】新型コロナワクチン…助成（9月18日）」のように制度の開始日等
+      # 別の日付が先に出現することがあり、これを最初の日付として誤って拾ってしまう
+      # バグがあった（実例: 2026-09-24 ユーザー指摘）。まず「（M月D日）」形式を優先的に
+      # 探し、見つからない場合のみタイトル中の日付表記にフォールバックする
+      m <- regmatches(title, regexpr("（\\d{1,2}月\\d{1,2}日）", title))
+      if (length(m) == 0 || nchar(m) == 0) {
+        m <- regmatches(title, regexpr("\\d{1,2}月\\d{1,2}日", title))
+      }
       if (length(m) == 0 || nchar(m) == 0 || nchar(title) == 0 || is.na(href)) return(NULL)
       dm <- regmatches(m, regexec("(\\d{1,2})月(\\d{1,2})日", m))[[1]]
       if (length(dm) < 3) return(NULL)
