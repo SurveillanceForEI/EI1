@@ -3,7 +3,7 @@
 # 「デプロイして」と指示された際は、このスクリプトを実行する。
 # ============================================================
 
-setwd("C:/Users/kobayashi/Documents/R/japan_surveillance")
+setwd("\\\\episynq-NAS1\\public1\\episynq\\japan_surveillance")
 
 # ① デプロイ前に最新データを取得（定点・全数・EBSニュース）
 source("scripts/auto_update.R")

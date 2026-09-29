@@ -1,4 +1,4 @@
-setwd("C:/Users/kobayashi/Documents/R/japan_surveillance")
+setwd("\\\\episynq-NAS1\\public1\\episynq\\japan_surveillance")
 
 log_file <- "data/noise_check.log"
 log <- function(...) {
