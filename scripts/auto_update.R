@@ -166,6 +166,32 @@ tryCatch({
   }
 }, error = function(e) log("SNS情報 エラー: ", e$message))
 
+# ⑨ NAS同期（作業フォルダ全体のミラー。.gitはローカルのみで運用するため除外）
+# Gitリポジトリ自体はネットワーク共有上での動作が公式に非推奨（ファイルロックの
+# 不整合・破損リスク）なため、Gitはこのローカルフォルダで運用を続け、成果物
+# （コード＋データ一式）のみをNAS上のミラーへ同期する（2026-09-29 ユーザー依頼）。
+# NAS側ファイルの所有者SIDがこのPCで解決できずrobocopyが権限コピーで失敗する
+# ことがあるため、権限・所有者情報はコピーしない（/COPY:DAT = データ・属性・
+# タイムスタンプのみ）。/MIR は削除済みファイルもNAS側から消すため、ソース側の
+# 現状を正確に反映する
+log("NAS同期開始...")
+tryCatch({
+  nas_dest <- "\\\\episynq-NAS1\\public1\\episynq\\japan_surveillance"
+  robocopy_result <- system2("robocopy",
+    c(shQuote(getwd()), shQuote(nas_dest),
+      "/MIR", "/COPY:DAT", "/XD", ".git", ".Rproj.user", "/R:2", "/W:2", "/NFL", "/NDL", "/NP"),
+    stdout = TRUE, stderr = TRUE)
+  # robocopyの終了コードは0-7が正常（8以上が失敗）というビットマスク仕様のため、
+  # 通常のstatus()判定（0のみ正常）は使えない
+  rc <- attr(robocopy_result, "status")
+  rc <- if (is.null(rc)) 0L else rc
+  if (rc < 8) {
+    log("NAS同期完了（robocopy終了コード: ", rc, "）")
+  } else {
+    log("NAS同期エラー（robocopy終了コード: ", rc, "）: ", paste(utils::tail(robocopy_result, 5), collapse = " / "))
+  }
+}, error = function(e) log("NAS同期 エラー: ", e$message))
+
 log("===== 自動更新完了 =====")
 
 # タイムスタンプファイルを書き出す（Shinyアプリが読み取り表示を更新）
