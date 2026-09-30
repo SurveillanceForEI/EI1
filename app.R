@@ -34,6 +34,15 @@ source("R/hokenjo_data_sources.R")
 source("R/hokenjo_map_module.R")
 source("R/sns_bluesky.R")
 
+# EBS国外タブの地域フィルタ選択肢（R/ebs_rule_screening.Rのregionラベルと一致させる）
+EBS_OVERSEAS_REGION_CHOICES <- c(
+  "アジア (Asia)", "中東(Middle East)", "アフリカ (Africa)",
+  "ヨーロッパ (Europe)", "北米 (North America)",
+  "中南米・カリブ (Central & South America/Caribbean)",
+  "オセアニア (Oceania)", "グローバル (Global)",
+  "その他 (Others)", "不明"
+)
+
 # shinyapps.io 上での実行かどうかを判定
 # R_CONFIG_ACTIVE, HOME パス, またはアプリIDのいずれかで判定
 IS_SHINYAPPS <- nchar(Sys.getenv("SHINYAPPS_APPLICATION_ID")) > 0 ||
@@ -1063,6 +1072,9 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
               value = FALSE),
             tags$div(style="font-size:0.75em;color:#888;margin-top:-8px;line-height:1.4;",
               "WHO・国外保健当局等の公式サイトからの情報のみに絞り込みます"),
+            selectInput("ebs_ov_region", "地域",
+              choices = c("全体" = "全体", EBS_OVERSEAS_REGION_CHOICES),
+              selected = "全体"),
             tags$div(style="font-size:0.8em;color:#888;margin-top:8px;",
               icon("info-circle"),
               " 流行トレンド評価には含まれません。都道府県フィルタ対象外。")
@@ -5613,6 +5625,9 @@ server <- function(input, output, session) {
     d <- d %>% filter(is.na(source_id) | source_id != "pubmed")
     if (isTRUE(input$ebs_ov_official_only)) {
       d <- d %>% filter(is_official_ebs_source(source_id))
+    }
+    if (!is.null(input$ebs_ov_region) && input$ebs_ov_region != "全体") {
+      d <- d %>% filter(!is.na(ebs_region) & ebs_region == input$ebs_ov_region)
     }
     period_days <- suppressWarnings(as.numeric(input$ebs_ov_period))
     bounds <- ebs_period_bounds(period_days)
