@@ -46,13 +46,5 @@ tryCatch({
   cat("GitHub pushエラー: ", e$message, "\n")
 })
 
-# ③ renvスナップショットの依存パッケージ検証を無効化
-#    （ローカルのcurl/httr2等のバージョン差でデプロイが失敗するのを防ぐ）
-options(renv.config.snapshot.validate = FALSE)
-
-# ④ shinyapps.io デプロイ
-rsconnect::deployApp(
-  appDir      = ".",
-  forceUpdate = TRUE,
-  logLevel    = "verbose"
-)
+# ③ shinyapps.io デプロイ（2026-09-30、ユーザー指示により無効化。
+#    Connect Cloud側はGitHub pushのみで自動反映されるため不要と判断）
