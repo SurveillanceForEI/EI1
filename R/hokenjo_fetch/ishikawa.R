@@ -1,3 +1,5 @@
+source("R/hokenjo_fetch/ishikawa_glyph.R")
+
 # 石川県「2026年第◯週の感染症別保健所別届出数及び週推移表」PDF
 # https://www.pref.ishikawa.lg.jp/hokan/kansenjoho/top/patients/documents/{YEAR}-{WEEK}.pdf
 #
@@ -84,112 +86,37 @@ ISHIKAWA_DISEASE_ORDER <- c(
 # をOCRで読み取る。col_centers を渡した場合はページごとの罫線検出を
 # スキップする（同一PDF内は全疾患ページで列レイアウトが共通なため、
 # 罫線検出が失敗しやすい号でも1ページ分の検出結果を使い回せる）
-.ishikawa_ocr_disease_page <- function(png_path, disease, year, eng, col_centers = NULL) {
-  d <- tesseract::ocr_data(png_path, engine = eng)
-  bb <- do.call(rbind, strsplit(d$bbox, ","))
-  d$x1 <- as.numeric(bb[, 1]); d$y1 <- as.numeric(bb[, 2])
-  d$x2 <- as.numeric(bb[, 3]); d$y2 <- as.numeric(bb[, 4])
-  d$xc <- (d$x1 + d$x2) / 2; d$yc <- (d$y1 + d$y2) / 2
-  d$conf <- as.numeric(d$confidence)
+.ishikawa_ocr_disease_page <- function(png_path, disease, year, eng = NULL, col_centers = NULL) {
+  # 表は「石川県(県全体)→金沢市→南加賀→石川中央→能登中部→能登北部」の6行×直近5週。
+  # 低解像度の画像表なので、tesseractではなく固定フォントのテンプレート照合で読む
+  # （詳細は R/hokenjo_fetch/ishikawa_glyph.R）。県全体の行は保健所別データではないため捨てる。
+  g <- png::readPNG(png_path)
+  if (length(dim(g)) == 3) g <- g[, , 1]
+  pg <- isk_read_page(g)
+  cnt <- pg$count[2:6, , drop = FALSE]; rate <- pg$rate[2:6, , drop = FALSE]
 
-  # OCRが小数点を読み落とし、"2.64"が"2"と"64"のように2トークンに
-  # 分裂して認識されることがある。同じ行(yc近接)かつxが近接する
-  # 整数1桁+整数2桁のペアは1つの小数として結合し直す
-  d <- d[order(d$yc, d$xc), ]
-  merge_idx <- rep(FALSE, nrow(d))
-  for (i in seq_len(nrow(d) - 1)) {
-    if (merge_idx[i]) next
-    if (grepl("^[0-9]$", d$word[i]) && grepl("^[0-9]{2}$", d$word[i + 1]) &&
-        abs(d$yc[i] - d$yc[i + 1]) < 15 && (d$xc[i + 1] - d$xc[i]) < 80 && (d$xc[i + 1] - d$xc[i]) > 0) {
-      d$word[i] <- paste0(d$word[i], ".", d$word[i + 1])
-      d$xc[i] <- (d$xc[i] + d$xc[i + 1]) / 2
-      merge_idx[i + 1] <- TRUE
+  # 報告数と定点あたり報告数の整合（報告数 = 定点あたり × 定点数）による補正。
+  # 定点数は保健所×疾患ごとに一定なので、5週のうち両方読めた週の 報告数/定点あたり の
+  # 最頻値から推定する。定点あたり(太字)の方が読み取りが安定しているため、不一致なら
+  # 定点あたりを優先して報告数を直し、片方しか読めなければもう片方を補う。
+  for (e in 1:5) {
+    both <- !is.na(cnt[e, ]) & !is.na(rate[e, ]) & cnt[e, ] > 0 & rate[e, ] > 0
+    n_site <- NA_real_
+    if (any(both)) {
+      cand <- round(cnt[e, both] / rate[e, both])
+      n_site <- as.numeric(names(sort(table(cand), decreasing = TRUE))[1])
     }
-  }
-  d <- d[!merge_idx, ]
-
-  if (is.null(col_centers)) col_centers <- .ishikawa_detect_col_centers(d)
-  if (is.null(col_centers) || length(col_centers) != 5 || anyNA(col_centers)) return(NULL)
-
-  is_int <- grepl("^[0-9]+$", d$word)
-  is_dec <- grepl("^[0-9]+\\.[0-9]+$", d$word)
-  # ヘッダー行(週番号)や列見出し（報告数/定点あたり報告数の凡例文字が
-  # 誤認識されたノイズ）を除外するため、ヘッダー行よりさらに下
-  # (yc>650)かつグラフ領域より上(yc<1700)に限定する
-  nums <- d[(is_int | is_dec) & d$conf > 15 & d$yc > 650 & d$yc < 1700, ]
-  if (nrow(nums) == 0) return(NULL)
-  # y方向にクラスタリングして行を作る
-  nums <- nums[order(nums$yc), ]
-  row_id <- cumsum(c(1, diff(nums$yc) > 25))
-  nums$row <- row_id
-
-  row_summary <- lapply(split(nums, nums$row), function(rr) {
-    list(y = mean(rr$yc), is_dec = mean(grepl("^[0-9]+\\.[0-9]+$", rr$word)) > 0.5, rows_df = rr)
-  })
-  ys <- sapply(row_summary, function(r) r$y)
-  is_dec_row <- sapply(row_summary, function(r) r$is_dec)
-  ord <- order(ys)
-  row_summary <- row_summary[ord]; is_dec_row <- is_dec_row[ord]; ys <- ys[ord]
-
-  # 表は「保健所ごとに 報告数行→定点あたり報告数行」の10行(5保健所×2)が
-  # 均等な間隔で並ぶ。「－」のみの行はOCRトークンが無く行ごと消失する
-  # ため、出現順に読み進めるのではなく、行間隔から10行分の格子(スロット)
-  # を推定し、検出できた行を最も近いスロットへ割り当てることで
-  # 欠落行があってもズレないようにする。
-  n_row <- length(ys)
-  match_col <- function(x) which.min(abs(col_centers - x))
-
-  cnt_vals_all <- matrix(NA_real_, nrow = 5, ncol = 5)   # [hokenjo, week]
-  rate_vals_all <- matrix(NA_real_, nrow = 5, ncol = 5)
-  rate_no_decimal <- matrix(FALSE, nrow = 5, ncol = 5)
-
-  if (n_row >= 2) {
-    gaps <- diff(ys)
-    unit_h <- stats::median(gaps[gaps < 1.5 * min(gaps)])
-    if (!is.finite(unit_h) || unit_h <= 0) unit_h <- min(gaps)
-    slot <- round((ys - ys[1]) / unit_h)
-    slot <- slot - min(slot)  # 先頭行が欠落している可能性はここでは考慮しない
-    for (i in seq_len(n_row)) {
-      s <- slot[i]
-      if (s < 0 || s > 9) next
-      hj_idx <- floor(s / 2) + 1
-      if (hj_idx > 5) next
-      # 表内の行順は「定点あたり報告数行→報告数行」（先に率、後に実数）
-      is_rate_slot <- (s %% 2) == 0
-      rr <- row_summary[[i]]$rows_df
-      for (k in seq_len(nrow(rr))) {
-        ci <- match_col(rr$xc[k])
-        val <- suppressWarnings(as.numeric(rr$word[k]))
-        # 小数点付きトークンとして認識されなかった（＝単なる整数として
-        # 読まれた）「定点あたり報告数」は、OCRが先頭の「0.」を読み
-        # 落として小数第2位までの値がそのまま整数として出力された誤読
-        # （例:「0.73」→「73」）の可能性があるため印を付けておき、
-        # 同じ疾患の他4保健所と比較して明らかな外れ値の場合のみ後段で
-        # NA化する（ARIのように定点あたり報告数が元々2桁になる疾患も
-        # あるため、値そのものの大小だけでは判定できない）
-        if (is_rate_slot) {
-          rate_vals_all[hj_idx, ci] <- val
-          if (!is.na(val) && !grepl("\\.", rr$word[k])) rate_no_decimal[hj_idx, ci] <- TRUE
-        } else {
-          cnt_vals_all[hj_idx, ci] <- val
-        }
+    for (w in 1:5) {
+      if (!is.na(rate[e, w]) && rate[e, w] == 0) { cnt[e, w] <- 0; next }
+      if (!is.na(cnt[e, w]) && cnt[e, w] == 0 && is.na(rate[e, w])) { rate[e, w] <- 0; next }
+      if (is.na(n_site)) next
+      if (!is.na(rate[e, w])) {
+        est <- round(rate[e, w] * n_site)
+        if (is.na(cnt[e, w]) || cnt[e, w] != est) cnt[e, w] <- est
+      } else if (!is.na(cnt[e, w])) {
+        rate[e, w] <- round(cnt[e, w] / n_site, 2)
       }
     }
-  }
-
-  # 小数点なしで読まれた「定点あたり報告数」のうち、同じ疾患・同じ週の
-  # 他の保健所の値と比べて明らかな外れ値（中央値の5倍超）になっている
-  # ものは、OCRが先頭の「0.」を読み落とした誤読とみなしNA化する
-  for (ci in 1:5) {
-    col_vals <- rate_vals_all[, ci]
-    flagged <- rate_no_decimal[, ci] & !is.na(col_vals)
-    if (!any(flagged)) next
-    others <- col_vals[!flagged & !is.na(col_vals)]
-    if (length(others) < 2) next
-    med_other <- stats::median(others)
-    if (med_other <= 0) next
-    bad <- flagged & !is.na(col_vals) & col_vals > med_other * 5
-    rate_vals_all[bad, ci] <- NA_real_
   }
 
   out <- list()
@@ -198,11 +125,49 @@ ISHIKAWA_DISEASE_ORDER <- c(
       out[[length(out) + 1]] <- data.frame(
         pref = "石川県", week_label = NA_character_, week_num = NA_integer_,
         hokenjo = ISHIKAWA_HOKENJO_ORDER[hi], disease = disease, week_col = w,
-        count = cnt_vals_all[hi, w], rate = rate_vals_all[hi, w], stringsAsFactors = FALSE
+        count = cnt[hi, w], rate = rate[hi, w], stringsAsFactors = FALSE
       )
     }
   }
   do.call(rbind, out)
+}
+
+# 各疾患ページのタイトルをjpn OCRで読み、ISHIKAWA_DISEASE_ORDERの部分列に対応づける。
+# OCRはかなり崩れる（例:「流行性耳下腺炎」→「之行性耳下肛炎」）ため、完全一致ではなく
+# 編集距離＋順序制約（ページ順は疾患順の単調増加）で決める。jpnモデルが無い環境では
+# 従来どおりページ順で割り当てる（省略疾患があるとずれるため警告）。
+.ishikawa_map_page_titles <- function(png_paths) {
+  n <- length(png_paths); cand <- ISHIKAWA_DISEASE_ORDER; m <- length(cand)
+  fallback <- function() { warning("石川県: ページ見出しを読めないためページ順で疾患を割り当てます"); ifelse(seq_len(n) <= m, cand[pmin(seq_len(n), m)], NA_character_) }
+  if (!"jpn" %in% tesseract::tesseract_info()$available) return(fallback())
+  jpn <- tesseract::tesseract("jpn", options = list(tessedit_pageseg_mode = "7"))
+  titles <- vapply(png_paths, function(p) {
+    if (is.null(p)) return("")
+    tryCatch({
+      g <- magick::image_crop(magick::image_read(p), "1700x200+300+180")
+      trimws(tesseract::ocr(g, engine = jpn))
+    }, error = function(e) "")
+  }, character(1))
+  titles <- gsub("[[:space:]ー_|]+", "", titles)
+  norm <- function(s) gsub("[()（）\\-]|ウイルス", "", s)
+  cost <- matrix(0, n, m)
+  for (i in seq_len(n)) for (j in seq_len(m)) {
+    a <- norm(titles[i]); b <- norm(cand[j])
+    cost[i, j] <- adist(a, b)[1, 1] / max(nchar(b), 1)
+  }
+  # DP: 単調増加な割り当て（各ページ→疾患、疾患は高々1回）
+  best <- matrix(Inf, n + 1, m + 1); best[1, ] <- 0; from <- matrix(0L, n + 1, m + 1)
+  for (i in 1:n) for (j in 1:m) {
+    for (k in 0:(j - 1)) {
+      v <- best[i, k + 1] + cost[i, j]
+      if (v < best[i + 1, j + 1]) { best[i + 1, j + 1] <- v; from[i + 1, j + 1] <- k }
+    }
+  }
+  j <- which.min(best[n + 1, 2:(m + 1)]); out <- rep(NA_character_, n)
+  if (!is.finite(best[n + 1, j + 1])) return(fallback())
+  for (i in n:1) { out[i] <- cand[j]; j <- from[i + 1, j + 1] }
+  message("石川県ページ見出し対応: ", paste(out, collapse = " / "))
+  out
 }
 
 # PDF1件から、そのPDFに掲載されている直近5週間分の全疾患データを取得する
@@ -238,9 +203,7 @@ fetch_ishikawa_history <- function(pdf_url, year = 2026) {
 
   eng <- tesseract::tesseract("eng")
 
-  # 罫線検出は号によって一部ページで失敗しやすい（OCRのレイアウト解析が
-  # 崩れるページがある）ため、同一PDF内で列レイアウトが共通であることを
-  # 利用し、最初に検出に成功したページの列中心を全ページで使い回す
+  # セル位置は300dpi描画上の固定座標（ishikawa_glyph.R）なので罫線検出は不要
   shared_col_centers <- NULL
   render_cache <- new.env(parent = emptyenv())
   get_png <- function(p) {
@@ -253,24 +216,17 @@ fetch_ishikawa_history <- function(pdf_url, year = 2026) {
     render_cache[[key]] <- png_path
     png_path
   }
-  for (p in disease_pages) {
-    png_path <- get_png(p)
-    if (is.null(png_path)) next
-    d0 <- tryCatch(tesseract::ocr_data(png_path, engine = eng), error = function(e) NULL)
-    if (is.null(d0)) next
-    bb <- do.call(rbind, strsplit(d0$bbox, ","))
-    d0$xc <- (as.numeric(bb[, 1]) + as.numeric(bb[, 3])) / 2
-    d0$yc <- (as.numeric(bb[, 2]) + as.numeric(bb[, 4])) / 2
-    d0$conf <- as.numeric(d0$confidence)
-    cc <- .ishikawa_detect_col_centers(d0)
-    if (!is.null(cc) && length(cc) == 5 && !anyNA(cc)) { shared_col_centers <- cc; break }
-  }
+
+  # 「5週連続0件」の疾患はページが省略されるため、ページ順＝疾患順とは限らない。
+  # ページ見出し（大きな日本語タイトル）をOCRし、疾患順を保ったまま
+  # 編集距離が最小になる対応づけ（DP）で疾患名を決める
+  disease_names <- .ishikawa_map_page_titles(lapply(disease_pages, get_png))
 
   out <- list(ari)
   for (i in seq_along(disease_pages)) {
-    if (i > length(ISHIKAWA_DISEASE_ORDER)) break
     p <- disease_pages[i]
-    disease <- ISHIKAWA_DISEASE_ORDER[i]
+    disease <- disease_names[i]
+    if (is.na(disease)) next
     png_path <- get_png(p)
     if (is.null(png_path)) next
     res <- tryCatch(.ishikawa_ocr_disease_page(png_path, disease, year, eng, col_centers = shared_col_centers),
