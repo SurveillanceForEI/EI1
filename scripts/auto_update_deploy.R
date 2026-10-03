@@ -143,15 +143,22 @@ tryCatch({
   # タスクスケジューラ等の非対話実行環境ではgitのglobal設定(HOME解決)が
   # 正しく引き継がれず"Author identity unknown"で失敗することがあるため、
   # -cでuser.name/user.emailを明示的に指定する
-  git_id <- c("-c", "user.name=japan_surveillance-auto-update",
+  # NAS上のリポジトリは所有者SIDが一致せず"dubious ownership"になる。タスクスケジューラ
+  # 実行ではglobalのsafe.directory設定が効かず、git statusがエラーで空を返して「変更なし」と
+  # 誤判定され、2026-09-30〜10-03のpushが止まっていた。-cで毎回指定し、失敗はログに残す
+  git_id <- c("-c", "safe.directory=*",
+              "-c", "user.name=japan_surveillance-auto-update",
               "-c", "user.email=kobayashi.yus@jihs.go.jp")
-  system2("git", c("add", "-f", shQuote(data_paths)))
-  status_out <- system2("git", c("status", "--porcelain"), stdout = TRUE)
+  add_out <- system2("git", c(git_id, "add", "-f", shQuote(data_paths)), stdout = TRUE, stderr = TRUE)
+  if (length(add_out) > 0) log("git add出力: ", paste(utils::head(add_out, 3), collapse = " / "))
+  status_out <- system2("git", c(git_id, "diff", "--cached", "--name-only"), stdout = TRUE, stderr = TRUE)
+  if (any(grepl("^(fatal|error)", status_out))) stop("git失敗: ", paste(utils::head(status_out, 3), collapse = " / "))
+  status_out <- status_out[nzchar(status_out)]
   if (length(status_out) > 0) {
     commit_msg <- paste0("自動データ更新 ", format(Sys.time(), "%Y-%m-%d %H:%M"))
     commit_result <- system2("git", c(git_id, "commit", "-m", shQuote(commit_msg)), stdout = TRUE, stderr = TRUE)
     log("GitHub commit結果: ", paste(tail(commit_result, 2), collapse = " / "))
-    push_result <- system2("git", c("push", "origin", "main"), stdout = TRUE, stderr = TRUE)
+    push_result <- system2("git", c(git_id, "push", "origin", "main"), stdout = TRUE, stderr = TRUE)
     log("GitHub push完了: ", paste(tail(push_result, 3), collapse = " / "))
     log("※ Posit Connect Cloud側は自動反映されません。ダッシュボードで手動Republishが必要です。")
   } else {
