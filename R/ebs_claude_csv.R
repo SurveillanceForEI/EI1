@@ -77,11 +77,15 @@ CLAUDE_CSV_DIR_CANDIDATES <- c(
   pub <- ifelse(is.na(pub), det, pub); pub <- as.Date(pub, origin = "1970-01-01")
 
   # カードに出す本文は「AI要約」。国外は英語のAI要約に対するAI翻訳（日本語）を表示する。
-  # 国内はAI要約とAI翻訳が同一なのでAI要約。どちらも無い場合のみ概要で代用する
+  # 国内はAI要約とAI翻訳が同一なのでAI要約。
+  # 本文が取得できず要約が無い記事は、「概要」列に書かれた事情説明（取得失敗・権利・URL未確認など）は
+  # 出さず、「本文未取得」とだけ表示する
   ai_sum <- col("AI要約"); ai_tr <- col("AI翻訳")
   use_tr <- !is.na(ai_tr) & (is.na(ai_sum) | ai_tr != ai_sum)
-  summary <- ifelse(use_tr, ai_tr, ifelse(!is.na(ai_sum), ai_sum, col("概要")))
-  ai_label <- ifelse(use_tr, "AI要約（AI翻訳）", ifelse(!is.na(ai_sum), "AI要約", NA_character_))
+  summary <- ifelse(use_tr, ai_tr, ifelse(!is.na(ai_sum), ai_sum, NA_character_))
+  no_body <- is.na(summary)
+  summary[no_body] <- "本文未取得"
+  ai_label <- ifelse(no_body, NA_character_, ifelse(use_tr, "AI要約（AI翻訳）", "AI要約"))
   scope <- ifelse(is.na(col("国内か国外か")), scope_default, col("国内か国外か"))
   sig_raw <- col("Signal分類")
   sig <- ifelse(grepl("^Signal High", sig_raw), "Signal High", ifelse(grepl("^Signal Low", sig_raw), "Signal Low", "FYI"))
@@ -99,8 +103,8 @@ CLAUDE_CSV_DIR_CANDIDATES <- c(
 
   df <- data.frame(
     source_id = ifelse(official, "claude_official", "claude_media"),
-    source_name = paste0("Claude収集（", ifelse(is.na(src_cls), "分類なし", src_cls), "）"),
-    category = "Claude収集",
+    source_name = ifelse(is.na(src_cls), "情報源不明", src_cls),
+    category = "収集",
     lang = "ja",
     title = title,
     link = first_url,

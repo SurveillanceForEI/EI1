@@ -548,8 +548,9 @@ async function ebsTranslateCards(containerId) {
   await Promise.all(els.map(async function(el) {
     var text = (el.getAttribute("data-orig") || el.textContent).trim();
     if (!text) return;
-    // すでに日本語の文章は翻訳不要（無駄なリクエストを避ける）
-    if (/[぀-ヿ一-鿿]/.test(text)) return;
+    // すでに日本語の文章（ひらがな・カタカナを含む）は翻訳不要。漢字だけで判定すると
+    // 台湾CDCなど中国語（繁体字）の記事まで日本語扱いになって翻訳されないため、かなの有無で判定する
+    if (/[぀-ヿ]/.test(text)) return;
     el.setAttribute("data-orig", text);
     try {
       var r = await fetch(
