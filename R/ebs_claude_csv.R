@@ -51,6 +51,106 @@ CLAUDE_CSV_DIR_CANDIDATES <- c(
 
 .cc_flag <- function(x) ifelse(!is.na(x) & grepl("^該当$", trimws(x)), "✓", "")
 
+# ── 情報源サイト名 ─────────────────────────────────────────────
+# カードの出典欄には「Official」「Media (Official sourceなし)」のような分類ではなく、
+# 情報源のサイト名を出す。URLのドメインから、既知のサイトは名称に、未知のサイトはドメイン名にする。
+# Yahoo!ニュース・livedoor等の配信サイトは、見出し末尾の「（媒体名）」を優先して使う。
+.CC_SITE_NAMES <- c(
+  "who.int" = "WHO", "afro.who.int" = "WHOアフリカ地域事務局", "emro.who.int" = "WHO東地中海地域事務局",
+  "cdc.gov" = "米国CDC", "ecdc.europa.eu" = "ECDC", "europa.eu" = "欧州連合", "cidrap.umn.edu" = "CIDRAP",
+  "afludiary.blogspot.com" = "Avian Flu Diary", "gov.uk" = "英国政府（UKHSA等）", "reliefweb.int" = "ReliefWeb",
+  "polioeradication.org" = "GPEI", "msf.org" = "国境なき医師団", "kdca.go.kr" = "韓国疾病管理庁",
+  "cdc.gov.tw" = "台湾CDC", "chp.gov.hk" = "香港CHP", "chinacdc.cn" = "中国CDC", "nicd.ac.za" = "南アフリカNICD",
+  "rki.de" = "ドイツRKI", "santepubliquefrance.fr" = "フランス公衆衛生局", "promedmail.org" = "ProMED",
+  "reuters.com" = "Reuters", "apnews.com" = "AP通信", "bbc.com" = "BBC", "bbc.co.uk" = "BBC", "cnn.com" = "CNN",
+  "aljazeera.com" = "Al Jazeera", "politico.eu" = "POLITICO", "politico.com" = "POLITICO", "statnews.com" = "STAT",
+  "healthpolicy-watch.news" = "Health Policy Watch", "thelancet.com" = "The Lancet", "bmj.com" = "BMJ",
+  "mhlw.go.jp" = "厚生労働省", "jihs.go.jp" = "JIHS（国立健康危機管理研究機構）", "niid.go.jp" = "国立感染症研究所",
+  "nhk.or.jp" = "NHK", "kyodonews.net" = "共同通信", "nikkei.com" = "日本経済新聞", "asahi.com" = "朝日新聞",
+  "mainichi.jp" = "毎日新聞", "yomiuri.co.jp" = "読売新聞", "sankei.com" = "産経新聞", "jiji.com" = "時事通信",
+  "japantimes.co.jp" = "The Japan Times", "fnn.jp" = "FNN", "tbs.co.jp" = "TBS", "ntv.co.jp" = "日本テレビ",
+  "minyu-net.com" = "福島民友新聞", "fukushima-minpo.co.jp" = "福島民報", "nnn.co.jp" = "日本海新聞",
+  "hokkaido-np.co.jp" = "北海道新聞", "kahoku.news" = "河北新報", "hokkoku.co.jp" = "北國新聞",
+  "niigata-nippo.co.jp" = "新潟日報", "chunichi.co.jp" = "中日新聞", "kobe-np.co.jp" = "神戸新聞",
+  "kyoto-np.co.jp" = "京都新聞", "sanyonews.jp" = "山陽新聞", "chugoku-np.co.jp" = "中国新聞",
+  "nishinippon.co.jp" = "西日本新聞", "ryukyushimpo.jp" = "琉球新報", "okinawatimes.co.jp" = "沖縄タイムス",
+  "yahoo.co.jp" = "Yahoo!ニュース", "news.livedoor.com" = "livedoorニュース", "msn.com" = "MSN",
+  "news.google.com" = "Google ニュース", "topics.smt.docomo.ne.jp" = "dメニューニュース"
+)
+
+.CC_PREF_ROMAJI <- c(
+  hokkaido = "北海道", aomori = "青森県", iwate = "岩手県", miyagi = "宮城県", akita = "秋田県", yamagata = "山形県",
+  fukushima = "福島県", ibaraki = "茨城県", tochigi = "栃木県", gunma = "群馬県", saitama = "埼玉県", chiba = "千葉県",
+  tokyo = "東京都", kanagawa = "神奈川県", niigata = "新潟県", toyama = "富山県", ishikawa = "石川県", fukui = "福井県",
+  yamanashi = "山梨県", nagano = "長野県", gifu = "岐阜県", shizuoka = "静岡県", aichi = "愛知県", mie = "三重県",
+  shiga = "滋賀県", kyoto = "京都府", osaka = "大阪府", hyogo = "兵庫県", nara = "奈良県", wakayama = "和歌山県",
+  tottori = "鳥取県", shimane = "島根県", okayama = "岡山県", hiroshima = "広島県", yamaguchi = "山口県",
+  tokushima = "徳島県", kagawa = "香川県", ehime = "愛媛県", kochi = "高知県", fukuoka = "福岡県", saga = "佐賀県",
+  nagasaki = "長崎県", kumamoto = "熊本県", oita = "大分県", miyazaki = "宮崎県", kagoshima = "鹿児島県", okinawa = "沖縄県"
+)
+
+# 市のドメイン名（city.<slug>.…）→ 市名。R取得側のソース定義（EBS_SOURCES等）の名称から作る
+.cc_city_names <- local({
+  cache <- NULL
+  function() {
+    if (!is.null(cache)) return(cache)
+    out <- character(0)
+    add <- function(url, name) {
+      slug <- regmatches(url, regexec("city\\.([a-z0-9-]+)\\.", url))[[1]]
+      nm <- sub("[（( 　].*$", "", name)
+      if (length(slug) == 2 && nzchar(nm)) out[slug[2]] <<- nm
+    }
+    out[c("hakodate", "kuki", "kumamoto", "yokohama", "chiba", "nagasaki", "kagoshima", "himeji", "nagoya", "tottori",
+          "sapporo", "kitakyushu", "kurume", "sagamihara", "fujisawa", "chigasaki", "hirakata", "fukuyama", "toshima")] <-
+      c("函館市", "久喜市", "熊本市", "横浜市", "千葉市", "長崎市", "鹿児島市", "姫路市", "名古屋市", "鳥取市",
+        "札幌市", "北九州市", "久留米市", "相模原市", "藤沢市", "茅ヶ崎市", "枚方市", "福山市", "豊島区")
+    if (exists("EBS_SOURCES")) for (s in EBS_SOURCES) if (!is.null(s$url) && !is.null(s$name)) add(s$url, s$name)
+    f <- "R/ebs_loader.R"   # 各スクリプトは作業フォルダをプロジェクトルートにしてから呼ぶ
+    f <- if (file.exists(f)) f else NA_character_
+    if (!is.na(f)) {
+      txt <- paste(readLines(f, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
+      m <- regmatches(txt, gregexpr("\"https?://[^\"]*city\\.[^\"]*\"\\s*,\\s*\"city_[a-z0-9_]+\"\\s*,\\s*\"[^\"]+\"", txt))[[1]]
+      for (z in m) { p <- strsplit(z, "\"")[[1]]; add(p[2], p[6]) }
+    }
+    cache <<- out
+    out
+  }
+})
+
+# ホスト名 -> サイト名（長いキーを優先して末尾一致）。都道府県・市の公式サイトは自治体名に、
+# それ以外の未知のサイトはwww.を除いたホスト名にする
+.cc_host_name <- function(url) {
+  host <- tolower(sub("^https?://([^/:?#]+).*$", "\\1", url))
+  host <- sub("^www[0-9]?\\.", "", host)
+  keys <- names(.CC_SITE_NAMES)[order(-nchar(names(.CC_SITE_NAMES)))]
+  hit <- keys[vapply(keys, function(k) host == k || endsWith(host, paste0(".", k)), logical(1))]
+  if (length(hit)) return(unname(.CC_SITE_NAMES[hit[1]]))
+  pm <- regmatches(host, regexec("(^|\\.)pref\\.([a-z]+)\\.", host))[[1]]
+  if (length(pm) == 3 && pm[3] %in% names(.CC_PREF_ROMAJI)) return(unname(.CC_PREF_ROMAJI[pm[3]]))
+  if (grepl("(^|\\.)metro\\.tokyo\\.", host)) return("東京都")
+  cm <- regmatches(host, regexec("(^|\\.)city\\.([a-z0-9-]+)\\.", host))[[1]]
+  if (length(cm) == 3) { nm <- .cc_city_names()[cm[3]]; if (!is.na(nm)) return(unname(nm)) }
+  if (nzchar(host)) host else "情報源不明"
+}
+
+# 1記事分: 情報源URL群と情報源タイトル群から、出典欄に出すサイト名（最大2件＋ほかN件）を作る
+.cc_source_label <- function(urls_txt, titles_txt) {
+  if (is.na(urls_txt)) return("情報源不明")
+  urls <- regmatches(urls_txt, gregexpr("https?://[^[:space:]]+", urls_txt))[[1]]
+  if (!length(urls)) return("情報源不明")
+  tt <- if (is.na(titles_txt)) character(0) else strsplit(titles_txt, "\n")[[1]]
+  names_i <- vapply(seq_along(urls), function(i) {
+    nm <- .cc_host_name(urls[i])
+    if (grepl("yahoo\\.co\\.jp|livedoor|msn\\.com|news\\.google", urls[i]) && i <= length(tt)) {
+      m <- regmatches(tt[i], regexec("[（(]([^（）()]{2,25})[）)]\\s*$", tt[i]))[[1]]
+      if (length(m) == 2) return(m[2])
+    }
+    nm
+  }, character(1))
+  u <- unique(names_i)
+  if (length(u) <= 2) paste(u, collapse = "、") else paste0(paste(u[1:2], collapse = "、"), " ほか", length(u) - 2, "件")
+}
+
 # WHO地域コード→アプリの地域ラベル（国名で判定できなかった場合のフォールバック）
 .cc_region_from_who <- function(who) {
   m <- c(AFRO = "アフリカ (Africa)", AMRO = "中南米・カリブ (Central & South America/Caribbean)",
@@ -103,7 +203,7 @@ CLAUDE_CSV_DIR_CANDIDATES <- c(
 
   df <- data.frame(
     source_id = ifelse(official, "claude_official", "claude_media"),
-    source_name = ifelse(is.na(src_cls), "情報源不明", src_cls),
+    source_name = vapply(seq_along(title), function(i) .cc_source_label(col("情報源")[i], col("情報源タイトル")[i]), character(1)),
     category = "収集",
     lang = "ja",
     title = title,
