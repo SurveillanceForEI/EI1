@@ -31,7 +31,7 @@ d <- readRDS(cache_path)
 log("キャッシュ総件数: ", nrow(d), " 件")
 
 # ── ノイズ除外（is_noise_article）────────────────────────────
-noise_flag <- mapply(is_noise_article, d$title, coalesce(d$summary, ""))
+noise_flag <- mapply(is_noise_article, d$title, coalesce(d$summary, "")) & !(grepl("^claude_", coalesce(d$source_id, "")))
 log("is_noise_article 除外対象: ", sum(noise_flag), " 件")
 
 # ── 除外対象をキャッシュから除去して保存 ─────────────────────

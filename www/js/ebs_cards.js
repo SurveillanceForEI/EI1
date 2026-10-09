@@ -105,10 +105,16 @@
       ? esc(c.pubDate)
       : '<span style="color:#e67e22;">日付不明</span>';
     var titleAttr = c.summary ? ' title="' + esc(c.summary) + '"' : "";
+    // Claude収集のCSV由来カードは本文がAI要約（国外はそのAI翻訳）のため、
+    // 原文ではなくAI生成であることがわかるようバッジを付ける
+    var aiBadge = c.aiLabel
+      ? '<span style="display:inline-block;margin-right:6px;padding:0 5px;border-radius:3px;' +
+        'background:#e8f0fe;color:#1a56b0;font-size:0.9em;font-weight:600;">' + esc(c.aiLabel) + "</span>"
+      : "";
     var summaryHtml = c.summary
-      ? '<div class="ebs-tr" style="font-size:0.76em;color:#666;white-space:nowrap;' +
-        'overflow:hidden;text-overflow:ellipsis;">' +
-        esc(c.summary) +
+      ? '<div style="font-size:0.76em;color:#666;white-space:nowrap;' +
+        'overflow:hidden;text-overflow:ellipsis;">' + aiBadge +
+        '<span class="ebs-tr">' + esc(c.summary) + "</span>" +
         "</div>"
       : "";
 

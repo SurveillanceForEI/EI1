@@ -5393,6 +5393,11 @@ server <- function(input, output, session) {
                               if ("ebs_pref" %in% names(d)) d$ebs_pref else NA,
                               if ("source_id" %in% names(d)) d$source_id else "",
                               if ("source_name" %in% names(d)) d$source_name else "")
+    # Claude収集CSV由来の行は、CSVの「国内か国外か」を優先する
+    if ("csv_scope" %in% names(d)) {
+      has_scope <- !is.na(d$csv_scope)
+      d$.is_overseas[has_scope] <- d$csv_scope[has_scope] == "国外"
+    }
     d
   })
 
@@ -5586,6 +5591,7 @@ server <- function(input, output, session) {
       signalLevel  = as.character(d$signal_level[i]),
       signalColor  = signal_color(as.character(d$signal_level[i])),
       summary      = if (!is.na(d$summary[i]) && nchar(d$summary[i]) > 0) d$summary[i] else NULL,
+      aiLabel      = if ("ai_label" %in% names(d) && !is.na(d$ai_label[i])) d$ai_label[i] else NULL,
       diseaseTags  = as.list(disease_labels),
       criteriaLabels = as.list(criteria_labels),
       locationText = location_text,

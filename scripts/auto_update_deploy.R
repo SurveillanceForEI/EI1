@@ -21,6 +21,7 @@ suppressPackageStartupMessages({
 source("R/data_loader.R")
 source("R/ebs_rule_screening.R")
 source("R/ebs_loader.R")
+source("R/ebs_claude_csv.R")
 
 # ── 1. IBS 定点把握データ取得 ────────────────────────────
 log("IBS データ取得開始...")
@@ -60,6 +61,7 @@ tryCatch({
     # 保持しているため、ここでの全件再スクリーニングは行わない（コスト増を避けるため）。
     # screen_entry()等のルール変更を過去記事にも遡及適用したい場合は
     # scripts/rescreen_ebs_full.R を手動実行すること。
+    merged <- tryCatch(apply_claude_csv_to_cache(merged), error = function(e) { log("Claude CSV反映エラー: ", conditionMessage(e)); merged })
     saveRDS(merged, cache_path)
     log("EBS キャッシュ更新完了: ", nrow(merged), " 件")
   } else {

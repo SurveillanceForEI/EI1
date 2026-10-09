@@ -290,7 +290,8 @@ is_overseas_article_vec <- function(titles, summaries, ebs_prefs = NA, source_id
 # WHO自身が発信した公式情報ではないため、あえて公式情報源には含めない
 OFFICIAL_EBS_SOURCE_IDS <- c(
   "mhlw", "jihs", "cdc", "reliefweb", "rki", "ukhsa", "nicd",
-  "taiwan_cdc", "china_cdc", "chp", "spf", "who_don"
+  "taiwan_cdc", "china_cdc", "chp", "spf", "who_don",
+  "claude_official"   # Claude収集CSVのうち情報源の分類が「Official」のもの
 )
 
 is_official_ebs_source <- function(source_id) {
@@ -5477,6 +5478,14 @@ signal_color <- function(level) {
 rescreen_ebs_data <- function(df) {
   if (is.null(df) || nrow(df) == 0) return(df)
   if (!exists("screen_entry", mode = "function")) return(df)
+
+  # Claude収集CSV由来の行（source_id=claude_*）はCSV側のシグナル・地域・7基準を
+  # そのまま使うため、再スクリーニング・ノイズ除外の対象外にする
+  is_claude <- !is.na(df$source_id) & grepl("^claude_", df$source_id)
+  if (any(is_claude)) {
+    rest <- rescreen_ebs_data(df[!is_claude, , drop = FALSE])
+    return(dplyr::bind_rows(rest, df[is_claude, , drop = FALSE]))
+  }
 
   # is_noise_article()のルール追加・修正が、フィード表示範囲外に出て再取得されなく
   # なった過去記事（既にキャッシュに入っている記事）にも遡及的に反映されるよう、

@@ -37,6 +37,7 @@ source("R/hosp_loader.R",  local = FALSE)
 source("R/std_loader.R",   local = FALSE)
 source("R/ari_pathogen_loader.R", local = FALSE)
 source("R/ebs_rule_screening.R", local = FALSE)
+source("R/ebs_claude_csv.R", local = FALSE)
 source("R/sns_bluesky.R", local = FALSE)
 
 dir.create("data",       showWarnings = FALSE)
@@ -81,6 +82,7 @@ tryCatch({
     # フィード表示範囲外に出て再取得されなくなった過去記事も含め、
     # マージ後の全件を再スクリーニング（screen_entry修正の遡及反映）
     merged <- rescreen_ebs_data(merged)
+    merged <- tryCatch(apply_claude_csv_to_cache(merged), error = function(e) { log("Claude CSV反映エラー: ", conditionMessage(e)); merged })
     saveRDS(merged, cache_path)
     log("EBSニュース完了: ", nrow(merged), " 件 -> data/ebs_startup_cache.rds")
   } else {
