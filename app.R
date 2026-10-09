@@ -528,11 +528,28 @@ $(document).on("shiny:sessioninitialized", function() {
 });
 
 // ── EBSカード翻訳 ──
+// Claude収集CSV由来のカードは、日本語（AI翻訳）と元の言語（AI要約）の両方を
+// data-ja / data-orig に持つので、Google翻訳を使わず切り替える
+function ebsSetLang(containerId, lang) {
+  Array.from(document.querySelectorAll("#" + containerId + " .ebs-lang")).forEach(function(el) {
+    var t = el.getAttribute(lang === "ja" ? "data-ja" : "data-orig");
+    if (t) el.textContent = t;
+  });
+}
+// 現在のラジオボタンの値（未初期化時は既定値）に表示を合わせる。カード再描画のたびに呼ぶ
+function ebsApplyLang(containerId, inputId, defaultVal) {
+  var v = (window.Shiny && Shiny.shinyapp && Shiny.shinyapp.$inputValues) ? Shiny.shinyapp.$inputValues[inputId] : null;
+  if (v === null || v === undefined) v = defaultVal;
+  if (v === "on") { ebsTranslateCards(containerId); } else { ebsUntranslateCards(containerId); }
+}
 async function ebsTranslateCards(containerId) {
+  ebsSetLang(containerId, "ja");
   var els = Array.from(document.querySelectorAll("#" + containerId + " .ebs-tr"));
   await Promise.all(els.map(async function(el) {
     var text = (el.getAttribute("data-orig") || el.textContent).trim();
     if (!text) return;
+    // すでに日本語の文章は翻訳不要（無駄なリクエストを避ける）
+    if (/[぀-ヿ一-鿿]/.test(text)) return;
     el.setAttribute("data-orig", text);
     try {
       var r = await fetch(
@@ -560,6 +577,7 @@ function goToNotes(anchorId) {
   }, 150);
 }
 function ebsUntranslateCards(containerId) {
+  ebsSetLang(containerId, "orig");
   Array.from(document.querySelectorAll("#" + containerId + " .ebs-tr")).forEach(function(el) {
     var orig = el.getAttribute("data-orig");
     if (orig) { el.textContent = orig; el.removeAttribute("data-orig"); }
@@ -1038,7 +1056,7 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
             uiOutput("ebs_signal_summary"),
             tags$div(style="text-align:right;margin-bottom:6px;",
               radioButtons("ebs_translate", NULL,
-                choices = c("そのまま表示" = "off", "🌐 日本語訳で読む" = "on"),
+                choices = c("元の言語で読む" = "off", "🌐 日本語で読む" = "on"),
                 selected = "off", inline = TRUE)
             ),
             uiOutput("ebs_news_feed")
@@ -1086,8 +1104,8 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
             uiOutput("ebs_ov_signal_summary"),
             tags$div(style="text-align:right;margin-bottom:6px;",
               radioButtons("ebs_ov_translate", NULL,
-                choices = c("そのまま表示" = "off", "🌐 日本語訳で読む" = "on"),
-                selected = "off", inline = TRUE)
+                choices = c("元の言語で読む" = "off", "🌐 日本語で読む" = "on"),
+                selected = "on", inline = TRUE)
             ),
             uiOutput("ebs_ov_news_feed")
           )
@@ -1132,7 +1150,7 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
           column(9,
             tags$div(style="text-align:right;margin-bottom:6px;",
               radioButtons("pubmed_translate", NULL,
-                choices=c("そのまま表示"="off","🌐 日本語訳で読む"="on"),
+                choices=c("元の言語で読む"="off","🌐 日本語で読む"="on"),
                 selected="off", inline=TRUE)
             ),
             uiOutput("pubmed_news_feed")
@@ -5592,6 +5610,7 @@ server <- function(input, output, session) {
       signalColor  = signal_color(as.character(d$signal_level[i])),
       summary      = if (!is.na(d$summary[i]) && nchar(d$summary[i]) > 0) d$summary[i] else NULL,
       aiLabel      = if ("ai_label" %in% names(d) && !is.na(d$ai_label[i])) d$ai_label[i] else NULL,
+      summaryOrig  = if ("summary_orig" %in% names(d) && !is.na(d$summary_orig[i])) d$summary_orig[i] else NULL,
       diseaseTags  = as.list(disease_labels),
       criteriaLabels = as.list(criteria_labels),
       locationText = location_text,
@@ -5715,7 +5734,9 @@ server <- function(input, output, session) {
         jsonlite::toJSON(cards, auto_unbox = TRUE, null = "null"),
         ", ",
         jsonlite::toJSON(meta, auto_unbox = TRUE),
-        ");"
+        ");",
+        # 海外記事は既定で日本語表示。カードを描画し直すたびに、ラジオボタンの現在値に表示を合わせる
+        "setTimeout(function(){ ebsApplyLang('ebs_ov_news_feed', 'ebs_ov_translate', 'on'); }, 200);"
       )))
     )
   })

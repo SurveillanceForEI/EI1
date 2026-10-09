@@ -125,6 +125,8 @@ CLAUDE_CSV_DIR_CANDIDATES <- c(
   df$ebs_location <- vapply(loc, function(z) z$location, character(1))
   df$ebs_region <- vapply(loc, function(z) z$region, character(1))
   df$ai_label <- ai_label
+  # 国外: 元の言語（英語）のAI要約。「元の言語で読む」表示で使う
+  df$summary_orig <- ifelse(use_tr, ai_sum, NA_character_)
   df$csv_scope <- scope
   df$csv_urls <- vapply(col("情報源"), function(u) paste(.cc_urls(u), collapse = " "), character(1), USE.NAMES = FALSE)
   df$csv_file <- basename(path)

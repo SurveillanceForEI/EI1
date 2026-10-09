@@ -109,14 +109,21 @@
     var titleAttr = "";
     // Claude収集のCSV由来カードは本文がAI要約（国外はそのAI翻訳）のため、
     // 原文ではなくAI生成であることがわかるようバッジを付ける
+    // 国外のCSV由来カード（summaryOrigあり）は、日本語＝AI翻訳、元の言語＝英語のAI要約を
+    // data-ja / data-orig に持ち、「日本語で読む／元の言語で読む」の切り替えで差し替える
+    // （ebs_cards.js内ではなくapp.R側の ebsSetLang が担当）。バッジも同様に切り替える
+    var hasOrig = !!c.summaryOrig;
     var aiBadge = c.aiLabel
-      ? '<span style="display:inline-block;margin-right:6px;padding:0 5px;border-radius:3px;' +
+      ? '<span' + (hasOrig ? ' class="ebs-lang" data-ja="' + esc(c.aiLabel) + '" data-orig="AI要約"' : "") +
+        ' style="display:inline-block;margin-right:6px;padding:0 5px;border-radius:3px;' +
         'background:#e8f0fe;color:#1a56b0;font-size:0.9em;font-weight:600;">' + esc(c.aiLabel) + "</span>"
       : "";
     var summaryHtml = c.summary
       ? '<div class="ebs-clip" style="font-size:0.76em;color:#666;white-space:nowrap;' +
         'overflow:hidden;text-overflow:ellipsis;">' + aiBadge +
-        '<span class="ebs-tr">' + esc(c.summary) + "</span>" +
+        (hasOrig
+          ? '<span class="ebs-lang" data-ja="' + esc(c.summary) + '" data-orig="' + esc(c.summaryOrig) + '">' + esc(c.summary) + "</span>"
+          : '<span class="ebs-tr">' + esc(c.summary) + "</span>") +
         "</div>"
       : "";
 
