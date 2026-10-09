@@ -5456,7 +5456,8 @@ server <- function(input, output, session) {
       }
     }
     if (!is.null(input$ebs_sort) && input$ebs_sort == "date") {
-      d %>% arrange(desc(pub_date))
+      # 日付の新しい順。同じ日の中は Signal High → Signal Low → FYI の順
+      d %>% arrange(desc(pub_date), signal_level)
     } else {
       d %>% arrange(signal_level, desc(pub_date))
     }
@@ -5671,7 +5672,8 @@ server <- function(input, output, session) {
         d <- d %>% filter(has_disease_tag(disease_tags, did))
     }
     if (!is.null(input$ebs_ov_sort) && input$ebs_ov_sort == "date") {
-      d %>% arrange(desc(pub_date))
+      # 日付の新しい順。同じ日の中は Signal High → Signal Low → FYI の順
+      d %>% arrange(desc(pub_date), signal_level)
     } else {
       d %>% arrange(signal_level, desc(pub_date))
     }
