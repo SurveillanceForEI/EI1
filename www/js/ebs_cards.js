@@ -104,7 +104,9 @@
     var dateHtml = c.pubDate
       ? esc(c.pubDate)
       : '<span style="color:#e67e22;">日付不明</span>';
-    var titleAttr = c.summary ? ' title="' + esc(c.summary) + '"' : "";
+    // カードにカーソルを当てると、省略されているタイトル・出典行・要約が全文展開される
+    // （www/custom.css の .ebs-card:hover .ebs-clip）。ツールチップは不要になった
+    var titleAttr = "";
     // Claude収集のCSV由来カードは本文がAI要約（国外はそのAI翻訳）のため、
     // 原文ではなくAI生成であることがわかるようバッジを付ける
     var aiBadge = c.aiLabel
@@ -112,21 +114,21 @@
         'background:#e8f0fe;color:#1a56b0;font-size:0.9em;font-weight:600;">' + esc(c.aiLabel) + "</span>"
       : "";
     var summaryHtml = c.summary
-      ? '<div style="font-size:0.76em;color:#666;white-space:nowrap;' +
+      ? '<div class="ebs-clip" style="font-size:0.76em;color:#666;white-space:nowrap;' +
         'overflow:hidden;text-overflow:ellipsis;">' + aiBadge +
         '<span class="ebs-tr">' + esc(c.summary) + "</span>" +
         "</div>"
       : "";
 
     return (
-      '<div style="background:#fff;border-radius:5px;padding:6px 12px;' +
+      '<div class="ebs-card" style="background:#fff;border-radius:5px;padding:6px 12px;' +
       "box-shadow:0 1px 2px rgba(0,0,0,0.06);border-left:4px solid " +
       esc(c.signalColor) +
       ';">' +
       '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">' +
       '<a href="' +
       esc(c.link) +
-      '" target="_blank" class="ebs-tr"' + titleAttr + ' style="flex:1;min-width:0;font-weight:700;' +
+      '" target="_blank" class="ebs-tr ebs-clip"' + titleAttr + ' style="flex:1;min-width:0;font-weight:700;' +
       "font-size:0.88em;color:#2c3e50;text-decoration:none;white-space:nowrap;" +
       'overflow:hidden;text-overflow:ellipsis;">' +
       esc(c.title) +
@@ -137,7 +139,7 @@
       esc(c.signalLevel) +
       "</span>" +
       "</div>" +
-      '<div style="font-size:0.74em;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
+      '<div class="ebs-clip" style="font-size:0.74em;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
       '<span style="font-weight:600;">' +
       esc(c.sourceName) +
       "</span>" +

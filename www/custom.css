@@ -194,3 +194,7 @@ a:hover, a:focus {
 
 /* Rt チャートの参照線ラベル */
 .rt-reference { color: #888; font-size: 0.8em; }
+
+/* EBSカード: カーソルを当てると省略されているタイトル・出典・要約を全文表示 */
+.ebs-card:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.18) !important; position: relative; z-index: 2; }
+.ebs-card:hover .ebs-clip { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; word-break: break-word; }
