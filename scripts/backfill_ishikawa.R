@@ -6,7 +6,7 @@ args <- commandArgs(trailingOnly = TRUE)
 YEAR <- if (length(args) >= 1) as.integer(args[1]) else 2026L
 LAST_WEEK <- if (length(args) >= 2) as.integer(args[2]) else 39L
 DRY <- length(args) >= 3 && args[3] == "dry"
-setwd("//episynq-NAS1/public1/episynq/japan_surveillance")
+setwd("//192.168.132.2/public1/episynq/japan_surveillance")
 source("R/hokenjo_fetch/ishikawa.R")
 
 pdf_weeks <- sort(unique(c(seq(LAST_WEEK, 5, by = -5), 5)))

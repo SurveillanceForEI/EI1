@@ -2,13 +2,13 @@
 # auto_update.R — 毎日自動実行用データ取得スクリプト
 # Windowsタスクスケジューラから Rscript.exe で呼び出す
 #
-# 2026-09-29: 作業フォルダをNAS（\\episynq-NAS1\public1\episynq）に
+# 2026-09-29: 作業フォルダをNAS（\\192.168.132.2\public1\episynq）に
 # 完全移行したため、setwd()の参照先もNASパスに変更した。Gitもこの
 # NASパス上で運用する（git config --global --add safe.directoryの
 # 設定が別途必要）
 # ============================================================
 
-setwd("\\\\episynq-NAS1\\public1\\episynq\\japan_surveillance")
+setwd("\\\\192.168.132.2\\public1\\episynq\\japan_surveillance")
 
 log_file <- file.path("data", "auto_update.log")
 log <- function(...) {

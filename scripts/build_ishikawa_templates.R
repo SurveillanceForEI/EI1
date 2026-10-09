@@ -2,7 +2,7 @@
 # 複数週のPDFをtesseractで全体OCRし、信頼度の高い数値トークンを正解ラベルとして
 # セル内の桁画像と対応づけ、クラスタ多数決（純度90%以上）でテンプレートを確定する。
 # 出力: data/ishikawa_templates.rds
-setwd("//episynq-NAS1/public1/episynq/japan_surveillance")
+setwd("//192.168.132.2/public1/episynq/japan_surveillance")
 source("R/hokenjo_fetch/ishikawa_glyph.R")
 
 WEEKS <- 24:39
