@@ -165,6 +165,23 @@
     );
   }
 
+  // 「10月9日（金）」形式の日付見出し。pubDateは "YYYY-MM-DD"、無ければ「日付不明」
+  function dateHeaderHtml(pubDate, n, isFirst) {
+    var label = "日付不明";
+    if (pubDate) {
+      var p = pubDate.split("-");
+      var d = new Date(+p[0], +p[1] - 1, +p[2]);
+      var wd = ["日", "月", "火", "水", "木", "金", "土"][d.getDay()];
+      label = (+p[1]) + "月" + (+p[2]) + "日（" + wd + "）";
+    }
+    return (
+      '<div class="ebs-date-head" style="display:flex;align-items:baseline;gap:8px;' +
+      "margin:" + (isFirst ? "2px" : "12px") + ' 0 2px;padding:3px 2px;border-bottom:2px solid #4b499c;">' +
+      '<span style="font-size:1em;font-weight:700;color:#4b499c;">' + esc(label) + "</span>" +
+      '<span style="font-size:0.75em;color:#999;">' + esc(n) + " 件</span></div>"
+    );
+  }
+
   function renderEbsCards(containerId, cards, meta) {
     var root = document.getElementById(containerId);
     if (!root) return;
@@ -178,10 +195,25 @@
       return;
     }
 
-    var grid =
-      '<div style="display:flex;flex-direction:column;gap:4px;">' +
-      cards.map(cardHtml).join("") +
-      "</div>";
+    // 日付順表示のときは、その日付の先頭カードの上に日付見出し（〇月〇日（曜）／件数）を入れる
+    var body;
+    if (meta.sortByDate) {
+      var counts = {};
+      cards.forEach(function (c) { var k = c.pubDate || ""; counts[k] = (counts[k] || 0) + 1; });
+      var prev = null;
+      body = cards.map(function (c) {
+        var k = c.pubDate || "";
+        var head = "";
+        if (k !== prev) {
+          head = dateHeaderHtml(c.pubDate, counts[k], prev === null);
+          prev = k;
+        }
+        return head + cardHtml(c);
+      }).join("");
+    } else {
+      body = cards.map(cardHtml).join("");
+    }
+    var grid = '<div style="display:flex;flex-direction:column;gap:4px;">' + body + "</div>";
 
     var moreNote = "";
     if (meta.total && meta.pageSize && meta.total > meta.pageSize) {

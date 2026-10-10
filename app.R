@@ -5653,7 +5653,7 @@ server <- function(input, output, session) {
     dlabel <- EBS_DLABEL
 
     cards <- lapply(seq_len(nrow(d)), function(i) .ebs_row_to_card(d, i, dlabel))
-    meta <- list(total = total, pageSize = PAGE_SIZE)
+    meta <- list(total = total, pageSize = PAGE_SIZE, sortByDate = identical(input$ebs_sort, "date"))
 
     tags$div(
       tags$div(id = "ebs-cards-root"),
@@ -5748,7 +5748,7 @@ server <- function(input, output, session) {
     dlabel <- EBS_DLABEL
 
     cards <- lapply(seq_len(nrow(d)), function(i) .ebs_row_to_card(d, i, dlabel))
-    meta <- list(total = total, pageSize = PAGE_SIZE)
+    meta <- list(total = total, pageSize = PAGE_SIZE, sortByDate = identical(input$ebs_ov_sort, "date"))
 
     tags$div(
       tags$div(id = "ebs-ov-cards-root"),
