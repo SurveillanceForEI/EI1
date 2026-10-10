@@ -198,3 +198,8 @@ a:hover, a:focus {
 /* EBSカード: カーソルを当てると省略されているタイトル・出典・要約を全文表示 */
 .ebs-card:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.18) !important; position: relative; z-index: 2; }
 .ebs-card:hover .ebs-clip { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; word-break: break-word; }
+
+/* 全数把握の類別ラジオ: 定点把握モードでは無効（グレーアウト） */
+#zensu_class input[type=radio]:disabled { cursor: not-allowed; }
+#zensu_class input[type=radio]:disabled + span { opacity: 0.35; cursor: not-allowed; }
+#zensu_class label:has(input:disabled) { cursor: not-allowed; }

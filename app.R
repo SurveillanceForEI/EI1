@@ -2148,6 +2148,12 @@ server <- function(input, output, session) {
   ))
   }, once = TRUE)
 
+  # 全数把握の類別ラジオ（全て／1類〜5類）は、「全数把握疾患」モードのときだけ操作可能にし、
+  # 定点把握モード（起動直後を含む）ではグレーアウトする
+  observe({
+    if (identical(input$ts_mode, "zensu")) shinyjs::enable("zensu_class") else shinyjs::disable("zensu_class")
+  })
+
   # ── 状態復元（localStorage → Shiny inputs） ───────────────
   observeEvent(input[["_restored_state"]], {
     s <- input[["_restored_state"]]
