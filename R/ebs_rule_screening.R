@@ -973,9 +973,42 @@ screen_entry <- function(title, summary = "", source_id = "", source_name = "",
 # ebs_loader.R と app.R の両方から呼ばれる共有関数
 # ============================================================
 
-is_noise_article <- function(title, summary = "") {
+is_noise_article <- function(title, summary = "", link = "", source_id = "") {
   tl <- tolower(paste(coalesce(as.character(title), ""),
                       coalesce(as.character(summary), ""), sep = " "))
+  tt   <- tolower(coalesce(as.character(title), ""))
+  lnk  <- tolower(coalesce(as.character(link), ""))
+  sid  <- tolower(trimws(coalesce(as.character(source_id), "")))
+
+  # ── 0a. 無条件除外: 感染症診査協議会・結核部会等の開催案内・開催結果 ──────
+  # 自治体が審査会の開催ごとに掲載する定型ページ（名古屋市の「第1〜4結核部会」等）が
+  # 大量に入り、発生状況の情報を含まないため除外する（2026-10-10 ユーザー指示）
+  # 「結核部会」「感染症部会」単独は厚生科学審議会（国の政策審議）や
+  # 「厚労省は感染症部会で…」という報道にも一致するため使わず、自治体の
+  # 「感染症診査協議会（結核部会）」に限定する
+  if (grepl("診査協議会|(結核|感染症).{0,6}(診査|審査)会", tt, perl = TRUE)) return(TRUE)
+
+  # ── 0b. 無条件除外: 芸能人の感染・公演延期等の芸能記事 ─────────────────
+  # 「声優○○がインフルエンザで公演延期」「女優○○が映画祭を辞退」等。流行状況の
+  # 情報としての価値がないため除外する（2026-10-10 ユーザー指示）。
+  # 毎日新聞の芸能・スポーツ面（/spp/）、スポーツ紙の芸能面もURLで除外する
+  if (grepl("声優|女優|俳優|タレント|芸人|お笑い|歌手|アイドル|所属事務所|芸能界", tt, perl = TRUE) &&
+      grepl("延期|辞退|欠席|休養|降板|中止|罹患|感染|診断|体調不良|公表", tt, perl = TRUE)) return(TRUE)
+  if (nchar(lnk) > 0 && grepl(paste0(
+    "mainichi\\.jp/articles/[0-9]+/spp/|nikkansports\\.com/entertainment/|",
+    "sponichi\\.co\\.jp/entertainment/|hochi\\.news/articles/.*entertainment|",
+    "daily\\.co\\.jp/gossip/|sanspo\\.com/article/.*entertainment|oricon\\.co\\.jp/news/"
+  ), lnk, perl = TRUE)) return(TRUE)
+
+  # ── 0c. 無条件除外: Japan Timesの感染症と無関係な記事 ───────────────────
+  # Japan Timesは全記事フィードのため、スポーツ・経済・政治・文化記事が大量に入る
+  # （2026-10-10 EBS品質確認で数十件）。science-health面以外は、タイトルに感染症の
+  # 語がない限り除外する
+  if (sid == "jptimes" && !grepl("/science-health/", lnk, fixed = TRUE) &&
+      !grepl(paste0("flu\\b|influenza|covid|corona|virus|infect|outbreak|vaccin|",
+                    "measles|rubella|disease|\\bpandemic|epidemic|tubercul|dengue|",
+                    "bacteri|pathogen|syphilis|mpox|ebola|cholera|plague|",
+                    "food poisoning|norovirus|hand, foot"), tt, perl = TRUE)) return(TRUE)
 
   # ── 1. 無条件除外: サイバー・コンピューターセキュリティ ─────────────
   cyber_fixed <- c(

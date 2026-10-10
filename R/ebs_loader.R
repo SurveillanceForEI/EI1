@@ -115,7 +115,23 @@ if (exists("COUNTRY_DB")) {
 # ある記事は引き続き海外と判定される）
 .OVERSEAS_SOURCE_IDS_LOADER <- c(
   "reliefweb", "who_don", "cdc", "ukhsa", "rki", "nicd",
-  "taiwan_cdc", "china_cdc", "chp", "spf"
+  "taiwan_cdc", "china_cdc", "chp", "spf",
+  # 海外の研究機関・国際機関・海外保健省・海外ブログ。記事に国名がなく位置Unknownのまま
+  # 国内タブに落ちていた（2026-10-10 EBS品質確認で約200件。CIDRAPの米国記事、
+  # WHO AFRO・WOAHの報告書、Avian Flu Diary等）
+  "who_afro", "woah", "afludiary", "uganda_moh", "ont"
+)
+# CIDRAPはトピック別に cidrap_measles / cidrap_dengue 等の多数のIDを持つため前方一致で判定
+.is_overseas_source_id <- function(sid) sid %in% .OVERSEAS_SOURCE_IDS_LOADER | grepl("^cidrap_", sid)
+
+# 海外在住者・海外向けの日本語メディア（Google Newsのタイトル末尾の媒体名で判定）。
+# 現地の自国記事を日本語で配信しており、「日本脳炎」「全国」等の語で日本キーワードに
+# 一致しても事象は海外であるため、日本キーワードの有無に関わらず海外とする
+# （2026-10-10 EBS品質確認: VIETJO・Vietnam.vn・タイランドハイパーリンクス等が国内タブに混入）
+.OVERSEAS_MEDIA_PATTERN <- paste0(
+  "vietjo|vietnam\\.vn|タイランドハイパーリンクス|newsclip|asiax|",
+  "kbs world|中央日報|朝鮮日報|東亜日報|聯合ニュース|ハンギョレ|",
+  "フォーカス台湾|focus taiwan|cgtn|人民網|新華社|nna asia"
 )
 
 # Google Newsは「記事タイトル - メディア名」形式（title）、
@@ -220,7 +236,8 @@ is_overseas_article <- function(title, summary, ebs_pref = NA, source_id = "", s
   media_non_japanese_script <- nchar(gsub("[^Ѐ-ӿ가-힣؀-ۿ]", "",
                                             gnews_media)) > 0
 
-  if (sid %in% .OVERSEAS_SOURCE_IDS_LOADER) return(!has_japan)
+  if (grepl(.OVERSEAS_MEDIA_PATTERN, media_low, perl = TRUE)) return(TRUE)
+  if (.is_overseas_source_id(sid)) return(!has_japan)
   if (sid == "jptimes") return(!has_japan)
   !has_japan && (has_overseas || media_has_overseas || media_non_japanese_script)
 }
@@ -272,10 +289,11 @@ is_overseas_article_vec <- function(titles, summaries, ebs_prefs = NA, source_id
   media_non_japanese_script <- nchar(gsub("[^Ѐ-ӿ가-힣؀-ۿ]", "", gnews_media)) > 0
 
   base_result <- ifelse(
-    sids %in% .OVERSEAS_SOURCE_IDS_LOADER | sids == "jptimes",
+    .is_overseas_source_id(sids) | sids == "jptimes",
     !has_japan,
     !has_japan & (has_overseas | media_has_overseas | media_non_japanese_script)
   )
+  base_result <- base_result | grepl(.OVERSEAS_MEDIA_PATTERN, media_low, perl = TRUE)
 
   known_pref <- !is.na(ebs_prefs) & nchar(ebs_prefs) > 0
   ifelse(known_pref | !is.na(detected), FALSE, base_result)
@@ -5499,7 +5517,9 @@ rescreen_ebs_data <- function(df) {
   if (exists("is_noise_article", mode = "function")) {
     is_noise <- vapply(seq_len(nrow(df)), function(i) {
       if (coalesce(df$source_id[i], "") == "pubmed") return(FALSE)
-      tryCatch(isTRUE(is_noise_article(coalesce(df$title[i], ""), coalesce(df$summary[i], ""))),
+      tryCatch(isTRUE(is_noise_article(coalesce(df$title[i], ""), coalesce(df$summary[i], ""),
+                                       link      = if ("link" %in% names(df)) coalesce(df$link[i], "") else "",
+                                       source_id = coalesce(df$source_id[i], ""))),
                error = function(e) FALSE)
     }, logical(1))
     if (any(is_noise)) df <- df[!is_noise, , drop = FALSE]
