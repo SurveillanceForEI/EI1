@@ -2604,6 +2604,24 @@ server <- function(input, output, session) {
     )
   }
 
+  # EBSシグナルサマリの最上段に出す「いま表示中の疾患」バナー。
+  # 既定は全疾患表示で、サイドバーで疾患を選ぶと絞り込みになる
+  ebs_disease_banner <- function(show_all) {
+    did <- sidebar_disease_id()
+    all_mode <- isTRUE(show_all) || is.null(did) || did == "すべて"
+    lbl <- if (all_mode) "すべての疾患" else coalesce(EBS_DISEASE_LABELS[did], did)
+    col <- if (all_mode) "#4b499c" else "#e67e22"
+    tags$div(
+      style = paste0("display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;",
+                     "padding:6px 12px;border-radius:6px;background:#f4f4fb;border-left:5px solid ", col, ";"),
+      tags$span(style = "font-size:0.8em;color:#666;", "表示中の疾患"),
+      tags$span(style = paste0("font-size:1.05em;font-weight:700;color:", col, ";"),
+                icon(if (all_mode) "list" else "filter"), " ", lbl),
+      tags$span(style = "font-size:0.72em;color:#999;",
+                if (all_mode) "サイドバーで疾患を選ぶと絞り込みます" else "「すべて表示」で解除")
+    )
+  }
+
   make_filter_bar <- function(items) {
     chips <- Filter(Negate(is.null), lapply(names(items), function(label) {
       val <- items[[label]]
@@ -5537,6 +5555,7 @@ server <- function(input, output, session) {
       else "表示記事の期間: -"
     }
     tags$div(
+      ebs_disease_banner(ebs_show_all_flag()),
       tags$div(style="font-size:0.78em;color:#888;margin-bottom:6px;", "EBS サマリー（国内）"),
       ebs_filter_status_badge(ebs_show_all_flag(), input$ebs_period, input$pref_filter),
       tags$div(style="font-size:0.75em;color:#999;margin-bottom:6px;",
@@ -5693,6 +5712,7 @@ server <- function(input, output, session) {
       else "表示記事の期間: -"
     }
     tags$div(style="background:#f8f9fa;border-radius:8px;padding:12px 16px;margin-bottom:4px;",
+      ebs_disease_banner(ebs_ov_show_all_flag()),
       tags$div(style="font-size:0.78em;color:#888;margin-bottom:6px;",
                "EBS サマリー（国外）"),
       ebs_filter_status_badge(ebs_ov_show_all_flag(), input$ebs_ov_period),
