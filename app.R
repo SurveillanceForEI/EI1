@@ -527,6 +527,23 @@ $(document).on("shiny:sessioninitialized", function() {
   } catch(e) {}
 });
 
+// ── 注意事項ダイアログの「次回以降表示しない」 ──
+// 接続時に、このブラウザで非表示が選ばれているかをサーバーへ通知する
+$(document).on("shiny:sessioninitialized", function() {
+  var hide = false;
+  try { hide = localStorage.getItem("japanSurv_hideNotice") === "1"; } catch(e) {}
+  // 起動直後はサーバー側のobserveEventがまだ登録されておらず取りこぼすことがあるため、
+  // 接続が安定してから送る
+  setTimeout(function() { Shiny.setInputValue("notice_hidden", hide, {priority: "event"}); }, 1500);
+});
+// ダイアログが閉じられるとき（ボタン・外側クリック・Esc いずれでも）、
+// チェックが入っていれば非表示設定を保存する
+$(document).on("hide.bs.modal", "#shiny-modal", function() {
+  try {
+    if ($("#notice_dont_show").is(":checked")) localStorage.setItem("japanSurv_hideNotice", "1");
+  } catch(e) {}
+});
+
 // ── EBSカード翻訳 ──
 // Claude収集CSV由来のカードは、日本語（AI翻訳）と元の言語（AI要約）の両方を
 // data-ja / data-orig に持つので、Google翻訳を使わず切り替える
@@ -2107,6 +2124,11 @@ server <- function(input, output, session) {
   outputOptions(output, "plotly_dep_loader", suspendWhenHidden = FALSE)
 
   # ── 初回アクセス時の注意事項ポップアップ ─────────────────
+  # 「次回以降表示しない」を選んだブラウザでは表示しない（設定はブラウザのlocalStorageに保存）。
+  # ブラウザ側の設定値を受け取ってから表示可否を決めるため、sessioninitialized後にJSが
+  # notice_hiddenを送ってくる（app.R冒頭のJS）
+  observeEvent(input$notice_hidden, {
+    if (isTRUE(input$notice_hidden)) return()
   showModal(modalDialog(
     title = "ご利用にあたっての注意事項",
     tags$div(style="line-height:1.8;font-size:0.95em;",
@@ -2129,10 +2151,16 @@ server <- function(input, output, session) {
           "「EIとは」タブ"), "をご覧ください。"
       )
     ),
-    footer = modalButton("同意して閉じる"),
+    footer = tagList(
+      tags$label(style = "float:left;margin:6px 0 0;font-weight:normal;cursor:pointer;",
+        tags$input(type = "checkbox", id = "notice_dont_show", style = "margin-right:6px;"),
+        "次回以降表示しない"),
+      modalButton("同意して閉じる")
+    ),
     easyClose = TRUE,
     size = "m"
   ))
+  }, once = TRUE)
 
   # ── 状態復元（localStorage → Shiny inputs） ───────────────
   observeEvent(input[["_restored_state"]], {
