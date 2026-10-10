@@ -1747,34 +1747,27 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
           # ■ EBS（イベントベースサーベイランス）
           # ══════════════════════════════════════════════════
           tags$h4(id="notes-ebs", "■ EBS（イベントベースサーベイランス）", style="border-bottom:2px solid #f39c12;padding-bottom:4px;color:#2c3e50;"),
-          tags$h5("主なデータソース"),
-          tags$p(style="font-size:0.85em;color:#888;",
-            "実際の取得記事数が多い代表的なソースを掲載しています（全ソースの一覧ではありません）。",
-            "このほか、全47都道府県・多数の市区町村の公式サイト等、100を超えるソースから取得していますが、",
-            "個々の取得件数は下記より少数です。"),
-          tags$table(class="table table-bordered table-sm", style="font-size:0.85em;",
-            tags$thead(tags$tr(tags$th("ソース"), tags$th("カテゴリ"), tags$th("言語"))),
-            tags$tbody(
-              tags$tr(tags$td("Google News（疾患別キーワード検索）"), tags$td("ニュース"), tags$td("日本語/英語")),
-              tags$tr(tags$td("CIDRAP（疾患別トピックフィード計20本）"), tags$td("国際"), tags$td("英語")),
-              tags$tr(tags$td("ReliefWeb（日本関連）"), tags$td("国際"), tags$td("英語")),
-              tags$tr(tags$td("Japan Times"), tags$td("メディア"), tags$td("英語")),
-              tags$tr(tags$td("PubMed（文献）"), tags$td("学術"), tags$td("英語")),
-              tags$tr(tags$td("UK Health Security Agency（UKHSA）"), tags$td("国際"), tags$td("英語")),
-              tags$tr(tags$td("米国CDC（Newsroom / Health Alerts / Outbreaks）"), tags$td("国際"), tags$td("英語")),
-              tags$tr(tags$td("Robert Koch-Institut（独）"), tags$td("国際"), tags$td("英語/独語")),
-              tags$tr(tags$td("Yahoo!ニュース（国内・科学）"), tags$td("メディア"), tags$td("日本語")),
-              tags$tr(tags$td("WHO Disease Outbreak News"), tags$td("国際"), tags$td("英語")),
-              tags$tr(tags$td("台湾CDC（衛生福利部疾病管制署）"), tags$td("国際"), tags$td("中国語"))
-            )
+          tags$h5("概要"),
+          tags$p("国内外の行政機関・国際機関の公式サイト、報道機関、専門メディア、学術文献など、",
+                 "多数の情報源から感染症に関する出来事（イベント）の情報を集め、シグナルの強さを判定して表示します。",
+                 "情報源は多数にのぼるため、個別の一覧は掲載していません。"),
+          tags$p("情報の集め方は次の2系統です。"),
+          tags$ul(
+            tags$li(tags$strong("自動収集"), "：プログラムが、RSS・Webページ・ニュース検索等から毎日自動で取得します。"),
+            tags$li(tags$strong("AIによる収集・要約"), "：AI（Claude）が収集・スクリーニングした記事で、",
+                    "本文はAIによる要約（国外は英語の要約とその日本語訳）として表示します。",
+                    "カードに「AI要約」のバッジが付き、本文が取得できなかった記事は「本文未取得」と表示されます。"),
+            tags$li("両系統で同じ出来事を重複して取得した場合は、URL・タイトルが明らかに同じものを自動で除き、",
+                    "シグナル・地域が付いたAI収集側を残します。")
           ),
           tags$p(style="font-size:0.85em;color:#888;", "※ PubMed論文はEBSニュース（国外）タブに表示。流行トレンド評価には含まない。"),
           tags$h5("国内・国外タブの振り分け"),
           tags$ul(
-            tags$li("情報ソースではなく、", tags$strong("記事のタイトル・本文中の地名・国名"), "で国内・国外を判定"),
+            tags$li("自動収集の記事：情報ソースではなく、", tags$strong("記事のタイトル・本文中の地名・国名"), "で判定"),
             tags$li("都道府県名・政令市・市区町村名・保健所名が含まれる記事 → ", tags$strong("EBSニュース（国内）")),
             tags$li("国外の国名・地名のみ含まれる記事 → ", tags$strong("EBSニュース（国外）")),
-            tags$li("どちらも検出されない場合は国内扱い")
+            tags$li("どちらも検出されない場合は国内扱い"),
+            tags$li("AI収集の記事：AIが付けた「国内／国外」の区分をそのまま使用")
           ),
           tags$h5("シグナルレベル"),
           tags$table(class="table table-bordered table-sm", style="font-size:0.85em;",
@@ -1791,14 +1784,16 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
                       tags$td("―"))
             )
           ),
+          tags$p(style="font-size:0.85em;color:#888;",
+            "※ 判定は、WHOのEBS基準に基づく7項目（Unusual/unexpected、Serious PH impact（当該国・日本）、",
+            "Epidemic-prone、Mass exposure、High profile、Special pathogen）の組み合わせによります。",
+            "AI収集の記事は、AIが同じ7項目で判定した結果を使用します。判定は試験的なものです。"),
           tags$h5("公式情報のみ表示フィルタ"),
           tags$ul(
             tags$li("国内・国外タブそれぞれのサイドバーにある「公式情報のみ表示」チェックボックスで、",
-                    "行政機関・国際機関の公式サイト/公式RSSから取得した記事のみに絞り込めます"),
-            tags$li("対象: 厚生労働省・JIHS・全47都道府県の公式サイト、WHO・ECDC・UKHSA・ロベルトコッホ研究所・",
-                    "台湾/中国CDC・香港CHP等の国外公的機関"),
-            tags$li("対象外（公式情報として扱わない）: NHK・新聞社等の報道機関、Google Newsによる",
-                    "ニュース集約、PubMed（学術論文）、SNS"),
+                    "行政機関・国際機関などの公式情報源の記事のみに絞り込めます"),
+            tags$li("対象: 厚生労働省・JIHS・都道府県・市区町村の公式サイト、WHO等の国際機関、各国の公的機関"),
+            tags$li("対象外（公式情報として扱わない）: 報道機関、ニュース集約、PubMed（学術論文）、SNS"),
             tags$li("公式情報源からの記事にはカード上に", tags$strong("「公式」"), "バッジが表示されます")
           ),
           tags$h5("都道府県判定（EBSニュース（国内））"),
@@ -1806,26 +1801,40 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
             tags$li("メディア名・URL → 都道府県マッピング（例: 神奈川新聞→神奈川県）"),
             tags$li("都道府県名・政令市・市区町村名（全国主要400市区）"),
             tags$li("保健所名パターン（「○○保健所」「○○保健センター」等）"),
+            tags$li("AI収集の記事は、AIが付けた都道府県を使用"),
             tags$li("都道府県フィルターで絞り込み可能")
+          ),
+          tags$h5("表示のしかた"),
+          tags$ul(
+            tags$li("サマリー最上段に、いま表示している疾患（既定は全疾患、サイドバーで選ぶと絞り込み）を表示"),
+            tags$li("並び順は「日付順」（新しい順・同じ日の中は Signal High → Low → FYI）と「シグナル優先」。",
+                    "日付順のときは日付ごとに見出し（〇月〇日）を表示"),
+            tags$li("カードにカーソルを当てると、省略されているタイトル・出典・要約の全文を表示"),
+            tags$li("出典欄にはサイト名（都道府県・市区町村は自治体名）を表示"),
+            tags$li("表示言語は「元の言語で読む」と「日本語で読む」を切り替え可能。",
+                    "AI収集の国外記事は、日本語＝AI要約の日本語訳、元の言語＝英語のAI要約を表示")
           ),
           tags$h5("データ更新"),
           tags$ul(
-            tags$li("毎日午前3時に自動取得・過去1年分をキャッシュ保持（PubMed含む全ソース共通）"),
+            tags$li("毎日午前3時に自動取得し、過去1年分をキャッシュ保持（PubMed含む全ソース共通）"),
+            tags$li("AI収集の記事は、同じ更新のなかで取り込み（以後も毎日更新）"),
             tags$li("PubMed: 直近1年以内に公開された論文を毎回取得し、累積1年分を保持"),
-            tags$li("重複記事は自動除去（タイトル・日付・ソースで判定）")
+            tags$li("アクセス時にデータを取り直すことはなく、表示は最後の更新時点の内容です")
           ),
           tags$br(),
 
           # ── 文献（PubMed） ─────────────────────────────────
           tags$h5("文献タブ"),
-          tags$p("PubMed収載論文のうち、サイドバーで選択中の疾患に関連するものを一覧表示します。データソース・更新頻度は上記「主なデータソース」「データ更新」と共通です。"),
+          tags$p("PubMed収載論文のうち、サイドバーで選択中の疾患に関連するものを一覧表示します。データソース・更新頻度は上記「概要」「データ更新」と共通です。"),
           tags$br(),
 
           # ── EBSニュース（国外）──────────────────────────────
           tags$h5(id="notes-ebs-overseas", "EBSニュース（国外）タブ"),
           tags$ul(
-            tags$li("全ソースのうち、タイトル・本文から国外の地名・国名のみ検出された記事を表示"),
+            tags$li("国外の出来事と判定された記事を表示（振り分けは上記「国内・国外タブの振り分け」参照）"),
             tags$li("Signal High / Signal Low / FYI の判定は国内タブと同じ基準"),
+            tags$li("既定の表示言語は日本語。「元の言語で読む」に切り替えると原文（AI収集は英語の要約）を表示"),
+            tags$li("サイドバーの「地域」で、アジア・中東・アフリカ・ヨーロッパ・北米・中南米・オセアニア等に絞り込み可能（既定は全体）"),
             tags$li(tags$strong("EBS/Trends 流行トレンド評価には含まれない")),
             tags$li("都道府県フィルターの影響を受けない")
           ),
@@ -1880,7 +1889,7 @@ $(document).on("shown.bs.tab", "a[data-toggle=\'tab\']", function() {
             tags$tbody(
               tags$tr(tags$td("定点把握（IBS）"), tags$td("毎日 03:00 自動"), tags$td("JIHS IDWR")),
               tags$tr(tags$td("全数把握"), tags$td("毎日 03:00 自動"), tags$td("JIHS 感染症発生動向調査")),
-              tags$tr(tags$td("EBSニュース"), tags$td("毎日 03:00 自動（1年キャッシュ）"), tags$td("各RSS・Google News")),
+              tags$tr(tags$td("EBSニュース"), tags$td("毎日 03:00 自動（1年キャッシュ）"), tags$td("自動収集（RSS・Webページ・ニュース検索等）、AI収集")),
               tags$tr(tags$td("Google Trends"), tags$td("毎日 03:00 自動"), tags$td("gtrendsR API")),
               tags$tr(tags$td("病原体検出（IASR）"), tags$td("毎日 03:00 自動（24時間キャッシュ）"), tags$td("JIHS IASR")),
               tags$tr(tags$td("入院サーベイランス"), tags$td("毎日 03:00 自動（直近3号分を再取得）"), tags$td("JIHS IDWR週報PDF")),
