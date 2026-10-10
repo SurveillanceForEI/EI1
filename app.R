@@ -105,13 +105,10 @@ EBS_CACHE <- local({
   } else {
     make_demo_ebs()
   }
-  # 非感染症記事をキャッシュから除去（is_noise_article は ebs_rule_screening.R で定義）
-  if (!is.null(d) && nrow(d) > 0) {
-    d <- d %>% dplyr::filter(
-      !mapply(is_noise_article, title, coalesce(summary, ""))
-    )
-  }
-
+  # 非感染症記事の除去（is_noise_article）は、毎晩の更新（auto_update.R の rescreen_ebs_data()）で
+  # キャッシュ全件に適用済みのため、起動時には行わない。起動時に約9,000件へ再適用すると
+  # 起動が約10秒遅くなるうえ、Claude収集CSV由来の記事（洪水・麻しん対策等）まで
+  # 誤ってノイズ判定して落としてしまっていた
   # 旧分類（高/中/低/参考）を新分類（Event/Signal/FYI）に変換
   if (!is.null(d) && "signal_level" %in% names(d)) {
     lv <- as.character(d$signal_level)
