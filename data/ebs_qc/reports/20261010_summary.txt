@@ -1,0 +1,6 @@
+EBS品質確認 20261010（実行 2026-10-10 10:31）
+キャッシュ 9270 → 9176 件（除外適用 94、国内外固定 210、日付修正 1、累積修正リスト全件を再適用）
+今回の判定 661 件: exclude=93 scope_overseas=209 scope_domestic=1 set_date=0 ok=358
+確認対象 703 件中 未判定 2 件
+修正リスト累計 304 件 / 確認済み累計 358 件
+退避: //192.168.132.2/public1/episynq/japan_surveillance/data/ebs_qc/backup/ebs_startup_cache_20261010_1031.rds
