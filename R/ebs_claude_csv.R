@@ -175,6 +175,10 @@ CLAUDE_CSV_DIR_CANDIDATES <- c(
   if (is.null(x) || nrow(x) == 0 || !"タイトル" %in% names(x)) return(NULL)
   col <- function(n) if (n %in% names(x)) as.character(x[[n]]) else rep(NA_character_, nrow(x))
   title <- trimws(col("タイトル"))
+  # タイトル末尾等の「（見出しに基づく）」「（RSS説明文に基づく）」等の作業注記はカードに出さない（2026/10/10 ユーザー指示）
+  title <- trimws(gsub("\\s*[（(](ProMED|RSS)?(見出し|説明文)に基づく[）)]", "",
+                  gsub("（(ProMED|RSS)?(見出し|説明文)に基づく\\s*[、，,]\\s*", "（",
+                  gsub("\\s*[、，,]\\s*(ProMED|RSS)?(見出し|説明文)に基づく", "", title, perl = TRUE), perl = TRUE), perl = TRUE))
   keep <- !is.na(title) & nzchar(title)
   x <- x[keep, , drop = FALSE]; if (nrow(x) == 0) return(NULL)
   title <- title[keep]
