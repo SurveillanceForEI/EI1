@@ -151,6 +151,14 @@ CLAUDE_CSV_DIR_CANDIDATES <- c(
   if (length(u) <= 2) paste(u, collapse = "、") else paste0(paste(u[1:2], collapse = "、"), " ほか", length(u) - 2, "件")
 }
 
+# 「情報源サイト名」列（改行区切り）→ 出典欄ラベル（最大2件＋ほかN件）。空ならNULL
+.cc_site_label <- function(sites_txt) {
+  if (is.na(sites_txt) || !nzchar(trimws(sites_txt))) return(NULL)
+  u <- unique(trimws(strsplit(sites_txt, "\n")[[1]])); u <- u[nzchar(u)]
+  if (!length(u)) return(NULL)
+  if (length(u) <= 2) paste(u, collapse = "、") else paste0(paste(u[1:2], collapse = "、"), " ほか", length(u) - 2, "件")
+}
+
 # WHO地域コード→アプリの地域ラベル（国名で判定できなかった場合のフォールバック）
 .cc_region_from_who <- function(who) {
   m <- c(AFRO = "アフリカ (Africa)", AMRO = "中南米・カリブ (Central & South America/Caribbean)",
@@ -203,7 +211,9 @@ CLAUDE_CSV_DIR_CANDIDATES <- c(
 
   df <- data.frame(
     source_id = ifelse(official, "claude_official", "claude_media"),
-    source_name = vapply(seq_along(title), function(i) .cc_source_label(col("情報源")[i], col("情報源タイトル")[i]), character(1)),
+    # 2026/10/09以降のCSVは27列目「情報源サイト名」（媒体名、URLがない行も必須）を持つので、あればそれを優先する。
+    # Google News RSS等の見出し掲載元リンクの行（2026/10/10〜）も「Google News（NHKニュース）」のように媒体名が出る
+    source_name = vapply(seq_along(title), function(i) { s <- .cc_site_label(col("情報源サイト名")[i]); if (!is.null(s)) s else .cc_source_label(col("情報源")[i], col("情報源タイトル")[i]) }, character(1)),
     category = "収集",
     lang = "ja",
     title = title,
